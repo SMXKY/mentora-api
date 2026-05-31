@@ -5,6 +5,9 @@ if (!process.env.PORT) throw new Error("PORT environment variable not set");
 if (!process.env.FRONTEND_URL)
   throw new Error("FRONTEND_URL environment variable not set");
 
+if (!process.env.CORS_ORIGINS)
+  throw new Error("CORS_ORIGINS environment variable not set");
+
 // Database
 if (!process.env.DATABASE_URL)
   throw new Error("DATABASE_URL environment variable not set");
@@ -164,3 +167,4 @@ export const WALLET_MIN_TOPUP = Number(process.env.WALLET_MIN_TOPUP);
 export const SOCKET_IO_CORS_ORIGIN = process.env.SOCKET_IO_CORS_ORIGIN!;
 export const DEFAULT_PAGE_SIZE = Number(process.env.DEFAULT_PAGE_SIZE);
 export const MAX_PAGE_SIZE = Number(process.env.MAX_PAGE_SIZE);
+export const CORS_ORIGINS = process.env.CORS_ORIGINS;
