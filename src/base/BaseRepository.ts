@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from "../generated/prisma";
-import prisma from "@/config/database.config";
+import prisma from "../config/database.config";
 import { AppError } from "../utils/AppError.util";
 import {
   OffsetFindOptions,

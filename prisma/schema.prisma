@@ -11,3 +11,13 @@ model HealthCheck {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 }
+
+model TestResource {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  status    String   @default("active")
+  notes     String?
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

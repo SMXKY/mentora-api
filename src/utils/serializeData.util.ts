@@ -1,4 +1,4 @@
-import { Prisma } from "src/generated/prisma";
+import { Prisma } from "../generated/prisma";
 
 export function serializeData<T>(data: T): T {
   if (data === null || data === undefined) return data;

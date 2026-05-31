@@ -7,10 +7,22 @@
     "doc": "docs"
   },
   "scripts": {
-    "dev": "nodemon src/index.ts",
+    "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "scaffold": "ts-node cli/scaffold.ts",
+    "docs:build": "ts-node cli/build-docs.ts",
+    "docs:watch": "nodemon --watch src --ext ts --exec npm run docs:build",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "db:reset": "prisma migrate reset",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",
