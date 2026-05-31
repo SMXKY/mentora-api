@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mentora_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mentora_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: mentora_postgres_test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mentora_test
+    ports:
+      - "5433:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: mentora_redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: mentora_pgbouncer
+    environment:
+      DATABASE_URL: postgres://postgres:password@postgres:5432/mentora_dev
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 100
+      DEFAULT_POOL_SIZE: 20
+    ports:
+      - "5434:5432"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  redis_data:

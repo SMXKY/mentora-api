@@ -1,0 +1,13 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+model HealthCheck {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+}
