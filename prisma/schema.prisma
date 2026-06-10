@@ -21,3 +21,3848 @@ model TestResource {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model Role {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  name        String   @unique @db.VarChar(100)
+  description String?
+
+  isSystem    Boolean  @default(false) @map("is_system")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  rolePermissions      RolePermission[]
+  userRoles            UserRole[]
+  storageQuotaDefaults StorageQuotaDefault[]
+
+  @@index([isActive])
+  @@map("roles")
+}
+
+model PermissionModule {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  nameLocaleCode        String   @unique @map("name_locale_code") @db.VarChar(100)
+  descriptionLocaleCode String?  @map("description_locale_code") @db.VarChar(100)
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  submodules  PermissionSubmodule[]
+  permissions Permission[]
+
+  @@map("permission_modules")
+}
+
+model PermissionSubmodule {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nameLocaleCode        String   @unique @map("name_locale_code") @db.VarChar(100)
+  descriptionLocaleCode String?  @map("description_locale_code") @db.VarChar(100)
+  permissionModuleId    String   @map("permission_module_id") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  permissionModule PermissionModule @relation(fields: [permissionModuleId], references: [id])
+  permissions      Permission[]
+
+  @@index([permissionModuleId])
+  @@map("permission_submodules")
+}
+
+model Permission {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  code                  String   @unique @db.VarChar(100)
+
+  nameLocaleCode        String   @unique @map("name_locale_code") @db.VarChar(100)
+  descriptionLocaleCode String?  @map("description_locale_code") @db.VarChar(100)
+
+  isSystem              Boolean  @default(false) @map("is_system")
+  permissionModuleId    String   @map("permission_module_id") @db.Uuid
+  permissionSubmoduleId String?  @map("permission_submodule_id") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  permissionModule    PermissionModule     @relation(fields: [permissionModuleId], references: [id])
+  permissionSubmodule PermissionSubmodule? @relation(fields: [permissionSubmoduleId], references: [id])
+  rolePermissions     RolePermission[]
+  overrides           PermissionOverride[]
+
+  implies             PermissionImplication[] @relation("ImplicationSource")
+
+  impliedBy           PermissionImplication[] @relation("ImplicationTarget")
+
+  @@index([permissionModuleId])
+  @@index([permissionSubmoduleId])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  createdById  String   @map("created_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+  createdBy  User       @relation("RolePermissionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([roleId, permissionId], map: "unique_role_permission")
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  roleId      String    @map("role_id") @db.Uuid
+  isActive    Boolean   @default(true) @map("is_active")
+  
+  expiresAt   DateTime? @map("expires_at")
+  createdById String    @map("created_by") @db.Uuid
+  reason      String?   @db.VarChar(255)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user      User @relation("UserRoleUser", fields: [userId], references: [id])
+  role      Role @relation(fields: [roleId], references: [id])
+  createdBy User @relation("UserRoleCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([userId, roleId], map: "unique_user_role")
+  @@index([userId])
+  @@index([roleId])
+  @@index([userId, roleId, isActive], map: "idx_user_role_active_lookup")
+  @@index([expiresAt])
+  @@index([isActive])
+  @@map("user_roles")
+}
+
+enum GrantType {
+  GRANT
+  REVOKE
+}
+
+model PermissionOverride {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  permissionId String    @map("permission_id") @db.Uuid
+  grantType    GrantType @map("grant_type")
+ 
+  expiresAt    DateTime? @map("expires_at")
+  createdById  String    @map("created_by") @db.Uuid
+  reason       String?   @db.VarChar(255)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user       User       @relation("PermissionOverrideUser", fields: [userId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+  createdBy  User       @relation("PermissionOverrideCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([userId, permissionId], map: "unique_user_permission_override")
+  @@index([userId])
+  @@index([permissionId])
+  @@index([expiresAt])
+  @@index([grantType])
+  @@map("permission_overrides")
+}
+
+model PermissionImplication {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  permissionId        String   @map("permission_id") @db.Uuid
+  impliedPermissionId String   @map("implied_permission_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  permission        Permission @relation("ImplicationSource", fields: [permissionId], references: [id])
+  impliedPermission Permission @relation("ImplicationTarget", fields: [impliedPermissionId], references: [id])
+
+  @@unique([permissionId, impliedPermissionId], map: "unique_permission_implication")
+  @@index([permissionId])
+  @@index([impliedPermissionId])
+  @@map("permission_implications")
+}
+
+model IpBlock {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ipAddress   String    @map("ip_address") @db.VarChar(45)
+  ipRange     String?   @map("ip_range") @db.VarChar(50)
+  reason      String
+  blockedById String    @map("blocked_by") @db.Uuid
+  isActive    Boolean   @default(true) @map("is_active")
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  blockedBy User @relation("IpBlockBlockedBy", fields: [blockedById], references: [id])
+
+  @@index([ipAddress])
+  @@index([isActive])
+  @@index([expiresAt])
+  @@index([ipAddress, isActive], map: "idx_ip_blocks_lookup")
+  @@map("ip_blocks")
+}
+
+enum LogOperation {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  RESTORE
+  SUSPEND
+  UNSUSPEND
+  BAN
+  APPROVE
+  REJECT
+  RELEASE
+  REFUND
+  TRANSFER
+  AUTH
+  FORGOT_PASSWORD
+  RESET_PASSWORD
+  CHANGE_PASSWORD
+  CHANGE_USER_CREDENTIALS
+}
+
+enum LogCategory {
+  WRITE
+  READ
+  SENSITIVE_READ
+  AUTH
+}
+
+enum LogStatus {
+  SUCCESS
+  FAILED
+}
+
+model AuditLog {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId       String?      @map("actor_id") @db.Uuid
+  actorEmail    String?      @map("actor_email") @db.VarChar(255)
+  actorRole     String?      @map("actor_role") @db.VarChar(50)
+  eventType     String       @map("event_type") @db.VarChar(100)
+  operation     LogOperation
+  category      LogCategory
+  status        LogStatus    @default(SUCCESS)
+  failureReason String?      @map("failure_reason")
+  tableName     String       @map("table_name") @db.VarChar(100)
+  targetId      String?      @map("target_id") @db.VarChar(255)
+  targetType    String?      @map("target_type") @db.VarChar(100)
+  previousState Json?        @map("previous_state")
+  newState      Json?        @map("new_state")
+  changedFields String[]     @map("changed_fields")
+  ipAddress     String?      @map("ip_address") @db.VarChar(45)
+  userAgent     String?      @map("user_agent")
+  requestId     String?      @map("request_id") @db.Uuid
+  metadata      Json?
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  actor User? @relation("AuditLogActor", fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([eventType])
+  @@index([operation])
+  @@index([tableName])
+  @@index([targetId])
+  @@index([targetType])
+  @@index([createdAt])
+  @@index([status])
+  @@index([actorId, createdAt], map: "idx_audit_actor_time")
+  @@index([targetId, eventType], map: "idx_audit_target_event")
+  @@index([tableName, operation], map: "idx_audit_table_operation")
+  @@map("audit_logs")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  DEACTIVATED
+  BANNED
+}
+
+enum UserGender {
+  MALE
+  FEMALE
+  PREFER_NOT_TO_SAY
+}
+
+enum PaymentAccountType {
+  MTN_MOMO
+  ORANGE_MONEY
+}
+
+enum SuspensionType {
+  SUSPENSION
+  BAN
+}
+
+enum PlatformTokenType {
+  WHATSAPP_VERIFICATION
+  INVITE_LINK
+}
+
+enum Languages{
+  EN
+  FR
+}
+
+model User {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+ 
+  clerkId        String  @unique @map("clerk_id") @db.VarChar(255)
+  googleAuthId   String? @unique @map("google_auth_id") @db.VarChar(255)
+  facebookAuthId String? @unique @map("facebook_auth_id") @db.VarChar(255)
+
+  firstName       String? @map("first_name") @db.VarChar(100)
+  lastName        String? @map("last_name") @db.VarChar(155)
+  username        String? @unique @db.VarChar(100)
+  email           String  @unique @db.VarChar(255)
+  isEmailVerified Boolean @default(false) @map("is_email_verified")
+
+
+  phoneNumber     String?   @map("phone_number") @db.VarChar(20)
+  
+  whatsappNumber  String?   @map("whatsapp_number") @db.VarChar(20)
+  whatsappOptIn   Boolean   @default(false) @map("whatsapp_opt_in")
+  whatsappOptInAt DateTime? @map("whatsapp_opt_in_at")
+
+  dob               DateTime?  @db.Date
+  gender            UserGender @default(PREFER_NOT_TO_SAY)
+  profilePictureUrl String?    @map("profile_picture_url") @db.VarChar(500)
+  address           String?    @db.VarChar(500)
+  
+  preferredLanguage Languages     @default(EN) @map("preferred_language")
+
+  notificationsMuted Boolean @default(false) @map("notifications_muted")
+
+  status            UserStatus @default(ACTIVE)
+  isSystem          Boolean    @default(false) @map("is_system")
+  isAccountComplete Boolean    @default(false) @map("is_account_complete")
+
+  lastLoggedInAt DateTime? @map("last_logged_in_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+ 
+  rolePermissionsCreated     RolePermission[]     @relation("RolePermissionCreatedBy")
+  userRoles                  UserRole[]           @relation("UserRoleUser")
+  userRolesCreated           UserRole[]           @relation("UserRoleCreatedBy")
+  permissionOverrides        PermissionOverride[] @relation("PermissionOverrideUser")
+  permissionOverridesCreated PermissionOverride[] @relation("PermissionOverrideCreatedBy")
+ 
+  ipBlocksCreated IpBlock[]  @relation("IpBlockBlockedBy")
+  auditLogs       AuditLog[] @relation("AuditLogActor")
+
+  devices             UserDevice[]
+  sessions            UserSession[]       @relation("UserSessionUser")
+  sessionsTerminated  UserSession[]       @relation("UserSessionTerminatedBy")
+  platformTokens      PlatformToken[]
+  paymentAccounts     PaymentAccount[]
+  suspensions         AccountSuspension[] @relation("AccountSuspensionUser")
+  suspensionsLifted   AccountSuspension[] @relation("AccountSuspensionLiftedBy")
+  suspensionsCreated  AccountSuspension[] @relation("AccountSuspensionCreatedBy")
+  studentProfiles     StudentProfile[]
+
+  tutorProfile               TutorProfile?
+  relationshipWeightsSet     SubjectRelationshipWeight[]
+  credentialsReviewed        TutorCredential[]
+  tutorSubjectsApproved      TutorSubject[]
+  
+  filesUploaded         File[]
+  quotaDefaultsCreated  StorageQuotaDefault[]
+  quotaOverride         StorageQuotaOverride? @relation("QuotaOverrideUser")
+  quotaOverridesGranted StorageQuotaOverride[] @relation("QuotaOverrideGrantedBy")
+  storageUsage          StorageUsage?
+  
+  materialAccess          MaterialAccess[]
+  materialReviewsActioned MaterialReview[] @relation("MaterialReviewReviewedBy")
+  materialReviewsAgainst  MaterialReview[] @relation("MaterialReviewTutor")
+  materialReviewsReported MaterialReview[] @relation("MaterialReviewReportedBy")
+ 
+  kycStatusChanges        KycStatusHistory[]
+  kycChecklistSubmissions KycChecklistSubmission[]
+  kycBansIssued           KycBan[]
+  
+  demandSignals DemandSignal[]
+  
+  bookingSeries          BookingSeries[]
+  bookings               Booking[]                 @relation("BookingBooker")
+  bookingsCancelled      Booking[]                 @relation("BookingCancelledBy")
+  groupParticipations    GroupSessionParticipant[]
+  rescheduleRequests     RescheduleRequest[]       @relation("RescheduleRequestedBy")
+  rescheduleResponses    RescheduleRequest[]       @relation("RescheduleRespondedBy")
+ 
+  notifications          Notification[]
+  scheduledNotifications ScheduledNotification[]
+  notificationPrefs      NotificationPreference[]
+  pushTokens             PushToken[]
+
+  wallet                   Wallet?
+  escrowHoldsPaid          EscrowHold[]            @relation("EscrowPayer")
+  escrowHoldsReceiving     EscrowHold[]            @relation("EscrowTutor")
+  ledgerEntriesFrom        TransactionLedger[]     @relation("LedgerFromUser")
+  ledgerEntriesTo          TransactionLedger[]     @relation("LedgerToUser")
+  ledgerAdjustments        TransactionLedger[]     @relation("LedgerPerformedBy")
+  payoutQueueEntries       PayoutQueue[]
+  idempotencyKeys          IdempotencyKey[]
+  paymentReconciliations   PaymentReconciliation[]
+  transactionIssues        TransactionIssue[]      @relation("TransactionIssueUser")
+  transactionIssuesResolved TransactionIssue[]     @relation("TransactionIssueResolvedBy")
+  receipts                 Receipt[]
+ 
+  sessionParticipations    SessionParticipant[]
+  participantEvents        ParticipantEvent[]       @relation("ParticipantEventUser")
+  participantEventsActioned ParticipantEvent[]      @relation("ParticipantEventActionedBy")
+  connectionQualityEvents  ConnectionQualityEvent[]
+
+  conversationsFrozen        Conversation[]            @relation("ConversationFrozenBy")
+  conversationParticipations ConversationParticipant[] @relation("ConvParticipantUser")
+  conversationMembersAdded   ConversationParticipant[] @relation("ConvParticipantAddedBy")
+  conversationMembersRemoved ConversationParticipant[] @relation("ConvParticipantRemovedBy")
+  messagesSent               Message[]                 @relation("MessageSender")
+  messagesDeleted            Message[]                 @relation("MessageDeletedBy")
+  messageReadReceipts        MessageReadReceipt[]
+  filterBlocks               FilterBlock[]
+  moderationReportsFiled     ModerationReview[]        @relation("ModerationReportedBy")
+  moderationReviewsDone      ModerationReview[]        @relation("ModerationReviewedBy")
+  sessionChatMessages        SessionChatMessage[]      @relation("SessionChatSender")
+  sessionChatMessagesDeleted SessionChatMessage[]      @relation("SessionChatDeletedBy")
+  filterKeywordsAdded        FilterKeyword[]
+  
+  lessonConfirmations    LessonConfirmation[]
+  disputesOpened         Dispute[]              @relation("DisputeOpenedBy")
+  disputesAssigned       Dispute[]              @relation("DisputeAssignedTo")
+  disputesResolved       Dispute[]              @relation("DisputeResolvedBy")
+  disputeEvidenceUploads DisputeEvidenceFile[]
+  incidentReportsFiled   IncidentReport[]       @relation("IncidentReportedBy")
+  incidentReportsAgainst IncidentReport[]       @relation("IncidentReportedAgainst")
+  incidentReportsReviewed IncidentReport[]      @relation("IncidentReviewedBy")
+
+  reviewWindowsReopened ReviewWindow[]
+  reviewsAuthored       Review[]             @relation("ReviewAuthor")
+  reviewsReceived       Review[]             @relation("ReviewSubject")
+  reviewsDeleted        Review[]             @relation("ReviewDeletedBy")
+  ratingSnapshot        TutorRatingSnapshot?
+  reviewReportsFiled    ReviewReport[]       @relation("ReviewReportReportedBy")
+  reviewReportsReviewed ReviewReport[]       @relation("ReviewReportReviewedBy")
+  reviewFraudSignals    ReviewFraudSignal[]
+ 
+  riskScore             RiskScore?         @relation("RiskScoreUser")
+  riskReviewsCompleted  RiskScore[]        @relation("RiskScoreReviewedBy")
+  riskSignals           RiskSignal[]       @relation("RiskSignalUser")
+  riskAdjustmentsMade   RiskSignal[]       @relation("RiskSignalPerformedBy")
+  riskStateHistory      RiskStateHistory[] @relation("RiskStateUser")
+  riskStatesCleared     RiskStateHistory[] @relation("RiskStateClearedBy")
+  reauthChallenges      ReauthChallenge[]
+  fingerprintEntries    DeviceFingerprintRegistry[]
+ 
+  deadLetterJobs          DeadLetterJob[]       @relation("DlqUser")
+  deadLetterJobsRetried   DeadLetterJob[]       @relation("DlqRetriedBy")
+  deadLetterJobsDismissed DeadLetterJob[]       @relation("DlqDismissedBy")
+  ticketsSubmitted        SupportTicket[]       @relation("TicketSubmittedBy")
+  ticketsAssigned         SupportTicket[]       @relation("TicketAssignedTo")
+  ticketsEscalatedTo      SupportTicket[]       @relation("TicketEscalatedTo")
+  ticketsResolved         SupportTicket[]       @relation("TicketResolvedBy")
+  ticketMessages          TicketMessage[]
+  ticketAttachments       TicketAttachment[]
+  ticketStatusChanges     TicketStatusHistory[]
+  payoutRetriesInitiated  FailedPayoutContext[]
+  reconciliationsResolved ReconciliationContext[]
+
+  scheduledReportsCreated ScheduledReport[]
+  generatedReports        GeneratedReport[]
+  heartbeatJobsDisabled   JobHeartbeatRegistry[]
+  learningSnapshots       LearningAnalyticsSnapshot[]
+  platformConfigsUpdated  PlatformConfig[]
+  monthlyFeeCharges       MonthlyFeeCharge[]
+
+  @@index([status])
+  @@index([isAccountComplete])
+  @@index([email, status], map: "idx_users_email_status")
+  @@index([firstName, lastName], map: "idx_users_name")
+  @@map("users")
+}
+
+model UserDevice {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+ 
+  deviceFingerprintHash String    @map("device_fingerprint_hash") @db.VarChar(255)
+  ipAddress             String?   @map("ip_address") @db.VarChar(45)
+  os                    String?   @db.VarChar(100)
+  browser               String?   @db.VarChar(100)
+  browserVersion        String?   @map("browser_version") @db.VarChar(50)
+ 
+  deviceType            String?   @map("device_type") @db.VarChar(50)
+  lastSeenAt            DateTime? @map("last_seen_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user       User          @relation(fields: [userId], references: [id])
+  sessions   UserSession[]
+  pushTokens PushToken[]
+
+  @@index([userId])
+  @@index([deviceFingerprintHash])
+  @@index([userId, deviceFingerprintHash], map: "idx_user_device_fingerprint")
+  @@map("user_devices")
+}
+
+model UserSession {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  deviceId       String    @map("device_id") @db.Uuid
+  isActive       Boolean   @default(true) @map("is_active")
+  expiresAt      DateTime  @map("expires_at")
+  lastActiveAt   DateTime? @map("last_active_at")
+  terminatedAt   DateTime? @map("terminated_at")
+  terminatedById String?   @map("terminated_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user         User       @relation("UserSessionUser", fields: [userId], references: [id])
+  device       UserDevice @relation(fields: [deviceId], references: [id])
+  terminatedBy User?      @relation("UserSessionTerminatedBy", fields: [terminatedById], references: [id])
+
+  @@index([userId])
+  @@index([deviceId])
+  @@index([isActive])
+  @@index([expiresAt])
+  @@index([userId, isActive], map: "idx_sessions_user_active")
+  @@map("user_sessions")
+}
+
+model PlatformToken {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String            @map("user_id") @db.Uuid
+  tokenHash     String            @unique @map("token_hash") @db.VarChar(255)
+  tokenType     PlatformTokenType @map("token_type")
+  expiresAt     DateTime          @map("expires_at")
+  usedAt        DateTime?         @map("used_at")
+  attemptCount  Int               @default(0) @map("attempt_count")
+  invalidatedAt DateTime?         @map("invalidated_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([tokenType])
+  @@index([expiresAt])
+  @@index([userId, tokenType], map: "idx_tokens_user_type")
+  @@map("platform_tokens")
+}
+
+model PaymentAccount {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String             @map("user_id") @db.Uuid
+  phoneNumber    String             @map("phone_number") @db.VarChar(20)
+  accountType    PaymentAccountType @map("account_type")
+  isVerified     Boolean            @default(false) @map("is_verified")
+  isPrimary      Boolean            @default(false) @map("is_primary")
+ 
+  coolingOffUntil DateTime?         @map("cooling_off_until")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+  deletedAt      DateTime?          @map("deleted_at")
+
+  user         User          @relation(fields: [userId], references: [id])
+  payoutQueues PayoutQueue[]
+
+  @@unique([userId, phoneNumber, accountType], map: "idx_payment_account_unique")
+  @@index([userId])
+  @@index([accountType])
+  @@index([isVerified])
+  @@index([coolingOffUntil])
+  @@map("payment_accounts")
+}
+
+model AccountSuspension {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  suspensionType SuspensionType @default(SUSPENSION) @map("suspension_type")
+  reason         String
+  expiresAt      DateTime?      @map("expires_at")
+  liftedAt       DateTime?      @map("lifted_at")
+  liftedById     String?        @map("lifted_by") @db.Uuid
+  createdById    String         @map("created_by") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  user      User  @relation("AccountSuspensionUser", fields: [userId], references: [id])
+  liftedBy  User? @relation("AccountSuspensionLiftedBy", fields: [liftedById], references: [id])
+  createdBy User  @relation("AccountSuspensionCreatedBy", fields: [createdById], references: [id])
+
+  @@index([userId])
+  @@index([suspensionType])
+  @@index([liftedAt])
+  @@index([expiresAt])
+  @@index([userId, liftedAt], map: "idx_suspensions_active")
+  @@map("account_suspensions")
+}
+
+enum KycStatus {
+  INCOMPLETE
+  PENDING
+  IDENTITY_APPROVED
+  ACTIVE
+  REJECTED
+  SUSPENDED
+  BANNED
+  PENDING_REVERIFICATION
+}
+
+enum QualificationType {
+  BSC
+  MSC
+  PHD
+  PGDE
+  TEACHING_CERTIFICATE
+  PROFESSIONAL_CERTIFICATION
+  HND
+  GCE_A_LEVEL
+  GCE_O_LEVEL
+  OTHER
+}
+
+enum CredentialStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SubjectVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TeachingMode {
+  ONLINE_ONLY
+  HOME_ONLY
+  BOTH
+}
+
+enum AvailabilitySlotType {
+  RECURRING
+  SPECIFIC_DATE
+}
+
+enum AvailabilityDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum SchoolType {
+  PRIMARY
+  SECONDARY
+  GCE
+  UNIVERSITY
+  OTHER
+}
+
+enum PreferredSessionMode {
+  ONLINE
+  HOME
+  BOTH
+}
+
+model Region {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  countryCode String   @default("CM") @map("country_code") @db.VarChar(5)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  cities          City[]
+  kycApplications KycApplication[]
+
+  @@index([countryCode])
+  @@index([isActive])
+  @@map("regions")
+}
+
+model City {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String   @db.VarChar(100)
+  regionId      String   @map("region_id") @db.Uuid
+  isActive      Boolean  @default(true) @map("is_active")
+
+  isInAllowlist Boolean  @default(false) @map("is_in_allowlist")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  region          Region           @relation(fields: [regionId], references: [id])
+  tutorProfiles   TutorProfile[]
+  kycApplications KycApplication[]
+  demandSignals   DemandSignal[]
+
+  @@unique([name, regionId], map: "idx_city_name_region")
+  @@index([regionId])
+  @@index([isActive])
+  @@index([isInAllowlist])
+  @@map("cities")
+}
+
+model SubjectDomain {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique @db.VarChar(100)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  subjects Subject[]
+
+  @@index([isActive])
+  @@map("subject_domains")
+}
+
+model Subject {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(100)
+  domainId  String   @map("domain_id") @db.Uuid
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  domain                  SubjectDomain               @relation(fields: [domainId], references: [id])
+  relationshipWeights     SubjectRelationshipWeight[]
+  credentialLinks         CredentialSubjectLink[]
+  tutorSubjects           TutorSubject[]
+  studentProfileSubjects  StudentProfileSubject[]
+  collections             Collection[]
+  demandSignals           DemandSignal[]
+  bookingSeries           BookingSeries[]
+  bookings                Booking[]
+  groupSessions           GroupSession[]
+  learningSnapshots       LearningAnalyticsSnapshot[]
+
+  @@unique([name, domainId], map: "idx_subject_name_domain")
+  @@index([domainId])
+  @@index([isActive])
+  @@map("subjects")
+}
+
+model SubjectRelationshipWeight {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  qualificationType QualificationType @map("qualification_type")
+  fieldOfStudy      String            @map("field_of_study") @db.VarChar(255)
+  subjectId         String            @map("subject_id") @db.Uuid
+  confidenceWeight  Int               @map("confidence_weight")
+  setById           String            @map("set_by") @db.Uuid
+  setAt             DateTime          @default(now()) @map("set_at")
+  createdAt         DateTime          @default(now()) @map("created_at")
+
+  subject Subject @relation(fields: [subjectId], references: [id])
+  setBy   User    @relation(fields: [setById], references: [id])
+
+  @@unique([qualificationType, fieldOfStudy, subjectId], map: "idx_relationship_weight_unique")
+  @@index([subjectId])
+  @@index([qualificationType])
+  @@map("subject_relationship_weights")
+}
+
+model Level {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String     @unique @db.VarChar(100)
+  schoolType SchoolType @map("school_type")
+  orderIndex Int        @map("order_index")
+  isActive   Boolean    @default(true) @map("is_active")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  collections     Collection[]
+  studentProfiles StudentProfile[]
+  bookingSeries   BookingSeries[]
+  bookings        Booking[]
+  groupSessions   GroupSession[]
+
+  @@unique([name, schoolType], map: "idx_level_name_school_type")
+  @@index([schoolType])
+  @@index([isActive])
+  @@index([orderIndex])
+  @@map("levels")
+}
+
+model TutorProfile {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String       @unique @map("user_id") @db.Uuid
+  bio               String
+  yearsOfExperience Int          @default(0) @map("years_of_experience")
+  teachingMode      TeachingMode @default(ONLINE_ONLY) @map("teaching_mode")
+  languages         Languages[]     @default([EN])
+  introVideoUrl     String?      @map("intro_video_url") @db.VarChar(500)
+  cvUrl             String?      @map("cv_url") @db.VarChar(500)
+  profilePictureUrl String?      @map("profile_picture_url") @db.VarChar(500)
+  cityId            String       @map("city_id") @db.Uuid
+  neighbourhood     String?      @db.VarChar(255)
+  exactAddress      String?      @map("exact_address") @db.VarChar(500)
+ 
+  kycStatus          KycStatus @default(INCOMPLETE) @map("kyc_status")
+  kycSubmittedAt     DateTime? @map("kyc_submitted_at")
+  kycApprovedAt      DateTime? @map("kyc_approved_at")
+  kycRejectedAt      DateTime? @map("kyc_rejected_at")
+  kycRejectionReason String?   @map("kyc_rejection_reason")
+
+  isPaymentOverdue Boolean @default(false) @map("is_payment_overdue")
+
+  responseRate   Int?     @map("response_rate")
+  compositeScore Decimal? @map("composite_score")
+
+  completedSessionsCount Int       @default(0) @map("completed_sessions_count")
+  minRateXaf             Int?      @map("min_rate_xaf")
+  maxRateXaf             Int?      @map("max_rate_xaf")
+ 
+  newTutorBoostExpiresAt DateTime? @map("new_tutor_boost_expires_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user              User                @relation(fields: [userId], references: [id])
+  city              City                @relation(fields: [cityId], references: [id])
+  credentials       TutorCredential[]
+  tutorSubjects     TutorSubject[]
+  availabilitySlots AvailabilitySlot[]
+  collections       Collection[]
+  lessonPlans       LessonPlan[]
+  kycApplications   KycApplication[]
+  kycStatusHistory  KycStatusHistory[]
+  kycBan            KycBan?
+  bookingSeries     BookingSeries[]
+  bookings          Booking[]
+  groupSessions     GroupSession[]
+  monthlyFeeCharges MonthlyFeeCharge[]
+
+  @@index([kycStatus])
+  @@index([cityId])
+  @@index([compositeScore])
+  @@index([isPaymentOverdue])
+  @@index([newTutorBoostExpiresAt])
+  @@index([kycStatus, cityId], map: "idx_tutor_kyc_city")
+  @@index([kycStatus, isPaymentOverdue, cityId], map: "idx_tutor_searchable")
+  @@map("tutor_profiles")
+}
+
+model TutorCredential {
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorProfileId        String            @map("tutor_profile_id") @db.Uuid
+  institutionName       String            @map("institution_name") @db.VarChar(255)
+  qualificationType     QualificationType @map("qualification_type")
+  fieldOfStudy          String            @map("field_of_study") @db.VarChar(255)
+  gradeOrClassification String?           @map("grade_or_classification") @db.VarChar(100)
+  yearAwarded           Int               @map("year_awarded")
+  documentUrl           String            @map("document_url") @db.VarChar(500)
+  status          CredentialStatus @default(PENDING)
+  reviewedById    String?          @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime?        @map("reviewed_at")
+  rejectionReason String?          @map("rejection_reason")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  tutorProfile TutorProfile            @relation(fields: [tutorProfileId], references: [id])
+  reviewedBy   User?                   @relation(fields: [reviewedById], references: [id])
+  subjectLinks CredentialSubjectLink[]
+
+  @@index([tutorProfileId])
+  @@index([status])
+  @@index([qualificationType])
+  @@map("tutor_credentials")
+}
+
+model CredentialSubjectLink {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  credentialId String   @map("credential_id") @db.Uuid
+  subjectId    String   @map("subject_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  credential TutorCredential @relation(fields: [credentialId], references: [id])
+  subject    Subject         @relation(fields: [subjectId], references: [id])
+
+  @@unique([credentialId, subjectId], map: "idx_credential_subject_unique")
+  @@index([credentialId])
+  @@index([subjectId])
+  @@map("credential_subject_links")
+}
+
+model TutorSubject {
+  id                    String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorProfileId        String                    @map("tutor_profile_id") @db.Uuid
+  subjectId             String                    @map("subject_id") @db.Uuid
+  status                SubjectVerificationStatus @default(PENDING)
+  confidenceScore       Int?                      @map("confidence_score")
+  confidenceExplanation String?                   @map("confidence_explanation")
+  approvedById          String?                   @map("approved_by") @db.Uuid
+  approvedAt            DateTime?                 @map("approved_at")
+  rejectedReason        String?                   @map("rejected_reason")
+
+  ratePerOnlineSessionXaf Int? @map("rate_per_online_session_xaf")
+  ratePerHomeSessionXaf   Int? @map("rate_per_home_session_xaf")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  tutorProfile TutorProfile @relation(fields: [tutorProfileId], references: [id])
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+  approvedBy   User?        @relation(fields: [approvedById], references: [id])
+
+  @@unique([tutorProfileId, subjectId], map: "idx_tutor_subject_unique")
+  @@index([tutorProfileId])
+  @@index([subjectId])
+  @@index([status])
+  @@index([tutorProfileId, status], map: "idx_tutor_subject_status")
+  @@map("tutor_subjects")
+}
+
+model AvailabilitySlot {
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorProfileId String               @map("tutor_profile_id") @db.Uuid
+  slotType       AvailabilitySlotType @map("slot_type")
+  dayOfWeek      AvailabilityDay?     @map("day_of_week")
+  startTime      DateTime             @map("start_time") @db.Time()
+  endTime        DateTime             @map("end_time") @db.Time()
+  specificDate   DateTime?            @map("specific_date") @db.Date
+ 
+  bufferMinutes  Int                  @default(30) @map("buffer_minutes")
+  isActive       Boolean              @default(true) @map("is_active")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  tutorProfile TutorProfile @relation(fields: [tutorProfileId], references: [id])
+
+  @@index([tutorProfileId])
+  @@index([slotType])
+  @@index([isActive])
+  @@index([dayOfWeek])
+  @@index([specificDate])
+  @@map("availability_slots")
+}
+
+model StudentProfile {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  firstName String   @map("first_name") @db.VarChar(100)
+  dob       DateTime? @db.Date
+  levelId    String?     @map("level_id") @db.Uuid
+  schoolType SchoolType? @map("school_type")
+  examOrGoal String?     @map("exam_or_goal") @db.VarChar(255)
+  preferredMode     PreferredSessionMode? @map("preferred_mode")
+  preferredLanguage Languages?               @map("preferred_language")
+  
+  specialNotes      String?               @map("special_notes")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  deletedAt         DateTime?             @map("deleted_at")
+
+  user                User                      @relation(fields: [userId], references: [id])
+  level               Level?                    @relation(fields: [levelId], references: [id])
+  subjects            StudentProfileSubject[]
+  bookings            Booking[]
+  groupParticipations GroupSessionParticipant[]
+  learningSnapshots   LearningAnalyticsSnapshot[]
+
+  @@index([userId])
+  @@index([schoolType])
+  @@index([levelId])
+  @@map("student_profiles")
+}
+
+model StudentProfileSubject {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentProfileId String   @map("student_profile_id") @db.Uuid
+  subjectId        String   @map("subject_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  studentProfile StudentProfile @relation(fields: [studentProfileId], references: [id])
+  subject        Subject        @relation(fields: [subjectId], references: [id])
+
+  @@unique([studentProfileId, subjectId], map: "idx_student_subject_unique")
+  @@index([studentProfileId])
+  @@index([subjectId])
+  @@map("student_profile_subjects")
+}
+
+enum FileProcessingStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+  QUARANTINED
+}
+
+enum FileType {
+  VIDEO
+  AUDIO
+  DOCUMENT
+  IMAGE
+}
+
+enum FileCategory {
+  PROFILE_PHOTO
+  INTRO_VIDEO
+  KYC_DOCUMENT
+  LESSON_NOTE
+  LESSON_AUDIO
+  LESSON_VIDEO
+  SESSION_RECORDING
+  WHITEBOARD_EXPORT
+  RECEIPT
+  DISPUTE_EVIDENCE
+  MESSAGE_ATTACHMENT
+}
+
+enum FileUploadType {
+  SERVER_SIDE
+  PRESIGNED
+}
+
+model File {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  uploadedById String @map("uploaded_by") @db.Uuid
+  refTable    String? @map("ref_table") @db.VarChar(100)
+  refRecordId String? @map("ref_record_id") @db.Uuid
+  originalFileName String @map("original_file_name") @db.VarChar(255)
+
+  storagePath      String @map("storage_path") @db.VarChar(500)
+  fileCategory     FileCategory @map("file_category")
+  fileType         FileType     @map("file_type")
+  mimeType         String       @map("mime_type") @db.VarChar(100)
+  fileSizeBytes    BigInt       @map("file_size_bytes")
+  uploadType       FileUploadType @map("upload_type")
+  status                FileProcessingStatus @default(PENDING)
+  processingStartedAt   DateTime?            @map("processing_started_at")
+  processingCompletedAt DateTime?            @map("processing_completed_at")
+  processingError       String?              @map("processing_error")
+  
+  scanResult      String?   @map("scan_result") @db.VarChar(50)
+  scanCompletedAt DateTime? @map("scan_completed_at")
+  isDisputeLocked Boolean   @default(false) @map("is_dispute_locked")
+  deletedAt       DateTime? @map("deleted_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  uploadedBy User          @relation(fields: [uploadedById], references: [id])
+  variants   FileVariant[]
+  materials  Material[]
+  
+  kycFrontPhotos  KycApplication[] @relation("KycCniFront")
+  kycBackPhotos   KycApplication[] @relation("KycCniBack")
+  kycSelfiePhotos KycApplication[] @relation("KycSelfie")
+
+  whiteboardRooms LiveRoom[] @relation("RoomWhiteboardFile")
+  recordingRooms  LiveRoom[] @relation("RoomRecordingFile")
+  
+  disputeEvidence   DisputeEvidenceFile[]
+  ticketAttachments TicketAttachment[]
+  generatedReports  GeneratedReport[]
+  receipts          Receipt[]
+
+  @@index([uploadedById])
+  @@index([fileCategory])
+  @@index([fileType])
+  @@index([status])
+  @@index([refTable])
+  @@index([refRecordId])
+  @@index([refTable, refRecordId], map: "idx_files_polymorphic")
+  @@index([uploadedById, fileCategory], map: "idx_files_owner_category")
+  @@index([deletedAt])
+  @@index([isDisputeLocked])
+  @@map("files")
+}
+
+enum FileVariantType {
+  VIDEO_720P
+  VIDEO_360P
+  /// 800x800 max profile photo
+  IMAGE_RESIZED
+  IMAGE_THUMBNAIL
+}
+
+model FileVariant {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fileId      String          @map("file_id") @db.Uuid
+  variant     FileVariantType
+  storagePath String          @map("storage_path") @db.VarChar(500)
+  fileSizeBytes BigInt        @map("file_size_bytes")
+  width       Int?
+  height      Int?
+  bitrateKbps Int?            @map("bitrate_kbps")
+  status          FileProcessingStatus @default(PENDING)
+  processingError String?              @map("processing_error")
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, variant], map: "idx_file_variant_unique")
+  @@index([fileId])
+  @@index([variant])
+  @@index([status])
+  @@map("file_variants")
+}
+
+enum QuotaOverrideSource {
+  ADMIN_GRANT
+  PAID_PLAN
+}
+
+model StorageQuotaDefault {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roleId          String   @unique @map("role_id") @db.Uuid
+  quotaLimitBytes BigInt   @map("quota_limit_bytes")
+  createdById     String   @map("created_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  role      Role @relation(fields: [roleId], references: [id])
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  @@map("storage_quota_defaults")
+}
+
+model StorageQuotaOverride {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String              @unique @map("user_id") @db.Uuid
+  quotaLimitBytes BigInt              @map("quota_limit_bytes")
+  source          QuotaOverrideSource @default(ADMIN_GRANT)
+  grantedById     String              @map("granted_by") @db.Uuid
+  reason          String?
+  expiresAt       DateTime?           @map("expires_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  user      User @relation("QuotaOverrideUser", fields: [userId], references: [id])
+  grantedBy User @relation("QuotaOverrideGrantedBy", fields: [grantedById], references: [id])
+
+  @@index([source])
+  @@index([expiresAt])
+  @@map("storage_quota_overrides")
+}
+
+model StorageUsage {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String   @unique @map("user_id") @db.Uuid
+  usedBytes     BigInt   @default(0) @map("used_bytes")
+  lastUpdatedAt DateTime @default(now()) @map("last_updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("storage_usage")
+}
+
+enum MaterialType {
+  VIDEO
+  AUDIO
+  DOCUMENT
+  IMAGE
+  WRITTEN_NOTE
+}
+
+enum MaterialReviewDecision {
+  WARNING
+  SUSPENDED
+  REMOVED
+  REINSTATED
+  FIX_ISSUE
+}
+
+model Collection {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorProfileId String  @map("tutor_profile_id") @db.Uuid
+  subjectId      String  @map("subject_id") @db.Uuid
+  levelId        String  @map("level_id") @db.Uuid
+  name           String  @db.VarChar(255)
+  description    String?
+  isPublished    Boolean @default(false) @map("is_published")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  tutorProfile TutorProfile     @relation(fields: [tutorProfileId], references: [id])
+  subject      Subject          @relation(fields: [subjectId], references: [id])
+  level        Level            @relation(fields: [levelId], references: [id])
+  sections     Section[]
+  materials    Material[]
+  lessonPlan   LessonPlan?
+  accessGrants MaterialAccess[]
+  reviews      MaterialReview[]
+
+  @@index([tutorProfileId])
+  @@index([subjectId])
+  @@index([levelId])
+  @@index([isPublished])
+  @@index([tutorProfileId, subjectId], map: "idx_collection_tutor_subject")
+  @@index([deletedAt])
+  @@map("collections")
+}
+
+model Section {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collectionId  String  @map("collection_id") @db.Uuid
+  name          String  @db.VarChar(255)
+  description   String? @db.VarChar(255)
+  orderIndex    Int     @map("order_index")
+  isFreePreview Boolean @default(false) @map("is_free_preview")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  collection Collection        @relation(fields: [collectionId], references: [id])
+  materials  Material[]
+  topics     LessonPlanTopic[]
+
+  @@index([collectionId])
+  @@index([isFreePreview])
+  @@index([collectionId, orderIndex], map: "idx_section_order")
+  @@index([deletedAt])
+  @@map("sections")
+}
+
+model Material {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collectionId String       @map("collection_id") @db.Uuid
+  sectionId    String?      @map("section_id") @db.Uuid
+  name         String       @db.VarChar(255)
+  materialType MaterialType @map("material_type")
+  orderIndex   Int          @map("order_index")
+  fileId       String?      @map("file_id") @db.Uuid
+  contentJson  Json?        @map("content_json")
+  isFreePreview Boolean     @default(false) @map("is_free_preview")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+  deletedAt    DateTime?    @map("deleted_at")
+
+  collection Collection       @relation(fields: [collectionId], references: [id])
+  section    Section?         @relation(fields: [sectionId], references: [id])
+  file       File?            @relation(fields: [fileId], references: [id])
+  reviews    MaterialReview[]
+
+  @@index([collectionId])
+  @@index([sectionId])
+  @@index([materialType])
+  @@index([fileId])
+  @@index([isFreePreview])
+  @@index([collectionId, orderIndex], map: "idx_material_collection_order")
+  @@index([sectionId, orderIndex], map: "idx_material_section_order")
+  @@index([deletedAt])
+  @@map("materials")
+}
+
+model LessonPlan {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collectionId   String  @unique @map("collection_id") @db.Uuid
+  tutorProfileId String  @map("tutor_profile_id") @db.Uuid
+  title          String  @db.VarChar(255)
+  description    String?
+  isPublished    Boolean @default(false) @map("is_published")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  collection   Collection        @relation(fields: [collectionId], references: [id])
+  tutorProfile TutorProfile      @relation(fields: [tutorProfileId], references: [id])
+  topics       LessonPlanTopic[]
+
+  @@index([tutorProfileId])
+  @@index([isPublished])
+  @@index([deletedAt])
+  @@map("lesson_plans")
+}
+
+model LessonPlanTopic {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lessonPlanId String  @map("lesson_plan_id") @db.Uuid
+  sectionId    String? @map("section_id") @db.Uuid
+  title        String  @db.VarChar(255)
+  description  String?
+  orderIndex   Int     @map("order_index")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  lessonPlan LessonPlan @relation(fields: [lessonPlanId], references: [id])
+  section    Section?   @relation(fields: [sectionId], references: [id])
+
+  @@index([lessonPlanId])
+  @@index([sectionId])
+  @@index([lessonPlanId, orderIndex], map: "idx_topic_plan_order")
+  @@index([deletedAt])
+  @@map("lesson_plan_topics")
+}
+
+model MaterialAccess {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  collectionId String   @map("collection_id") @db.Uuid
+  bookingId    String   @map("booking_id") @db.Uuid
+  grantedAt    DateTime @default(now()) @map("granted_at")
+
+  user       User       @relation(fields: [userId], references: [id])
+  collection Collection @relation(fields: [collectionId], references: [id])
+  booking    Booking    @relation(fields: [bookingId], references: [id])
+
+  @@unique([userId, collectionId], map: "idx_material_access_unique")
+  @@index([userId])
+  @@index([collectionId])
+  @@index([bookingId])
+  @@map("material_access")
+}
+
+model MaterialReview {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  collectionId String                 @map("collection_id") @db.Uuid
+  materialId   String?                @map("material_id") @db.Uuid
+  reviewedById String                 @map("reviewed_by") @db.Uuid
+  tutorId      String                 @map("tutor_id") @db.Uuid
+  reportedById String?                @map("reported_by") @db.Uuid
+  reportReason String?                @map("report_reason") @db.VarChar(255)
+  decision     MaterialReviewDecision
+  reviewNote   String?                @map("review_note")
+  removalReason String?               @map("removal_reason")
+  isActive     Boolean                @default(true) @map("is_active")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+
+  collection Collection @relation(fields: [collectionId], references: [id])
+  material   Material?  @relation(fields: [materialId], references: [id])
+  reviewedBy User       @relation("MaterialReviewReviewedBy", fields: [reviewedById], references: [id])
+  tutor      User       @relation("MaterialReviewTutor", fields: [tutorId], references: [id])
+  reportedBy User?      @relation("MaterialReviewReportedBy", fields: [reportedById], references: [id])
+
+  @@index([collectionId])
+  @@index([materialId])
+  @@index([reviewedById])
+  @@index([tutorId])
+  @@index([reportedById])
+  @@index([decision])
+  @@index([isActive])
+  @@index([tutorId, decision, createdAt], map: "idx_review_tutor_decision_time")
+  @@map("material_reviews")
+}
+
+enum IdDocumentType {
+  ORIGINAL_CNI
+  RECEIPT
+}
+
+enum KycStep {
+  STEP_1_IDENTITY
+  STEP_2_BIOGRAPHY
+  STEP_3_CREDENTIALS
+  STEP_4_REVIEW
+  SUBMITTED
+}
+
+model KycApplication {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorProfileId String  @map("tutor_profile_id") @db.Uuid
+  version        Int     @default(1)
+  currentStep    KycStep @default(STEP_1_IDENTITY) @map("current_step")
+
+  idDocumentType    IdDocumentType? @map("id_document_type")
+  cniNumber         String?         @map("cni_number") @db.VarChar(20)
+  cniDateIssued     DateTime?       @map("cni_date_issued") @db.Date
+  cniExpirationDate DateTime?       @map("cni_expiration_date") @db.Date
+  cniFrontPhotoId   String?         @map("cni_front_photo_id") @db.Uuid
+  cniBackPhotoId    String?         @map("cni_back_photo_id") @db.Uuid
+  selfieWithCniId   String?         @map("selfie_with_cni_id") @db.Uuid
+
+  fullLegalName            String?     @map("full_legal_name") @db.VarChar(255)
+  surname                  String?     @db.VarChar(255)
+  dob                      DateTime?   @db.Date
+  gender                   UserGender?
+  placeOfBirth             String?     @map("place_of_birth") @db.VarChar(255)
+  currentStreet            String?     @map("current_street") @db.VarChar(255)
+  currentNeighbourhood     String?     @map("current_neighbourhood") @db.VarChar(255)
+  currentCityId            String?     @map("current_city_id") @db.Uuid
+  currentRegionId          String?     @map("current_region_id") @db.Uuid
+  cityOfOrigin             String?     @map("city_of_origin") @db.VarChar(255)
+  regionOfOrigin           String?     @map("region_of_origin") @db.VarChar(255)
+  emergencyContactName     String?     @map("emergency_contact_name") @db.VarChar(255)
+  emergencyContactPhone    String?     @map("emergency_contact_phone") @db.VarChar(20)
+  selfDeclarationStatement String?     @map("self_declaration_statement") @db.VarChar(500)
+
+  declarationAccepted   Boolean   @default(false) @map("declaration_accepted")
+  declarationAcceptedAt DateTime? @map("declaration_accepted_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  tutorProfile  TutorProfile @relation(fields: [tutorProfileId], references: [id])
+  cniFrontPhoto File?        @relation("KycCniFront", fields: [cniFrontPhotoId], references: [id])
+  cniBackPhoto  File?        @relation("KycCniBack", fields: [cniBackPhotoId], references: [id])
+  selfieWithCni File?        @relation("KycSelfie", fields: [selfieWithCniId], references: [id])
+  currentCity   City?        @relation(fields: [currentCityId], references: [id])
+  currentRegion Region?      @relation(fields: [currentRegionId], references: [id])
+
+  statusHistory        KycStatusHistory[]
+  rejectionFlags       KycRejectionFlag[]
+  checklistSubmissions KycChecklistSubmission[]
+
+  @@unique([tutorProfileId, version], map: "idx_kyc_tutor_version")
+  @@index([tutorProfileId])
+  @@index([currentStep])
+  @@index([deletedAt])
+  @@map("kyc_applications")
+}
+
+model KycStatusHistory {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kycApplicationId String     @map("kyc_application_id") @db.Uuid
+  tutorProfileId   String     @map("tutor_profile_id") @db.Uuid
+  previousStatus   KycStatus? @map("previous_status")
+  newStatus        KycStatus  @map("new_status")
+  changedById      String     @map("changed_by") @db.Uuid
+  reason           String?
+
+  reviewDurationSeconds Int?     @map("review_duration_seconds")
+  checklistCompleted    Boolean? @map("checklist_completed")
+  flaggedForSpotCheck   Boolean  @default(false) @map("flagged_for_spot_check")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  kycApplication       KycApplication           @relation(fields: [kycApplicationId], references: [id])
+  tutorProfile         TutorProfile             @relation(fields: [tutorProfileId], references: [id])
+  changedBy            User                     @relation(fields: [changedById], references: [id])
+  rejectionFlags       KycRejectionFlag[]
+  checklistSubmissions KycChecklistSubmission[]
+
+  @@index([kycApplicationId])
+  @@index([tutorProfileId])
+  @@index([newStatus])
+  @@index([changedById])
+  @@index([flaggedForSpotCheck])
+  @@index([createdAt])
+  @@map("kyc_status_history")
+}
+
+enum KycRejectionFlagItem {
+  CNI_NUMBER_MISMATCH
+  SELFIE_MISMATCH
+  DOCUMENT_TYPE_MISMATCH
+  DEGREE_FIELD_MISMATCH
+  SUBJECT_NOT_SUPPORTED_BY_CREDENTIALS
+  DOCUMENT_EXPIRED
+  DOCUMENT_UNREADABLE
+  SUSPICIOUS_DOCUMENT
+  OTHER
+}
+
+model KycRejectionFlag {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kycApplicationId   String               @map("kyc_application_id") @db.Uuid
+  kycStatusHistoryId String               @map("kyc_status_history_id") @db.Uuid
+  flagItem           KycRejectionFlagItem @map("flag_item")
+  reason             String
+  adminMessage       String?              @map("admin_message")
+  createdAt          DateTime             @default(now()) @map("created_at")
+
+  kycApplication   KycApplication   @relation(fields: [kycApplicationId], references: [id])
+  kycStatusHistory KycStatusHistory @relation(fields: [kycStatusHistoryId], references: [id])
+
+  @@index([kycApplicationId])
+  @@index([kycStatusHistoryId])
+  @@index([flagItem])
+  @@map("kyc_rejection_flags")
+}
+
+model KycChecklistSubmission {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kycApplicationId   String   @map("kyc_application_id") @db.Uuid
+  kycStatusHistoryId String   @map("kyc_status_history_id") @db.Uuid
+  reviewedById       String   @map("reviewed_by") @db.Uuid
+
+  cniNumberMatchesDocument        Boolean @default(false) @map("cni_number_matches_document")
+  selfieMatchesCniPhoto           Boolean @default(false) @map("selfie_matches_cni_photo")
+  documentTypeMatchesDeclaration  Boolean @default(false) @map("document_type_matches_declaration")
+  degreeMatchesFieldOfStudy       Boolean @default(false) @map("degree_matches_field_of_study")
+  subjectsSupportedByCredentials  Boolean @default(false) @map("subjects_supported_by_credentials")
+
+  reviewOpenedAt DateTime @map("review_opened_at")
+  submittedAt    DateTime @default(now()) @map("submitted_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  kycApplication   KycApplication   @relation(fields: [kycApplicationId], references: [id])
+  kycStatusHistory KycStatusHistory @relation(fields: [kycStatusHistoryId], references: [id])
+  reviewedBy       User             @relation(fields: [reviewedById], references: [id])
+
+  @@index([kycApplicationId])
+  @@index([kycStatusHistoryId])
+  @@index([reviewedById])
+  @@map("kyc_checklist_submissions")
+}
+
+model KycBan {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorProfileId String   @unique @map("tutor_profile_id") @db.Uuid
+  bannedById     String   @map("banned_by") @db.Uuid
+  reason         String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tutorProfile TutorProfile @relation(fields: [tutorProfileId], references: [id])
+  bannedBy     User         @relation(fields: [bannedById], references: [id])
+
+  @@index([bannedById])
+  @@map("kyc_bans")
+}
+
+model DemandSignal {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectId   String? @map("subject_id") @db.Uuid
+  cityId      String? @map("city_id") @db.Uuid
+  userId      String? @map("user_id") @db.Uuid
+  searchQuery String? @map("search_query") @db.VarChar(255)
+  isNotifyMe  Boolean @default(false) @map("is_notify_me")
+  notifiedAt  DateTime? @map("notified_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  subject Subject? @relation(fields: [subjectId], references: [id])
+  city    City?    @relation(fields: [cityId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+
+  @@index([subjectId])
+  @@index([cityId])
+  @@index([userId])
+  @@index([isNotifyMe])
+  @@index([subjectId, cityId], map: "idx_demand_subject_city")
+  @@index([notifiedAt])
+  @@map("demand_signals")
+}
+
+enum SessionType {
+  ONLINE
+  HOME
+}
+
+enum BookingStatus {
+  REQUESTED
+  ACCEPTED
+  REJECTED
+  CANCELLED_UNPAID
+  PAID
+  IN_PROGRESS
+  AWAITING_CONFIRMATION
+  CONFIRMED
+  AUTO_CONFIRMED
+  DISPUTED
+  RESOLVED_TUTOR_FAVOR
+  RESOLVED_PARENT_FAVOR
+  CANCELLED_BY_TUTOR
+  CANCELLED_BY_PARENT
+}
+
+enum RecurrenceType {
+  WEEKLY
+  BIWEEKLY
+  CUSTOM
+}
+
+enum RescheduleStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum GroupSessionStatus {
+  DRAFT
+  PUBLISHED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model BookingSeries {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  parentId       String         @map("parent_id") @db.Uuid
+  tutorProfileId String         @map("tutor_profile_id") @db.Uuid
+  subjectId      String         @map("subject_id") @db.Uuid
+  levelId        String         @map("level_id") @db.Uuid
+  sessionType    SessionType    @default(ONLINE) @map("session_type")
+  recurrenceType RecurrenceType @map("recurrence_type")
+  recurrenceDays String[]       @map("recurrence_days")
+  startDate      DateTime       @map("start_date") @db.Date
+  endDate        DateTime?      @map("end_date") @db.Date
+  occurrenceCount Int?          @map("occurrence_count")
+  durationMinutes Int           @map("duration_minutes")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  parent       User         @relation(fields: [parentId], references: [id])
+  tutorProfile TutorProfile @relation(fields: [tutorProfileId], references: [id])
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+  level        Level        @relation(fields: [levelId], references: [id])
+  bookings     Booking[]
+
+  @@index([parentId])
+  @@index([tutorProfileId])
+  @@index([subjectId])
+  @@map("booking_series")
+}
+
+model Booking {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookerId         String? @map("booker_id") @db.Uuid
+  studentProfileId String? @map("student_profile_id") @db.Uuid
+  tutorProfileId   String  @map("tutor_profile_id") @db.Uuid
+
+  subjectId       String      @map("subject_id") @db.Uuid
+  levelId         String      @map("level_id") @db.Uuid
+  sessionType     SessionType @default(ONLINE) @map("session_type")
+  durationMinutes Int         @map("duration_minutes")
+  messageToTutor  String?     @map("message_to_tutor")
+
+  sessionDate      DateTime @map("session_date") @db.Date
+  sessionStartTime DateTime @map("session_start_time") @db.Time()
+  sessionEndTime   DateTime @map("session_end_time") @db.Time()
+
+  paymentWindowExpiresAt DateTime? @map("payment_window_expires_at")
+
+  agreedRateXaf         Int?    @map("agreed_rate_xaf")
+  commissionRatePercent Int?    @map("commission_rate_percent")
+  commissionAmountXaf   Int?    @map("commission_amount_xaf")
+  netTutorAmountXaf     Int?    @map("net_tutor_amount_xaf")
+  taxType               String? @map("tax_type") @db.VarChar(50)
+  taxRatePercent        Int?    @map("tax_rate_percent")
+  taxAmountXaf          Int?    @map("tax_amount_xaf")
+  totalAmountXaf        Int?    @map("total_amount_xaf")
+
+  status          BookingStatus @default(REQUESTED)
+  rejectionReason String?       @map("rejection_reason")
+
+  cancelledById      String?   @map("cancelled_by") @db.Uuid
+  cancelledAt        DateTime? @map("cancelled_at")
+  cancellationReason String?   @map("cancellation_reason")
+
+  tutorCheckedInAt   DateTime? @map("tutor_checked_in_at")
+  bookerCheckedInAt  DateTime? @map("booker_checked_in_at")
+  tutorCheckedOutAt  DateTime? @map("tutor_checked_out_at")
+  bookerCheckedOutAt DateTime? @map("booker_checked_out_at")
+
+  isGroupSession Boolean @default(false) @map("is_group_session")
+  seriesId       String? @map("series_id") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  booker         User?           @relation("BookingBooker", fields: [bookerId], references: [id])
+  studentProfile StudentProfile? @relation(fields: [studentProfileId], references: [id])
+  tutorProfile   TutorProfile    @relation(fields: [tutorProfileId], references: [id])
+  subject        Subject         @relation(fields: [subjectId], references: [id])
+  level          Level           @relation(fields: [levelId], references: [id])
+  cancelledBy    User?           @relation("BookingCancelledBy", fields: [cancelledById], references: [id])
+  series         BookingSeries?  @relation(fields: [seriesId], references: [id])
+
+  groupParticipants      GroupSessionParticipant[]
+  groupSession           GroupSession?
+  rescheduleRequests     RescheduleRequest[]
+  scheduledNotifications ScheduledNotification[]
+  materialAccess         MaterialAccess[]
+  escrowHolds            EscrowHold[]
+  ledgerEntries          TransactionLedger[]
+  reconciliations        PaymentReconciliation[]
+  receipts               Receipt[]
+  liveRoom               LiveRoom?
+  conversations          Conversation[]
+  lessonConfirmation     LessonConfirmation?
+  autoRecommendation     AutoResolutionRecommendation?
+  dispute                Dispute?
+  incidentReports        IncidentReport[]
+  reviewWindow           ReviewWindow?
+  reviews                Review[]
+  deadLetterJobs         DeadLetterJob[]
+  supportTickets         SupportTicket[]
+
+  @@index([bookerId])
+  @@index([tutorProfileId])
+  @@index([subjectId])
+  @@index([levelId])
+  @@index([status])
+  @@index([sessionDate])
+  @@index([seriesId])
+  @@index([isGroupSession])
+  @@index([paymentWindowExpiresAt])
+  @@index([tutorProfileId, sessionDate, status], map: "idx_booking_tutor_date_status")
+  @@index([bookerId, status], map: "idx_booking_booker_status")
+  @@index([deletedAt])
+  @@map("bookings")
+}
+
+enum ParticipantPaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
+model GroupSessionParticipant {
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId        String                   @map("booking_id") @db.Uuid
+  studentId        String                   @map("student_id") @db.Uuid
+  studentProfileId String?                  @map("student_profile_id") @db.Uuid
+  paymentStatus    ParticipantPaymentStatus @default(PENDING) @map("payment_status")
+
+  agreedRateXaf       Int? @map("agreed_rate_xaf")
+  commissionAmountXaf Int? @map("commission_amount_xaf")
+  netTutorAmountXaf   Int? @map("net_tutor_amount_xaf")
+  taxAmountXaf        Int? @map("tax_amount_xaf")
+  totalAmountXaf      Int? @map("total_amount_xaf")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  booking        Booking         @relation(fields: [bookingId], references: [id])
+  student        User            @relation(fields: [studentId], references: [id])
+  studentProfile StudentProfile? @relation(fields: [studentProfileId], references: [id])
+  escrowHolds    EscrowHold[]
+
+  @@unique([bookingId, studentId], map: "idx_group_participant_unique")
+  @@index([bookingId])
+  @@index([studentId])
+  @@index([paymentStatus])
+  @@map("group_session_participants")
+}
+
+model GroupSession {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorProfileId       String             @map("tutor_profile_id") @db.Uuid
+  bookingId            String             @unique @map("booking_id") @db.Uuid
+  subjectId            String             @map("subject_id") @db.Uuid
+  levelId              String             @map("level_id") @db.Uuid
+  topic                String             @db.VarChar(255)
+  minStudents          Int                @map("min_students")
+  maxStudents          Int                @map("max_students")
+  pricePerStudentXaf   Int                @map("price_per_student_xaf")
+  registrationCutoffAt DateTime           @map("registration_cutoff_at")
+  status               GroupSessionStatus @default(DRAFT)
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  deletedAt            DateTime?          @map("deleted_at")
+
+  tutorProfile TutorProfile @relation(fields: [tutorProfileId], references: [id])
+  booking      Booking      @relation(fields: [bookingId], references: [id])
+  subject      Subject      @relation(fields: [subjectId], references: [id])
+  level        Level        @relation(fields: [levelId], references: [id])
+
+  @@index([tutorProfileId])
+  @@index([subjectId])
+  @@index([levelId])
+  @@index([status])
+  @@index([registrationCutoffAt])
+  @@index([deletedAt])
+  @@map("group_sessions")
+}
+
+model RescheduleRequest {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId         String           @map("booking_id") @db.Uuid
+  requestedById     String           @map("requested_by") @db.Uuid
+  proposedDate      DateTime         @map("proposed_date") @db.Date
+  proposedStartTime DateTime         @map("proposed_start_time") @db.Time()
+  proposedEndTime   DateTime         @map("proposed_end_time") @db.Time()
+  reason            String?
+  status            RescheduleStatus @default(PENDING)
+  respondedById     String?          @map("responded_by") @db.Uuid
+  respondedAt       DateTime?        @map("responded_at")
+  rejectionReason   String?          @map("rejection_reason")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  booking     Booking @relation(fields: [bookingId], references: [id])
+  requestedBy User    @relation("RescheduleRequestedBy", fields: [requestedById], references: [id])
+  respondedBy User?   @relation("RescheduleRespondedBy", fields: [respondedById], references: [id])
+
+  @@index([bookingId])
+  @@index([requestedById])
+  @@index([status])
+  @@index([bookingId, status], map: "idx_reschedule_booking_status")
+  @@map("reschedule_requests")
+}
+
+
+enum NotificationType {
+  ACCOUNT_CREATED
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  NEW_DEVICE_LOGIN
+  ACCOUNT_SUSPENDED
+  ACCOUNT_UNSUSPENDED
+  TWO_FACTOR_LOCKED
+
+  KYC_SUBMITTED
+  KYC_IDENTITY_APPROVED
+  KYC_APPROVED
+  KYC_REJECTED
+  KYC_SLA_BREACH
+  KYC_BANNED
+  KYC_REVERIFICATION_REQUIRED
+
+  BOOKING_REQUESTED
+  BOOKING_ACCEPTED
+  BOOKING_REJECTED
+  BOOKING_CANCELLED_BY_TUTOR
+  BOOKING_CANCELLED_BY_PARENT
+  BOOKING_CANCELLED_UNPAID
+  PAYMENT_WINDOW_REMINDER
+  RESCHEDULE_REQUESTED
+  RESCHEDULE_ACCEPTED
+  RESCHEDULE_REJECTED
+
+  SESSION_REMINDER_24HR
+  SESSION_REMINDER_1HR
+  SESSION_CHECKIN_REMINDER
+  SESSION_CHECKIN_OVERDUE
+  SESSION_TUTOR_DISCONNECTED
+  SESSION_NO_SHOW
+
+  PAYMENT_CONFIRMED
+  WALLET_TOPPED_UP
+  WALLET_WITHDRAWAL_INITIATED
+  WITHDRAWAL_FAILED
+  ESCROW_RELEASED
+  REFUND_ISSUED
+  PAYOUT_ACCOUNT_ADDED
+  MONTHLY_FEE_DEDUCTED
+  MONTHLY_FEE_FAILED
+  PAYMENT_RECONCILIATION_PENDING
+
+  LESSON_AWAITING_CONFIRMATION
+  LESSON_CONFIRMED
+  LESSON_AUTO_CONFIRMED
+  DISPUTE_OPENED
+  DISPUTE_TUTOR_RESPONSE_REMINDER
+  DISPUTE_RESOLVED
+  DISPUTE_ESCALATED
+
+  REVIEW_WINDOW_OPENED
+  REVIEW_RECEIVED
+  REVIEW_RESPONSE_SUBMITTED
+
+  ACCOUNT_FLAGGED
+  REAUTH_REQUIRED
+
+  SUPPORT_TICKET_OPENED
+  SUPPORT_TICKET_RESPONSE
+  SUPPORT_TICKET_RESOLVED
+
+  MATERIAL_REMOVED
+  MATERIAL_ACCESS_GRANTED
+
+  PLATFORM_OUTAGE_REFUND
+  SCHEDULED_MAINTENANCE
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+  WHATSAPP
+  SMS
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum ScheduledNotificationStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+model Notification {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientId String           @map("recipient_id") @db.Uuid
+  type        NotificationType
+  titleCode   String           @map("title_code") @db.VarChar(255)
+  bodyCode    String           @map("body_code") @db.VarChar(255)
+  data        Json?
+  isTransactional Boolean      @default(false) @map("is_transactional")
+  readAt      DateTime?        @map("read_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  deletedAt   DateTime?        @map("deleted_at")
+
+  recipient  User                     @relation(fields: [recipientId], references: [id])
+  deliveries NotificationDelivery[]
+
+  @@index([recipientId])
+  @@index([type])
+  @@index([readAt])
+  @@index([isTransactional])
+  @@index([recipientId, readAt], map: "idx_notifications_recipient_read")
+  @@index([recipientId, type], map: "idx_notifications_recipient_type")
+  @@index([deletedAt])
+  @@map("notifications")
+}
+
+model NotificationDelivery {
+  id             String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  notificationId String                     @map("notification_id") @db.Uuid
+  channel        NotificationChannel
+  status         NotificationDeliveryStatus @default(PENDING)
+
+  attemptNumber  Int                        @default(1) @map("attempt_number")
+ 
+  failureReason  String?                    @map("failure_reason")
+  attemptedAt    DateTime                   @default(now()) @map("attempted_at")
+  deliveredAt    DateTime?                  @map("delivered_at")
+
+  notification Notification @relation(fields: [notificationId], references: [id])
+
+  @@index([notificationId])
+  @@index([channel])
+  @@index([status])
+  @@index([attemptNumber])
+  @@index([notificationId, channel], map: "idx_delivery_notification_channel")
+  @@index([status, attemptedAt], map: "idx_delivery_status_time")
+  @@map("notification_deliveries")
+}
+
+model ScheduledNotification {
+  id          String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientId String                      @map("recipient_id") @db.Uuid
+  type        NotificationType
+  titleCode   String                      @map("title_code") @db.VarChar(255)
+  bodyCode    String                      @map("body_code") @db.VarChar(255)
+  data        Json?
+  scheduledFor DateTime                   @map("scheduled_for")
+  jobId       String?                     @map("job_id") @db.VarChar(255)
+  status      ScheduledNotificationStatus @default(PENDING)
+  bookingId   String?                     @map("booking_id") @db.Uuid
+  deliveredAt DateTime?                   @map("delivered_at")
+  cancelledAt DateTime?                   @map("cancelled_at")
+  failureReason String?                   @map("failure_reason")
+  createdAt   DateTime                    @default(now()) @map("created_at")
+  updatedAt   DateTime                    @updatedAt @map("updated_at")
+
+  recipient User     @relation(fields: [recipientId], references: [id])
+  booking   Booking? @relation(fields: [bookingId], references: [id])
+
+  @@index([recipientId])
+  @@index([type])
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([bookingId])
+  @@index([jobId])
+  @@index([status, scheduledFor], map: "idx_scheduled_pending_time")
+  @@index([bookingId, status], map: "idx_scheduled_booking_status")
+  @@map("scheduled_notifications")
+}
+
+model NotificationPreference {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String              @map("user_id") @db.Uuid
+  notificationType NotificationType    @map("notification_type")
+  channel          NotificationChannel
+  isEnabled        Boolean             @default(true) @map("is_enabled")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, notificationType, channel], map: "idx_preference_unique")
+  @@index([userId])
+  @@index([notificationType])
+  @@index([channel])
+  @@map("notification_preferences")
+}
+
+model PushToken {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  deviceId    String?  @map("device_id") @db.Uuid
+  fcmToken    String   @map("fcm_token") @db.VarChar(500)
+  platform    String   @db.VarChar(20)
+  isActive    Boolean  @default(true) @map("is_active")
+  invalidatedAt    DateTime? @map("invalidated_at")
+  invalidationReason String?  @map("invalidation_reason") @db.VarChar(100)
+  lastUsedAt  DateTime? @map("last_used_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user   User        @relation(fields: [userId], references: [id])
+  device UserDevice? @relation(fields: [deviceId], references: [id])
+
+  @@unique([userId, fcmToken], map: "idx_push_token_unique")
+  @@index([userId])
+  @@index([deviceId])
+  @@index([isActive])
+  @@index([userId, isActive], map: "idx_push_tokens_active")
+  @@map("push_tokens")
+}
+
+enum WalletType {
+  PARENT
+  STUDENT
+  TUTOR
+}
+
+enum EscrowStatus {
+  HELD
+  RELEASED
+  REFUNDED
+  FROZEN
+}
+
+enum PayoutQueueStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  WAITING_ON_FLOAT
+  FAILED
+  CANCELLED
+}
+
+enum LedgerOperation {
+  WALLET_TOPUP
+  BOOKING_PAYMENT
+  BOOKING_PAYMENT_MOMO
+  ESCROW_RELEASE
+  ESCROW_REFUND
+  WALLET_WITHDRAWAL
+  COMMISSION_DEDUCTION
+  MONTHLY_FEE
+  PLATFORM_WITHDRAWAL
+  MANUAL_ADJUSTMENT
+}
+
+enum LedgerStatus {
+  SUCCESS
+  FAILED
+  PENDING
+  REVERSED
+}
+
+enum TransactionIssueType {
+  FAILED_PAYOUT
+  PENDING_RECONCILIATION
+  MANUAL_INVESTIGATION
+}
+
+enum TransactionIssueStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  ESCALATED
+}
+
+enum PaymentDirection {
+  USER_TO_PLATFORM
+  PLATFORM_TO_USER
+  INTERNAL
+}
+
+model Wallet {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String     @unique @map("user_id") @db.Uuid
+  walletType WalletType @map("wallet_type")
+  balanceXaf Int        @default(0) @map("balance_xaf")
+  pendingEscrowXaf Int? @map("pending_escrow_xaf")
+  totalEarnedXaf   Int? @map("total_earned_xaf")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([walletType])
+  @@map("wallets")
+}
+
+
+model EscrowHold {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId String @map("booking_id") @db.Uuid
+
+  groupParticipantId String? @map("group_participant_id") @db.Uuid
+  payerId   String @map("payer_id") @db.Uuid
+  tutorId   String @map("tutor_id") @db.Uuid
+
+  grossAmountXaf          Int @map("gross_amount_xaf")
+  commissionRateSnapshot  Int @map("commission_rate_snapshot")
+  commissionAmountXaf     Int @map("commission_amount_xaf")
+  momoFeeXaf              Int @default(0) @map("momo_fee_xaf")
+  netTutorAmountXaf       Int @map("net_tutor_amount_xaf")
+
+  status     EscrowStatus @default(HELD)
+  releasedAt DateTime?    @map("released_at")
+  refundedAt DateTime?    @map("refunded_at")
+  frozenAt   DateTime?    @map("frozen_at")
+
+  releasedByDisputeId String?  @map("released_by_dispute_id") @db.Uuid
+  autoReleased        Boolean  @default(false) @map("auto_released")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  booking           Booking                  @relation(fields: [bookingId], references: [id])
+  groupParticipant  GroupSessionParticipant?  @relation(fields: [groupParticipantId], references: [id])
+  payer             User                     @relation("EscrowPayer", fields: [payerId], references: [id])
+  tutor             User                     @relation("EscrowTutor", fields: [tutorId], references: [id])
+  releasedByDispute Dispute?                 @relation("EscrowReleasedByDispute", fields: [releasedByDisputeId], references: [id])
+  ledgerEntries     TransactionLedger[]
+
+  @@index([bookingId])
+  @@index([groupParticipantId])
+  @@index([payerId])
+  @@index([tutorId])
+  @@index([status])
+  @@index([status, createdAt], map: "idx_escrow_status_time")
+  @@index([autoReleased])
+  @@map("escrow_holds")
+}
+
+model PlatformCommission {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  balanceXaf           Int      @default(0) @map("balance_xaf")
+  lastUpdatedAt        DateTime @default(now()) @map("last_updated_at")
+  updatedByLedgerEntryId String? @map("updated_by_ledger_entry_id") @db.Uuid
+
+  @@map("platform_commission")
+}
+
+model TransactionLedger {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  fromUserId String? @map("from_user_id") @db.Uuid
+  toUserId   String? @map("to_user_id") @db.Uuid
+
+  operation LedgerOperation
+  direction PaymentDirection
+  status    LedgerStatus @default(SUCCESS)
+  amountXaf Int          @map("amount_xaf")
+
+  providerTransactionId String? @map("provider_transaction_id") @db.VarChar(255)
+  providerService       String? @map("provider_service") @db.VarChar(50)
+
+  momoPhone    String? @map("momo_phone") @db.VarChar(20)
+  momoProvider String? @map("momo_provider") @db.VarChar(20)
+  momoFeeXaf   Int?    @map("momo_fee_xaf")
+
+  bookingId       String? @map("booking_id") @db.Uuid
+  escrowHoldId    String? @map("escrow_hold_id") @db.Uuid
+  payoutQueueId   String? @map("payout_queue_id") @db.Uuid
+  idempotencyKeyId String? @map("idempotency_key_id") @db.Uuid
+
+  isPlatformSender   Boolean @default(false) @map("is_platform_sender")
+  isPlatformReceiver Boolean @default(false) @map("is_platform_receiver")
+
+  failureReason String? @map("failure_reason")
+  adminReason   String? @map("admin_reason")
+  performedById String? @map("performed_by") @db.Uuid
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  fromUser       User?           @relation("LedgerFromUser", fields: [fromUserId], references: [id])
+  toUser         User?           @relation("LedgerToUser", fields: [toUserId], references: [id])
+  booking        Booking?        @relation(fields: [bookingId], references: [id])
+  escrowHold     EscrowHold?     @relation(fields: [escrowHoldId], references: [id])
+  payoutQueue    PayoutQueue?    @relation(fields: [payoutQueueId], references: [id])
+  idempotencyKey IdempotencyKey? @relation(fields: [idempotencyKeyId], references: [id])
+  performedBy    User?           @relation("LedgerPerformedBy", fields: [performedById], references: [id])
+  transactionIssues TransactionIssue[]
+
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([operation])
+  @@index([status])
+  @@index([providerTransactionId])
+  @@index([bookingId])
+  @@index([escrowHoldId])
+  @@index([payoutQueueId])
+  @@index([createdAt])
+  @@index([fromUserId, createdAt], map: "idx_ledger_from_user_time")
+  @@index([toUserId, createdAt], map: "idx_ledger_to_user_time")
+  @@index([operation, status], map: "idx_ledger_operation_status")
+  @@map("transaction_ledger")
+}
+
+model PayoutQueue {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  paymentAccountId String           @map("payment_account_id") @db.Uuid
+  grossAmountXaf   Int              @map("gross_amount_xaf")
+  momoFeeXaf       Int              @map("momo_fee_xaf")
+  netAmountXaf     Int              @map("net_amount_xaf")
+  status           PayoutQueueStatus @default(PENDING)
+  providerTransactionId String?     @map("provider_transaction_id") @db.VarChar(255)
+  providerResponse Json?            @map("provider_response")
+  attemptCount     Int              @default(0) @map("attempt_count")
+  lastAttemptedAt  DateTime?        @map("last_attempted_at")
+  nextRetryAt      DateTime?        @map("next_retry_at")
+  completedAt      DateTime?        @map("completed_at")
+  failedAt         DateTime?        @map("failed_at")
+  failureReason    String?          @map("failure_reason")
+  cancelledAt      DateTime?        @map("cancelled_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  user           User           @relation(fields: [userId], references: [id])
+  paymentAccount PaymentAccount @relation(fields: [paymentAccountId], references: [id])
+  ledgerEntries  TransactionLedger[]
+  transactionIssues TransactionIssue[]
+  deadLetterJobs DeadLetterJob[]
+  supportTickets SupportTicket[]
+  failedPayoutContexts FailedPayoutContext[] @relation("FailedPayoutSource")
+  retryPayoutContexts  FailedPayoutContext[] @relation("FailedPayoutRetry")
+
+  @@index([userId])
+  @@index([paymentAccountId])
+  @@index([status])
+  @@index([status, createdAt], map: "idx_payout_queue_status_time")
+  @@index([status, nextRetryAt], map: "idx_payout_queue_retry")
+  @@index([providerTransactionId])
+  @@map("payout_queue")
+}
+
+model IdempotencyKey {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  key            String   @db.VarChar(255)
+  operation      String   @db.VarChar(100)
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  expiresAt      DateTime @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user          User                @relation(fields: [userId], references: [id])
+  ledgerEntries TransactionLedger[]
+
+  @@unique([userId, key], map: "idx_idempotency_user_key")
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+model PaymentReconciliation {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String   @map("user_id") @db.Uuid
+  bookingId             String?  @map("booking_id") @db.Uuid
+  providerTransactionId String   @map("provider_transaction_id") @db.VarChar(255)
+  providerStatus        String?  @map("provider_status") @db.VarChar(50)
+  providerQueryResponse Json?    @map("provider_query_response")
+  queriedAt             DateTime? @map("queried_at")
+  resolved              Boolean  @default(false)
+  resolvedAt            DateTime? @map("resolved_at")
+  resolutionAction      String?  @map("resolution_action") @db.VarChar(100)
+  supportTicketId       String?  @map("support_ticket_id") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user    User     @relation(fields: [userId], references: [id])
+  booking Booking? @relation(fields: [bookingId], references: [id])
+  supportTicket SupportTicket? @relation(fields: [supportTicketId], references: [id])
+  transactionIssues TransactionIssue[]
+  reconciliationContexts ReconciliationContext[]
+
+  @@index([userId])
+  @@index([providerTransactionId])
+  @@index([resolved])
+  @@index([bookingId])
+  @@index([resolved, createdAt], map: "idx_reconciliation_unresolved")
+  @@map("payment_reconciliations")
+}
+
+model TransactionIssue {
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String                 @map("user_id") @db.Uuid
+  issueType      TransactionIssueType   @map("issue_type")
+  status         TransactionIssueStatus @default(OPEN)
+  payoutQueueId  String?                @map("payout_queue_id") @db.Uuid
+  reconciliationId String?              @map("reconciliation_id") @db.Uuid
+  ledgerEntryId  String?                @map("ledger_entry_id") @db.Uuid
+  amountXaf      Int?                   @map("amount_xaf")
+  failureReason  String?                @map("failure_reason")
+  providerResponse Json?                @map("provider_response")
+  supportTicketId String?               @map("support_ticket_id") @db.Uuid
+  resolvedById   String?                @map("resolved_by") @db.Uuid
+  resolvedAt     DateTime?              @map("resolved_at")
+  resolutionNote String?                @map("resolution_note")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  user           User                  @relation("TransactionIssueUser", fields: [userId], references: [id])
+  payoutQueue    PayoutQueue?          @relation(fields: [payoutQueueId], references: [id])
+  reconciliation PaymentReconciliation? @relation(fields: [reconciliationId], references: [id])
+  ledgerEntry    TransactionLedger?    @relation(fields: [ledgerEntryId], references: [id])
+  resolvedBy     User?                 @relation("TransactionIssueResolvedBy", fields: [resolvedById], references: [id])
+
+  @@index([userId])
+  @@index([issueType])
+  @@index([status])
+  @@index([payoutQueueId])
+  @@index([status, createdAt], map: "idx_issues_status_time")
+  @@index([issueType, status], map: "idx_issues_type_status")
+  @@map("transaction_issues")
+}
+
+model Receipt {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  referenceNumber String   @unique @map("reference_number") @db.VarChar(50)
+  bookingId       String   @map("booking_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  fileId          String   @map("file_id") @db.Uuid
+  amountXaf       Int      @map("amount_xaf")
+  metadata        Json?    @map("metadata")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  file    File    @relation(fields: [fileId], references: [id])
+
+  @@index([bookingId])
+  @@index([userId])
+  @@index([fileId])
+  @@map("receipts")
+}
+
+model MonthlyFeeCharge {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorProfileId String    @map("tutor_profile_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  periodStart    DateTime  @map("period_start") @db.Date
+  amountXaf      Int       @map("amount_xaf")
+  isPaid         Boolean   @default(false) @map("is_paid")
+  paidAt         DateTime? @map("paid_at")
+  gracePeriodEndsAt DateTime? @map("grace_period_ends_at")
+  isOverdue      Boolean   @default(false) @map("is_overdue")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  tutorProfile TutorProfile @relation(fields: [tutorProfileId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([tutorProfileId, periodStart], map: "idx_monthly_fee_tutor_period")
+  @@index([isPaid])
+  @@index([isOverdue])
+  @@index([gracePeriodEndsAt])
+  @@map("monthly_fee_charges")
+}
+
+enum LiveRoomStatus {
+  PENDING
+  CREATED
+  ACTIVE
+  ENDED
+  FAILED
+}
+
+enum SessionEndReason {
+  TUTOR_ENDED
+  TIMEOUT
+  EMPTY_TIMEOUT
+  ALL_LEFT
+}
+
+enum ParticipantRole {
+  TUTOR
+  STUDENT
+  PARENT
+  ADMIN
+}
+
+enum ConnectionQuality {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  LOST
+}
+
+enum ParticipantEventType {
+  JOINED
+  LEFT
+  RECONNECTING
+  RECONNECTED
+  REMOVED
+  MUTED
+  UNMUTED
+}
+
+
+model LiveRoom {
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId String         @unique @map("booking_id") @db.Uuid
+  roomName  String         @unique @map("room_name") @db.VarChar(255)
+  status    LiveRoomStatus @default(PENDING)
+
+  scheduledStartAt DateTime  @map("scheduled_start_at")
+  scheduledEndAt   DateTime  @map("scheduled_end_at")
+  roomCreateAt     DateTime? @map("room_create_at")
+  roomCreatedAt    DateTime? @map("room_created_at")
+  actualStartAt    DateTime? @map("actual_start_at")
+  actualEndAt      DateTime? @map("actual_end_at")
+  endReason        SessionEndReason? @map("end_reason")
+
+  overlapSeconds    Int? @map("overlap_seconds")
+  overlapPercentage Int? @map("overlap_percentage")
+
+  whiteboardFileId String? @map("whiteboard_file_id") @db.Uuid
+  recordingFileId  String? @map("recording_file_id") @db.Uuid
+
+  creationFailedAt      DateTime? @map("creation_failed_at")
+  creationFailureReason String?   @map("creation_failure_reason")
+  creationAttempts      Int       @default(0) @map("creation_attempts")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  booking        Booking  @relation(fields: [bookingId], references: [id])
+  whiteboardFile File?    @relation("RoomWhiteboardFile", fields: [whiteboardFileId], references: [id])
+  recordingFile  File?    @relation("RoomRecordingFile", fields: [recordingFileId], references: [id])
+  participants   SessionParticipant[]
+  events         ParticipantEvent[]
+  qualityEvents  ConnectionQualityEvent[]
+  chatMessages   SessionChatMessage[]
+
+  @@index([status])
+  @@index([scheduledStartAt])
+  @@index([status, scheduledStartAt], map: "idx_rooms_status_schedule")
+  @@index([actualEndAt])
+  @@map("live_rooms")
+}
+
+model SessionParticipant {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveRoomId     String          @map("live_room_id") @db.Uuid
+  userId         String          @map("user_id") @db.Uuid
+  participantRole ParticipantRole @map("participant_role")
+  firstJoinedAt  DateTime?       @map("first_joined_at")
+  lastLeftAt     DateTime?       @map("last_left_at")
+  totalTimeSeconds Int?          @map("total_time_seconds")
+  deviceType     String?         @map("device_type") @db.VarChar(50)
+  browser        String?         @db.VarChar(100)
+  os             String?         @db.VarChar(100)
+  livekitParticipantIdentity String? @map("livekit_participant_identity") @db.VarChar(255)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  liveRoom      LiveRoom               @relation(fields: [liveRoomId], references: [id])
+  user          User                   @relation(fields: [userId], references: [id])
+  events        ParticipantEvent[]
+  qualityEvents ConnectionQualityEvent[]
+
+  @@unique([liveRoomId, userId], map: "idx_participant_room_user")
+  @@index([liveRoomId])
+  @@index([userId])
+  @@index([participantRole])
+  @@index([liveRoomId, participantRole], map: "idx_participant_room_role")
+  @@map("session_participants")
+}
+
+model ParticipantEvent {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveRoomId           String               @map("live_room_id") @db.Uuid
+  sessionParticipantId String               @map("session_participant_id") @db.Uuid
+  userId               String               @map("user_id") @db.Uuid
+  eventType            ParticipantEventType @map("event_type")
+  occurredAt           DateTime             @default(now()) @map("occurred_at")
+  actionedById         String?              @map("actioned_by") @db.Uuid
+  source               String               @default("livekit_webhook") @db.VarChar(50)
+  metadata             Json?
+  createdAt            DateTime             @default(now()) @map("created_at")
+
+  liveRoom           LiveRoom           @relation(fields: [liveRoomId], references: [id])
+  sessionParticipant SessionParticipant @relation(fields: [sessionParticipantId], references: [id])
+  user               User               @relation("ParticipantEventUser", fields: [userId], references: [id])
+  actionedBy         User?              @relation("ParticipantEventActionedBy", fields: [actionedById], references: [id])
+
+  @@index([liveRoomId])
+  @@index([sessionParticipantId])
+  @@index([userId])
+  @@index([eventType])
+  @@index([occurredAt])
+  @@index([liveRoomId, occurredAt], map: "idx_events_room_time")
+  @@index([sessionParticipantId, eventType], map: "idx_events_participant_type")
+  @@map("participant_events")
+}
+
+model ConnectionQualityEvent {
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveRoomId           String            @map("live_room_id") @db.Uuid
+  sessionParticipantId String            @map("session_participant_id") @db.Uuid
+  userId               String            @map("user_id") @db.Uuid
+  quality              ConnectionQuality
+  occurredAt           DateTime          @default(now()) @map("occurred_at")
+  durationSeconds      Int?              @map("duration_seconds")
+  metadata             Json?
+  createdAt            DateTime          @default(now()) @map("created_at")
+
+  liveRoom           LiveRoom           @relation(fields: [liveRoomId], references: [id])
+  sessionParticipant SessionParticipant @relation(fields: [sessionParticipantId], references: [id])
+  user               User               @relation(fields: [userId], references: [id])
+
+  @@index([liveRoomId])
+  @@index([sessionParticipantId])
+  @@index([userId])
+  @@index([quality])
+  @@index([occurredAt])
+  @@index([sessionParticipantId, occurredAt], map: "idx_quality_participant_time")
+  @@index([liveRoomId, quality], map: "idx_quality_room_level")
+  @@map("connection_quality_events")
+}
+
+enum ConversationType {
+  INQUIRY
+  DIRECT
+  GROUP
+  ARCHIVED
+}
+
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+  FROZEN
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+  DELETED
+}
+
+enum MessageFilterResult {
+  CLEAN
+  BLOCKED_PHONE
+  BLOCKED_URL
+  BLOCKED_SOCIAL
+  BLOCKED_OBFUSCATED
+  BLOCKED_INTENT_KEYWORD
+}
+
+enum ConversationParticipantRole {
+  MEMBER
+  ADMIN
+}
+
+enum ModerationReviewStatus {
+  PENDING
+  REVIEWED
+  WARNING_ISSUED
+  FROZEN
+  ESCALATED
+  RESOLVED
+}
+
+enum ModerationReviewTrigger {
+  FILTER_ESCALATION
+  TRUST_SAFETY_FLAG
+  MANUAL_REPORT
+  ADMIN_INITIATED
+}
+
+enum FilterKeywordLanguage {
+  EN
+  FR
+  ANY
+}
+
+model Conversation {
+  id       String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type     ConversationType
+  status   ConversationStatus @default(ACTIVE)
+  bookingId String?           @map("booking_id") @db.Uuid
+  lastMessageAt      DateTime? @map("last_message_at")
+  lastMessagePreview String?   @map("last_message_preview") @db.VarChar(100)
+  frozenById   String?         @map("frozen_by") @db.Uuid
+  frozenAt     DateTime?       @map("frozen_at")
+  freezeReason String?         @map("freeze_reason")
+  blockCountConversation Int   @default(0) @map("block_count_conversation")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  deletedAt    DateTime?       @map("deleted_at")
+
+  booking      Booking?                  @relation(fields: [bookingId], references: [id])
+  frozenBy     User?                     @relation("ConversationFrozenBy", fields: [frozenById], references: [id])
+  participants ConversationParticipant[]
+  messages     Message[]
+  filterBlocks FilterBlock[]
+  moderationReviews ModerationReview[]
+
+  @@index([bookingId])
+  @@index([type])
+  @@index([status])
+  @@index([lastMessageAt])
+  @@index([type, status], map: "idx_conv_type_status")
+  @@index([deletedAt])
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id               String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId   String                      @map("conversation_id") @db.Uuid
+  userId           String                      @map("user_id") @db.Uuid
+  role             ConversationParticipantRole  @default(MEMBER)
+  unreadCount      Int                         @default(0) @map("unread_count")
+  lastReadMessageId String?                    @map("last_read_message_id") @db.Uuid
+  lastReadAt       DateTime?                   @map("last_read_at")
+  addedAt          DateTime                    @default(now()) @map("added_at")
+  addedById        String?                     @map("added_by") @db.Uuid
+  removedAt        DateTime?                   @map("removed_at")
+  removedById      String?                     @map("removed_by") @db.Uuid
+  createdAt        DateTime                    @default(now()) @map("created_at")
+  updatedAt        DateTime                    @updatedAt @map("updated_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  user         User         @relation("ConvParticipantUser", fields: [userId], references: [id])
+  addedBy      User?        @relation("ConvParticipantAddedBy", fields: [addedById], references: [id])
+  removedBy    User?        @relation("ConvParticipantRemovedBy", fields: [removedById], references: [id])
+
+  @@unique([conversationId, userId], map: "idx_participant_conv_user")
+  @@index([conversationId])
+  @@index([userId])
+  @@index([userId, unreadCount], map: "idx_participant_unread")
+  @@index([removedAt])
+  @@map("conversation_participants")
+}
+
+
+model Message {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String        @map("conversation_id") @db.Uuid
+  senderId       String        @map("sender_id") @db.Uuid
+  content        String
+  contentDeleted Boolean       @default(false) @map("content_deleted")
+  deletedContentKey String?    @map("deleted_content_key") @db.VarChar(255)
+  replyToId      String?       @map("reply_to_id") @db.Uuid
+  status         MessageStatus @default(SENT)
+  deliveredAt    DateTime?     @map("delivered_at")
+  deletedById    String?       @map("deleted_by") @db.Uuid
+  deletedAt      DateTime?     @map("deleted_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  conversation Conversation       @relation(fields: [conversationId], references: [id])
+  sender       User               @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo      Message?           @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies      Message[]          @relation("MessageReplies")
+  deletedBy    User?              @relation("MessageDeletedBy", fields: [deletedById], references: [id])
+  readReceipts MessageReadReceipt[]
+  moderationReviews ModerationReview[]
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([status])
+  @@index([replyToId])
+  @@index([contentDeleted])
+  @@index([conversationId, createdAt], map: "idx_messages_conv_time")
+  @@index([conversationId, status], map: "idx_messages_conv_status")
+  @@index([deletedAt])
+  @@map("messages")
+}
+
+model MessageReadReceipt {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  readAt    DateTime @default(now()) @map("read_at")
+
+  message Message @relation(fields: [messageId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId], map: "idx_read_receipt_unique")
+  @@index([messageId])
+  @@index([userId])
+  @@index([userId, readAt], map: "idx_read_receipt_user_time")
+  @@map("message_read_receipts")
+}
+
+model FilterBlock {
+  id               String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId   String              @map("conversation_id") @db.Uuid
+  senderId         String              @map("sender_id") @db.Uuid
+  attemptedContent String              @map("attempted_content")
+  filterResult     MessageFilterResult @map("filter_result")
+  matchedPattern   String?             @map("matched_pattern") @db.VarChar(500)
+  normalisedContent String?            @map("normalised_content")
+  filterLayer      Int                 @map("filter_layer")
+  escalatedToModerator    Boolean      @default(false) @map("escalated_to_moderator")
+  escalatedToTrustSafety  Boolean      @default(false) @map("escalated_to_trust_safety")
+  createdAt               DateTime     @default(now()) @map("created_at")
+
+  conversation Conversation      @relation(fields: [conversationId], references: [id])
+  sender       User              @relation(fields: [senderId], references: [id])
+  moderationReviews ModerationReview[]
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([filterResult])
+  @@index([filterLayer])
+  @@index([createdAt])
+  @@index([senderId, createdAt], map: "idx_blocks_sender_time")
+  @@index([conversationId, senderId], map: "idx_blocks_conv_sender")
+  @@index([escalatedToTrustSafety])
+  @@map("filter_blocks")
+}
+
+model ModerationReview {
+  id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId   String                  @map("conversation_id") @db.Uuid
+  trigger          ModerationReviewTrigger
+  status           ModerationReviewStatus  @default(PENDING)
+  filterBlockId    String?                 @map("filter_block_id") @db.Uuid
+  reportedMessageId String?               @map("reported_message_id") @db.Uuid
+  reportedById     String?                 @map("reported_by") @db.Uuid
+  reportReason     String?                 @map("report_reason") @db.VarChar(255)
+  reviewedById     String?                 @map("reviewed_by") @db.Uuid
+  reviewedAt       DateTime?               @map("reviewed_at")
+  reviewNote       String?                 @map("review_note")
+  actionTaken      String?                 @map("action_taken")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+
+  conversation    Conversation @relation(fields: [conversationId], references: [id])
+  filterBlock     FilterBlock? @relation(fields: [filterBlockId], references: [id])
+  reportedMessage Message?     @relation(fields: [reportedMessageId], references: [id])
+  reportedBy      User?        @relation("ModerationReportedBy", fields: [reportedById], references: [id])
+  reviewedBy      User?        @relation("ModerationReviewedBy", fields: [reviewedById], references: [id])
+
+  @@index([conversationId])
+  @@index([trigger])
+  @@index([status])
+  @@index([reviewedById])
+  @@index([reportedById])
+  @@index([status, createdAt], map: "idx_moderation_status_time")
+  @@index([conversationId, status], map: "idx_moderation_conv_status")
+  @@map("moderation_reviews")
+}
+
+model SessionChatMessage {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveRoomId String   @map("live_room_id") @db.Uuid
+  senderId   String   @map("sender_id") @db.Uuid
+  content    String
+  replyToId  String?  @map("reply_to_id") @db.Uuid
+  sentViaLivekit Boolean @default(true) @map("sent_via_livekit")
+  deletedById String? @map("deleted_by") @db.Uuid
+  deletedAt  DateTime? @map("deleted_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  liveRoom LiveRoom           @relation(fields: [liveRoomId], references: [id])
+  sender   User               @relation("SessionChatSender", fields: [senderId], references: [id])
+  replyTo  SessionChatMessage? @relation("SessionChatReplies", fields: [replyToId], references: [id])
+  replies  SessionChatMessage[] @relation("SessionChatReplies")
+  deletedBy User?              @relation("SessionChatDeletedBy", fields: [deletedById], references: [id])
+
+  @@index([liveRoomId])
+  @@index([senderId])
+  @@index([liveRoomId, createdAt], map: "idx_session_chat_room_time")
+  @@index([deletedAt])
+  @@map("session_chat_messages")
+}
+
+model FilterKeyword {
+  id            String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keyword       String                @db.VarChar(255)
+  language      FilterKeywordLanguage @default(ANY)
+  isActive      Boolean               @default(true) @map("is_active")
+  addedById     String                @map("added_by") @db.Uuid
+  addedAt       DateTime              @default(now()) @map("added_at")
+  deactivatedAt DateTime?             @map("deactivated_at")
+
+  addedBy User @relation(fields: [addedById], references: [id])
+
+  @@unique([keyword, language], map: "idx_keyword_lang_unique")
+  @@index([keyword])
+  @@index([language])
+  @@index([isActive])
+  @@map("filter_keywords")
+}
+
+enum ConfirmationAction {
+  CONFIRMED
+  AUTO_CONFIRMED
+}
+
+enum AutoResolutionRecommendationType {
+  TUTOR_FAVOR
+  PARENT_FAVOR
+  ADMIN_REVIEW
+}
+
+enum DisputeStatus {
+  OPEN
+  AWAITING_ADMIN
+  UNDER_REVIEW
+  RESOLVED_TUTOR_FAVOR
+  RESOLVED_PARENT_FAVOR
+  ESCALATED
+}
+
+enum DisputeReason {
+  LESSON_DID_NOT_HAPPEN
+  LESSON_SIGNIFICANTLY_SHORTER
+  TUTOR_DID_NOT_COVER_SUBJECT
+  TUTOR_BEHAVIOUR_INAPPROPRIATE
+  TECHNICAL_ISSUES_PREVENTED_LESSON
+  OTHER
+}
+
+enum DisputeEvidenceParty {
+  PARENT
+  TUTOR
+}
+
+enum IncidentReportType {
+  PARENT_REPORTING_TUTOR
+  TUTOR_REPORTING_PARENT
+  TUTOR_REPORTING_STUDENT
+}
+
+enum IncidentReason {
+  INAPPROPRIATE_LANGUAGE_OR_BEHAVIOUR
+  DID_NOT_COVER_AGREED_SUBJECT
+  SIGNIFICANTLY_LATE_OR_UNPREPARED
+  MADE_UNCOMFORTABLE
+  ATTEMPTED_OFF_PLATFORM_CONTACT
+  ABUSIVE_OR_DISRESPECTFUL
+  UNREASONABLE_DEMANDS
+  NO_SHOW_WITHOUT_CANCELLATION
+  OTHER
+}
+
+model LessonConfirmation {
+  id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId String              @unique @map("booking_id") @db.Uuid
+  action    ConfirmationAction?
+  confirmedById String?         @map("confirmed_by") @db.Uuid
+  confirmedAt   DateTime?       @map("confirmed_at")
+  windowOpenedAt DateTime       @map("window_opened_at")
+  windowClosesAt DateTime       @map("window_closes_at")
+  autoReleaseJobId String?      @map("auto_release_job_id") @db.VarChar(255)
+  sessionDataSnapshot Json      @map("session_data_snapshot")
+  createdAt          DateTime   @default(now()) @map("created_at")
+
+  booking        Booking                       @relation(fields: [bookingId], references: [id])
+  confirmedBy    User?                         @relation(fields: [confirmedById], references: [id])
+  recommendation AutoResolutionRecommendation?
+  dispute        Dispute?
+
+  @@index([action])
+  @@index([windowClosesAt])
+  @@index([action, confirmedAt], map: "idx_confirmation_action_time")
+  @@map("lesson_confirmations")
+}
+
+model AutoResolutionRecommendation {
+  id                     String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId              String                           @unique @map("booking_id") @db.Uuid
+  lessonConfirmationId   String                           @unique @map("lesson_confirmation_id") @db.Uuid
+  recommendation         AutoResolutionRecommendationType
+  overlapPercentage      Int?                             @map("overlap_percentage")
+  tutorJoined            Boolean                          @map("tutor_joined")
+  studentJoined          Boolean                          @map("student_joined")
+  tutorJoinDelayMinutes  Int?                             @map("tutor_join_delay_minutes")
+  severeConnectionEvents Boolean                          @default(false) @map("severe_connection_events")
+  sessionEndedEarly      Boolean                          @default(false) @map("session_ended_early")
+  reasoning              String
+  createdAt              DateTime                         @default(now()) @map("created_at")
+
+  booking            Booking            @relation(fields: [bookingId], references: [id])
+  lessonConfirmation LessonConfirmation @relation(fields: [lessonConfirmationId], references: [id])
+  disputes           Dispute[]
+
+  @@index([recommendation])
+  @@index([lessonConfirmationId])
+  @@map("auto_resolution_recommendations")
+}
+
+model Dispute {
+  id                     String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId              String        @unique @map("booking_id") @db.Uuid
+  lessonConfirmationId   String        @unique @map("lesson_confirmation_id") @db.Uuid
+  openedById             String        @map("opened_by") @db.Uuid
+  reason                 DisputeReason
+  description            String
+  status                 DisputeStatus @default(OPEN)
+  tutorResponseDueAt     DateTime      @map("tutor_response_due_at")
+  tutorResponseReminderSent Boolean    @default(false) @map("tutor_response_reminder_sent")
+  tutorRespondedAt       DateTime?     @map("tutor_responded_at")
+  tutorResponseStatement String?       @map("tutor_response_statement")
+  assignedToId           String?       @map("assigned_to") @db.Uuid
+  assignedAt             DateTime?     @map("assigned_at")
+  resolvedById           String?       @map("resolved_by") @db.Uuid
+  resolvedAt             DateTime?     @map("resolved_at")
+  resolutionReason       String?       @map("resolution_reason")
+  escalatedAt            DateTime?     @map("escalated_at")
+  escalationNotified     Boolean       @default(false) @map("escalation_notified")
+  recommendationId       String?       @map("recommendation_id") @db.Uuid
+  openedAt               DateTime      @default(now()) @map("opened_at")
+  updatedAt              DateTime      @updatedAt @map("updated_at")
+
+  booking            Booking                       @relation(fields: [bookingId], references: [id])
+  lessonConfirmation LessonConfirmation            @relation(fields: [lessonConfirmationId], references: [id])
+  openedBy           User                          @relation("DisputeOpenedBy", fields: [openedById], references: [id])
+  assignedTo         User?                         @relation("DisputeAssignedTo", fields: [assignedToId], references: [id])
+  resolvedBy         User?                         @relation("DisputeResolvedBy", fields: [resolvedById], references: [id])
+  recommendation     AutoResolutionRecommendation? @relation(fields: [recommendationId], references: [id])
+  evidenceFiles      DisputeEvidenceFile[]
+  evidenceSnapshot   DisputeEvidenceSnapshot?
+  escrowReleases     EscrowHold[]                  @relation("EscrowReleasedByDispute")
+  supportTickets     SupportTicket[]
+
+  @@index([openedById])
+  @@index([status])
+  @@index([resolvedById])
+  @@index([tutorResponseDueAt])
+  @@index([status, openedAt], map: "idx_dispute_status_time")
+  @@index([status, escalatedAt], map: "idx_dispute_escalation")
+  @@map("disputes")
+}
+
+model DisputeEvidenceFile {
+  id          String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  disputeId   String               @map("dispute_id") @db.Uuid
+  fileId      String               @map("file_id") @db.Uuid
+  uploadedById String              @map("uploaded_by") @db.Uuid
+  party       DisputeEvidenceParty
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  dispute    Dispute @relation(fields: [disputeId], references: [id])
+  file       File    @relation(fields: [fileId], references: [id])
+  uploadedBy User    @relation(fields: [uploadedById], references: [id])
+
+  @@index([disputeId])
+  @@index([fileId])
+  @@index([uploadedById])
+  @@index([party])
+  @@index([disputeId, party], map: "idx_evidence_dispute_party")
+  @@map("dispute_evidence_files")
+}
+
+model DisputeEvidenceSnapshot {
+  id                           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  disputeId                    String   @unique @map("dispute_id") @db.Uuid
+  bookingSnapshot              Json     @map("booking_snapshot")
+  sessionDataSnapshot          Json     @map("session_data_snapshot")
+  conversationSnapshot         Json     @map("conversation_snapshot")
+  sessionChatSnapshot          Json     @map("session_chat_snapshot")
+  recommendationSnapshot       Json     @map("recommendation_snapshot")
+  tutorDisputeHistorySnapshot  Json     @map("tutor_dispute_history_snapshot")
+  parentDisputeHistorySnapshot Json     @map("parent_dispute_history_snapshot")
+  assembledAt                  DateTime @default(now()) @map("assembled_at")
+  assemblyDurationMs           Int?     @map("assembly_duration_ms")
+
+  dispute Dispute @relation(fields: [disputeId], references: [id])
+
+  @@index([assembledAt])
+  @@map("dispute_evidence_snapshots")
+}
+
+model IncidentReport {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId        String             @map("booking_id") @db.Uuid
+  reportedById     String             @map("reported_by") @db.Uuid
+  reportedAgainstId String            @map("reported_against") @db.Uuid
+  reportType       IncidentReportType @map("report_type")
+  reason           IncidentReason
+  description      String
+  reviewedById     String?            @map("reviewed_by") @db.Uuid
+  reviewedAt       DateTime?          @map("reviewed_at")
+  reviewNote       String?            @map("review_note")
+  actionTaken      String?            @map("action_taken") @db.VarChar(255)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  booking         Booking @relation(fields: [bookingId], references: [id])
+  reportedBy      User    @relation("IncidentReportedBy", fields: [reportedById], references: [id])
+  reportedAgainst User    @relation("IncidentReportedAgainst", fields: [reportedAgainstId], references: [id])
+  reviewedBy      User?   @relation("IncidentReviewedBy", fields: [reviewedById], references: [id])
+
+  @@index([bookingId])
+  @@index([reportedById])
+  @@index([reportedAgainstId])
+  @@index([reportType])
+  @@index([reviewedById])
+  @@index([reportedAgainstId, createdAt], map: "idx_incident_against_time")
+  @@index([reportedById, createdAt], map: "idx_incident_by_time")
+  @@map("incident_reports")
+}
+
+enum ReviewAuthorRole {
+  PARENT
+  STUDENT
+  TUTOR
+}
+
+enum ReviewSubjectRole {
+  TUTOR
+  PARENT
+  STUDENT
+}
+
+enum ReviewStatus {
+  PENDING
+  SUBMITTED
+  REVEALED
+  EXPIRED
+}
+
+enum ReportReason {
+  FAKE_OR_SPAM
+  INAPPROPRIATE_CONTENT
+  HARASSMENT
+  IRRELEVANT
+  OTHER
+}
+
+enum ReviewReportStatus {
+  PENDING
+  DISMISSED
+  WARNING_ISSUED
+  REMOVED
+  ESCALATED
+}
+
+enum ReviewFraudSignalType {
+  COORDINATED_REVIEW_BURST
+  ZERO_BOOKING_HISTORY_CLUSTER
+  EXCESSIVE_REPORTS_BY_ACCOUNT
+}
+
+model ReviewWindow {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId         String    @unique @map("booking_id") @db.Uuid
+  openedAt          DateTime  @default(now()) @map("opened_at")
+  closesAt          DateTime  @map("closes_at")
+  closeJobId        String?   @map("close_job_id") @db.VarChar(255)
+  authorSubmitted   Boolean   @default(false) @map("author_submitted")
+  subjectSubmitted  Boolean   @default(false) @map("subject_submitted")
+  revealedAt        DateTime? @map("revealed_at")
+  reopenedById      String?   @map("reopened_by") @db.Uuid
+  reopenedAt        DateTime? @map("reopened_at")
+  reopenReason      String?   @map("reopen_reason")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  reopenedBy User?    @relation(fields: [reopenedById], references: [id])
+  reviews    Review[]
+
+  @@index([closesAt])
+  @@index([revealedAt])
+  @@index([authorSubmitted, subjectSubmitted], map: "idx_window_submission_state")
+  @@index([closesAt, revealedAt], map: "idx_window_pending_reveal")
+  @@map("review_windows")
+}
+
+model Review {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId       String           @map("booking_id") @db.Uuid
+  reviewWindowId  String           @map("review_window_id") @db.Uuid
+  authorId        String           @map("author_id") @db.Uuid
+  subjectId       String           @map("subject_id") @db.Uuid
+  authorRole      ReviewAuthorRole @map("author_role")
+  subjectRole     ReviewSubjectRole @map("subject_role")
+  overallRating   Int              @map("overall_rating")
+  wouldRebook     Boolean          @map("would_rebook")
+  ratingSubjectKnowledge Int?      @map("rating_subject_knowledge")
+  ratingCommunication    Int?      @map("rating_communication")
+  ratingPunctuality      Int?      @map("rating_punctuality")
+  writtenReview   String?          @map("written_review")
+  status          ReviewStatus     @default(SUBMITTED)
+  revealedAt      DateTime?        @map("revealed_at")
+  tutorResponse   String?          @map("tutor_response")
+  tutorResponseAt DateTime?        @map("tutor_response_at")
+  tutorResponseEditDeadline DateTime? @map("tutor_response_edit_deadline")
+  deletedById     String?          @map("deleted_by") @db.Uuid
+  deletedAt       DateTime?        @map("deleted_at")
+  deletionReason  String?          @map("deletion_reason")
+  lowStarPromptShown    Boolean    @default(false) @map("low_star_prompt_shown")
+  incidentReportFiled   Boolean    @default(false) @map("incident_report_filed")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  booking      Booking      @relation(fields: [bookingId], references: [id])
+  reviewWindow ReviewWindow @relation(fields: [reviewWindowId], references: [id])
+  author       User         @relation("ReviewAuthor", fields: [authorId], references: [id])
+  subject      User         @relation("ReviewSubject", fields: [subjectId], references: [id])
+  deletedBy    User?        @relation("ReviewDeletedBy", fields: [deletedById], references: [id])
+  ratingSnapshots TutorRatingSnapshot[] @relation("SnapshotTrigger")
+  reports      ReviewReport[]
+
+  @@unique([bookingId, authorId], map: "idx_review_booking_author")
+  @@index([bookingId])
+  @@index([reviewWindowId])
+  @@index([authorId])
+  @@index([subjectId])
+  @@index([overallRating])
+  @@index([status])
+  @@index([revealedAt])
+  @@index([deletedAt])
+  @@index([subjectId, status, revealedAt], map: "idx_review_subject_revealed")
+  @@index([subjectId, createdAt], map: "idx_review_subject_time")
+  @@map("reviews")
+}
+
+model TutorRatingSnapshot {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorId            String   @unique @map("tutor_id") @db.Uuid
+  bayesianRating     Decimal  @default(0) @map("bayesian_rating") @db.Decimal(3, 2)
+  rawAverage         Decimal  @default(0) @map("raw_average") @db.Decimal(3, 2)
+  totalReviewCount   Int      @default(0) @map("total_review_count")
+  wouldRebookCount   Int      @default(0) @map("would_rebook_count")
+  wouldRebookPercentage Int?  @map("would_rebook_percentage")
+  avgSubjectKnowledge Decimal? @map("avg_subject_knowledge") @db.Decimal(3, 2)
+  avgCommunication   Decimal? @map("avg_communication") @db.Decimal(3, 2)
+  avgPunctuality     Decimal? @map("avg_punctuality") @db.Decimal(3, 2)
+  count5Star         Int      @default(0) @map("count_5_star")
+  count4Star         Int      @default(0) @map("count_4_star")
+  count3Star         Int      @default(0) @map("count_3_star")
+  count2Star         Int      @default(0) @map("count_2_star")
+  count1Star         Int      @default(0) @map("count_1_star")
+  lastRecalculatedAt     DateTime @default(now()) @map("last_recalculated_at")
+  recalculatedByReviewId String?  @map("recalculated_by_review_id") @db.Uuid
+  platformAvgAtCalculation Decimal? @map("platform_avg_at_calculation") @db.Decimal(3, 2)
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  tutor              User    @relation(fields: [tutorId], references: [id])
+  recalculatedByReview Review? @relation("SnapshotTrigger", fields: [recalculatedByReviewId], references: [id])
+
+  @@index([bayesianRating])
+  @@index([totalReviewCount])
+  @@index([lastRecalculatedAt])
+  @@map("tutor_rating_snapshots")
+}
+
+model ReviewReport {
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reviewId     String             @map("review_id") @db.Uuid
+  reportedById String             @map("reported_by") @db.Uuid
+  reason       ReportReason
+  description  String?
+  status       ReviewReportStatus @default(PENDING)
+  reviewedById String?            @map("reviewed_by") @db.Uuid
+  reviewedAt   DateTime?          @map("reviewed_at")
+  reviewNote   String?            @map("review_note")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  review     Review @relation(fields: [reviewId], references: [id])
+  reportedBy User   @relation("ReviewReportReportedBy", fields: [reportedById], references: [id])
+  reviewedBy User?  @relation("ReviewReportReviewedBy", fields: [reviewedById], references: [id])
+
+  @@unique([reviewId, reportedById], map: "idx_report_review_user")
+  @@index([reviewId])
+  @@index([reportedById])
+  @@index([status])
+  @@index([reviewedById])
+  @@index([status, createdAt], map: "idx_report_status_time")
+  @@map("review_reports")
+}
+
+model ReviewFraudSignal {
+  id               String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  signalType       ReviewFraudSignalType  @map("signal_type")
+  subjectUserId    String                 @map("subject_user_id") @db.Uuid
+  reviewIds        String[]               @map("review_ids") @db.Uuid
+  detectedAt       DateTime               @default(now()) @map("detected_at")
+  detectionWindowHours Int                @map("detection_window_hours")
+  trustSafetySignalCreated Boolean        @default(false) @map("trust_safety_signal_created")
+  trustSafetySignalAt      DateTime?      @map("trust_safety_signal_at")
+  metadata                 Json?
+  createdAt                DateTime       @default(now()) @map("created_at")
+
+  subjectUser User @relation(fields: [subjectUserId], references: [id])
+
+  @@index([subjectUserId])
+  @@index([signalType])
+  @@index([detectedAt])
+  @@index([trustSafetySignalCreated])
+  @@index([subjectUserId, signalType], map: "idx_fraud_signal_subject_type")
+  @@map("review_fraud_signals")
+}
+
+enum RiskState {
+  GREEN
+  YELLOW
+  ORANGE
+  RED
+}
+
+enum ReauthChallengeStatus {
+  PENDING
+  PASSED
+  FAILED
+  EXPIRED
+}
+
+model RiskScore {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @unique @map("user_id") @db.Uuid
+  currentScore       Int       @default(0) @map("current_score")
+  currentState       RiskState @default(GREEN) @map("current_state")
+  lastNegativeSignalAt DateTime? @map("last_negative_signal_at")
+  lastDecayAt        DateTime? @map("last_decay_at")
+  nextDecayAt        DateTime? @map("next_decay_at")
+  currentStateSince  DateTime  @default(now()) @map("current_state_since")
+  suspendedByTrustSafety Boolean @default(false) @map("suspended_by_trust_safety")
+  humanReviewDueAt   DateTime? @map("human_review_due_at")
+  humanReviewCompletedAt DateTime? @map("human_review_completed_at")
+  humanReviewCompletedById String? @map("human_review_completed_by") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  user                   User              @relation("RiskScoreUser", fields: [userId], references: [id])
+  humanReviewCompletedBy User?             @relation("RiskScoreReviewedBy", fields: [humanReviewCompletedById], references: [id])
+  signals                RiskSignal[]
+  stateHistory           RiskStateHistory[]
+
+  @@index([currentState])
+  @@index([currentScore])
+  @@index([currentState, currentStateSince], map: "idx_risk_state_since")
+  @@index([nextDecayAt])
+  @@index([humanReviewDueAt])
+  @@index([suspendedByTrustSafety])
+  @@map("risk_scores")
+}
+
+model RiskSignal {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  riskScoreId     String    @map("risk_score_id") @db.Uuid
+  signalType      String    @map("signal_type") @db.VarChar(100)
+  pointsApplied   Int       @map("points_applied")
+  scoreBefore     Int       @map("score_before")
+  scoreAfter      Int       @map("score_after")
+  stateBefore     RiskState @map("state_before")
+  stateAfter      RiskState @map("state_after")
+  sourceModule    String    @map("source_module") @db.VarChar(10)
+  sourceRecordId  String?   @map("source_record_id") @db.Uuid
+  sourceRecordType String?  @map("source_record_type") @db.VarChar(100)
+  triggeredImmediateEscalation Boolean @default(false) @map("triggered_immediate_escalation")
+  performedById   String?   @map("performed_by") @db.Uuid
+  manualReason    String?   @map("manual_reason")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  user        User      @relation("RiskSignalUser", fields: [userId], references: [id])
+  riskScore   RiskScore @relation(fields: [riskScoreId], references: [id])
+  performedBy User?     @relation("RiskSignalPerformedBy", fields: [performedById], references: [id])
+  stateTransitions RiskStateHistory[]
+
+  @@index([userId])
+  @@index([riskScoreId])
+  @@index([signalType])
+  @@index([sourceModule])
+  @@index([sourceRecordId])
+  @@index([createdAt])
+  @@index([triggeredImmediateEscalation])
+  @@index([userId, createdAt], map: "idx_signals_user_time")
+  @@index([userId, signalType], map: "idx_signals_user_type")
+  @@index([signalType, createdAt], map: "idx_signals_type_time")
+  @@map("risk_signals")
+}
+
+model RiskStateHistory {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  riskScoreId          String    @map("risk_score_id") @db.Uuid
+  previousState        RiskState @map("previous_state")
+  newState             RiskState @map("new_state")
+  scoreAtTransition    Int       @map("score_at_transition")
+  triggeringSignalId   String    @map("triggering_signal_id") @db.Uuid
+  suspensionTriggered  Boolean   @default(false) @map("suspension_triggered")
+  suspensionTriggeredAt DateTime? @map("suspension_triggered_at")
+  clearedById          String?   @map("cleared_by") @db.Uuid
+  clearedAt            DateTime? @map("cleared_at")
+  clearanceReason      String?   @map("clearance_reason")
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  user             User       @relation("RiskStateUser", fields: [userId], references: [id])
+  riskScore        RiskScore  @relation(fields: [riskScoreId], references: [id])
+  triggeringSignal RiskSignal @relation(fields: [triggeringSignalId], references: [id])
+  clearedBy        User?      @relation("RiskStateClearedBy", fields: [clearedById], references: [id])
+
+  @@index([userId])
+  @@index([riskScoreId])
+  @@index([previousState])
+  @@index([newState])
+  @@index([triggeringSignalId])
+  @@index([createdAt])
+  @@index([suspensionTriggered])
+  @@index([userId, createdAt], map: "idx_state_history_user_time")
+  @@index([newState, createdAt], map: "idx_state_history_new_state_time")
+  @@map("risk_state_history")
+}
+
+model ReauthChallenge {
+  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String                @map("user_id") @db.Uuid
+  triggerAction   String                @map("trigger_action") @db.VarChar(100)
+  triggerRecordId String?               @map("trigger_record_id") @db.Uuid
+  status          ReauthChallengeStatus @default(PENDING)
+  issuedAt        DateTime              @default(now()) @map("issued_at")
+  expiresAt       DateTime              @map("expires_at")
+  completedAt     DateTime?             @map("completed_at")
+  failureReason   String?               @map("failure_reason")
+  riskScoreAtIssue Int                  @map("risk_score_at_issue")
+  riskStateAtIssue RiskState            @map("risk_state_at_issue")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([triggerRecordId])
+  @@index([userId, status], map: "idx_reauth_user_status")
+  @@index([status, expiresAt], map: "idx_reauth_pending_expiry")
+  @@map("reauth_challenges")
+}
+
+model DeviceFingerprintRegistry {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  deviceFingerprintHash   String   @map("device_fingerprint_hash") @db.VarChar(255)
+  userId                  String   @map("user_id") @db.Uuid
+  firstSeenAt             DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt              DateTime @default(now()) @map("last_seen_at")
+  associatedWithSuspended Boolean  @default(false) @map("associated_with_suspended")
+  associatedWithBanned    Boolean  @default(false) @map("associated_with_banned")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([deviceFingerprintHash, userId], map: "idx_fingerprint_user_unique")
+  @@index([deviceFingerprintHash])
+  @@index([userId])
+  @@index([deviceFingerprintHash, associatedWithBanned], map: "idx_fingerprint_banned")
+  @@index([associatedWithSuspended])
+  @@map("device_fingerprint_registry")
+}
+
+
+enum DeadLetterJobStatus {
+  FAILED
+  RETRYING
+  RESOLVED
+  DISMISSED
+}
+
+model DeadLetterJob {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId         String              @map("job_id") @db.VarChar(255)
+  queueName     String              @map("queue_name") @db.VarChar(100)
+  jobType       String              @map("job_type") @db.VarChar(100)
+  jobData       Json                @map("job_data")
+  status        DeadLetterJobStatus @default(FAILED)
+  attemptCount  Int                 @map("attempt_count")
+  lastFailureReason String          @map("last_failure_reason")
+  lastFailedAt  DateTime            @map("last_failed_at")
+  errorStack    String?             @map("error_stack")
+  bookingId     String?             @map("booking_id") @db.Uuid
+  userId        String?             @map("user_id") @db.Uuid
+  payoutQueueId String?             @map("payout_queue_id") @db.Uuid
+  retriedById   String?             @map("retried_by") @db.Uuid
+  retriedAt     DateTime?           @map("retried_at")
+  retryJobId    String?             @map("retry_job_id") @db.VarChar(255)
+  resolvedAt    DateTime?           @map("resolved_at")
+  dismissedById String?             @map("dismissed_by") @db.Uuid
+  dismissedAt   DateTime?           @map("dismissed_at")
+  dismissalReason String?           @map("dismissal_reason")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  booking     Booking?     @relation(fields: [bookingId], references: [id])
+  user        User?        @relation("DlqUser", fields: [userId], references: [id])
+  payoutQueue PayoutQueue? @relation(fields: [payoutQueueId], references: [id])
+  retriedBy   User?        @relation("DlqRetriedBy", fields: [retriedById], references: [id])
+  dismissedBy User?        @relation("DlqDismissedBy", fields: [dismissedById], references: [id])
+
+  @@index([jobId])
+  @@index([queueName])
+  @@index([jobType])
+  @@index([status])
+  @@index([userId])
+  @@index([bookingId])
+  @@index([payoutQueueId])
+  @@index([lastFailedAt])
+  @@index([status, lastFailedAt], map: "idx_dlq_status_time")
+  @@index([queueName, status], map: "idx_dlq_queue_status")
+  @@map("dead_letter_jobs")
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  AWAITING_USER
+  ESCALATED
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+enum TicketCategory {
+  PAYMENT_ISSUE
+  BOOKING_ISSUE
+  ACCOUNT_ACCESS
+  KYC_QUERY
+  DISPUTE_QUERY
+  WITHDRAWAL_FAILED
+  RECONCILIATION_PENDING
+  TECHNICAL_ISSUE
+  POLICY_QUERY
+  OTHER
+}
+
+enum TicketCreationSource {
+  USER_MANUAL
+  SYSTEM_FAILED_PAYOUT
+  SYSTEM_RECONCILIATION
+}
+
+enum TicketMessageAuthorType {
+  USER
+  SUPPORT_AGENT
+  ADMIN
+  SYSTEM
+}
+
+model SupportTicket {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  submittedById   String               @map("submitted_by") @db.Uuid
+  category        TicketCategory
+  subject         String               @db.VarChar(100)
+  status          TicketStatus         @default(OPEN)
+  creationSource  TicketCreationSource @default(USER_MANUAL) @map("creation_source")
+  assignedToId    String?              @map("assigned_to") @db.Uuid
+  assignedAt      DateTime?            @map("assigned_at")
+  escalatedToId   String?              @map("escalated_to") @db.Uuid
+  escalatedAt     DateTime?            @map("escalated_at")
+  escalationReason String?             @map("escalation_reason")
+  resolvedById    String?              @map("resolved_by") @db.Uuid
+  resolvedAt      DateTime?            @map("resolved_at")
+  resolutionSummary String?            @map("resolution_summary")
+  reopenDeadline  DateTime?            @map("reopen_deadline")
+  reopenedAt      DateTime?            @map("reopened_at")
+  reopenCount     Int                  @default(0) @map("reopen_count")
+  autoCloseJobId  String?              @map("auto_close_job_id") @db.VarChar(255)
+  bookingId       String?              @map("booking_id") @db.Uuid
+  payoutQueueId   String?              @map("payout_queue_id") @db.Uuid
+  reconciliationId String?             @map("reconciliation_id") @db.Uuid
+  disputeId       String?              @map("dispute_id") @db.Uuid
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  submittedBy    User                   @relation("TicketSubmittedBy", fields: [submittedById], references: [id])
+  assignedTo     User?                  @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+  escalatedTo    User?                  @relation("TicketEscalatedTo", fields: [escalatedToId], references: [id])
+  resolvedBy     User?                  @relation("TicketResolvedBy", fields: [resolvedById], references: [id])
+  booking        Booking?               @relation(fields: [bookingId], references: [id])
+  payoutQueue    PayoutQueue?           @relation(fields: [payoutQueueId], references: [id])
+  dispute        Dispute?               @relation(fields: [disputeId], references: [id])
+  reconciliations PaymentReconciliation[] 
+  messages       TicketMessage[]
+  attachments    TicketAttachment[]
+  statusHistory  TicketStatusHistory[]
+  failedPayoutContext FailedPayoutContext?
+  reconciliationContext ReconciliationContext?
+
+  @@index([submittedById])
+  @@index([assignedToId])
+  @@index([escalatedToId])
+  @@index([status])
+  @@index([category])
+  @@index([creationSource])
+  @@index([bookingId])
+  @@index([payoutQueueId])
+  @@index([status, createdAt], map: "idx_ticket_status_time")
+  @@index([assignedToId, status], map: "idx_ticket_agent_status")
+  @@index([status, reopenDeadline], map: "idx_ticket_reopen_window")
+  @@index([submittedById, status], map: "idx_ticket_user_status")
+  @@map("support_tickets")
+}
+
+model TicketMessage {
+  id         String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId   String                   @map("ticket_id") @db.Uuid
+  authorId   String?                  @map("author_id") @db.Uuid
+  authorType TicketMessageAuthorType  @map("author_type")
+  content    String
+  isInternalNote Boolean              @default(false) @map("is_internal_note")
+  createdAt  DateTime                 @default(now()) @map("created_at")
+
+  ticket      SupportTicket      @relation(fields: [ticketId], references: [id])
+  author      User?              @relation(fields: [authorId], references: [id])
+  attachments TicketAttachment[]
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@index([authorType])
+  @@index([isInternalNote])
+  @@index([ticketId, createdAt], map: "idx_ticket_messages_thread")
+  @@index([ticketId, isInternalNote], map: "idx_ticket_messages_visibility")
+  @@map("ticket_messages")
+}
+
+model TicketAttachment {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId     String   @map("ticket_id") @db.Uuid
+  messageId    String   @map("message_id") @db.Uuid
+  fileId       String   @map("file_id") @db.Uuid
+  uploadedById String   @map("uploaded_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  message   TicketMessage @relation(fields: [messageId], references: [id])
+  file      File          @relation(fields: [fileId], references: [id])
+  uploadedBy User         @relation(fields: [uploadedById], references: [id])
+
+  @@unique([messageId, fileId], map: "idx_attachment_message_file")
+  @@index([ticketId])
+  @@index([messageId])
+  @@index([fileId])
+  @@index([uploadedById])
+  @@map("ticket_attachments")
+}
+
+model TicketStatusHistory {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId       String       @map("ticket_id") @db.Uuid
+  previousStatus TicketStatus? @map("previous_status")
+  newStatus      TicketStatus @map("new_status")
+  changedById    String?      @map("changed_by") @db.Uuid
+  changeReason   String?      @map("change_reason")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  changedBy User?         @relation(fields: [changedById], references: [id])
+
+  @@index([ticketId])
+  @@index([previousStatus])
+  @@index([newStatus])
+  @@index([changedById])
+  @@index([createdAt])
+  @@index([ticketId, createdAt], map: "idx_ticket_history_thread")
+  @@map("ticket_status_history")
+}
+
+model FailedPayoutContext {
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId        String  @unique @map("ticket_id") @db.Uuid
+  payoutQueueId   String  @map("payout_queue_id") @db.Uuid
+  withdrawalAmountXaf    Int @map("withdrawal_amount_xaf")
+  destinationPhone       String @map("destination_phone") @db.VarChar(20)
+  destinationProvider    String @map("destination_provider") @db.VarChar(20)
+  providerFailureReason  String? @map("provider_failure_reason")
+  providerResponseSnapshot Json? @map("provider_response_snapshot")
+  registeredAccountsSnapshot Json @map("registered_accounts_snapshot")
+  retryInitiatedById     String? @map("retry_initiated_by") @db.Uuid
+  retryInitiatedAt       DateTime? @map("retry_initiated_at")
+  retryPayoutQueueId     String? @map("retry_payout_queue_id") @db.Uuid
+  retryOutcome           String? @map("retry_outcome") @db.VarChar(50)
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  ticket           SupportTicket @relation(fields: [ticketId], references: [id])
+  payoutQueue      PayoutQueue   @relation("FailedPayoutSource", fields: [payoutQueueId], references: [id])
+  retryInitiatedBy User?         @relation(fields: [retryInitiatedById], references: [id])
+  retryPayoutQueue PayoutQueue?  @relation("FailedPayoutRetry", fields: [retryPayoutQueueId], references: [id])
+
+  @@index([payoutQueueId])
+  @@index([retryPayoutQueueId])
+  @@map("failed_payout_contexts")
+}
+
+model ReconciliationContext {
+  id                      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId                String  @unique @map("ticket_id") @db.Uuid
+  reconciliationId        String  @map("reconciliation_id") @db.Uuid
+  providerTransactionId   String  @map("provider_transaction_id") @db.VarChar(255)
+  paymentAmountXaf        Int     @map("payment_amount_xaf")
+  providerQueryResult     String? @map("provider_query_result") @db.VarChar(50)
+  providerQuerySnapshot   Json?   @map("provider_query_snapshot")
+  parentWalletBalanceAtTicket Int @map("parent_wallet_balance_at_ticket")
+  manuallyResolvedById    String? @map("manually_resolved_by") @db.Uuid
+  manuallyResolvedAt      DateTime? @map("manually_resolved_at")
+  manualResolution        String? @map("manual_resolution") @db.VarChar(50)
+  manualResolutionNote    String? @map("manual_resolution_note")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  ticket         SupportTicket         @relation(fields: [ticketId], references: [id])
+  reconciliation PaymentReconciliation @relation(fields: [reconciliationId], references: [id])
+  manuallyResolvedBy User?             @relation(fields: [manuallyResolvedById], references: [id])
+
+  @@index([reconciliationId])
+  @@index([providerTransactionId])
+  @@index([manualResolution])
+  @@map("reconciliation_contexts")
+}
+
+enum AnalyticsSnapshotType {
+  REVENUE_METRICS
+  USER_METRICS
+  DEMAND_SIGNALS
+  TUTOR_PERFORMANCE
+  PLATFORM_HEALTH
+  LEARNING_HEALTH
+}
+
+enum ReportFormat {
+  CSV
+  PDF
+}
+
+enum ReportSchedule {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum GeneratedReportStatus {
+  QUEUED
+  GENERATING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum ReportType {
+  REVENUE_SUMMARY
+  USER_REGISTRATIONS
+  TUTOR_PERFORMANCE
+  BOOKING_SUMMARY
+  DISPUTE_SUMMARY
+  PAYMENT_LEDGER
+  KYC_PIPELINE
+  TRUST_SAFETY_SUMMARY
+  DEMAND_SIGNALS
+  LEARNING_ANALYTICS
+  CUSTOM
+}
+
+model AnalyticsSnapshot {
+  id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  snapshotType        AnalyticsSnapshotType @map("snapshot_type")
+  data                Json
+  computedAt          DateTime              @default(now()) @map("computed_at")
+  computationDurationMs Int?                @map("computation_duration_ms")
+  coversPeriodFrom    DateTime              @map("covers_period_from")
+  coversPeriodTo      DateTime              @map("covers_period_to")
+  jobId               String?               @map("job_id") @db.VarChar(255)
+
+  @@index([snapshotType])
+  @@index([computedAt])
+  @@index([snapshotType, computedAt], map: "idx_snapshot_type_time")
+  @@map("analytics_snapshots")
+}
+
+model ScheduledReport {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdById  String         @map("created_by") @db.Uuid
+  reportType   ReportType     @map("report_type")
+  format       ReportFormat
+  schedule     ReportSchedule
+  rollingDays  Int            @map("rolling_days")
+  filters      Json?
+  recipientEmails String[]   @map("recipient_emails")
+  isActive     Boolean        @default(true) @map("is_active")
+  lastRunAt    DateTime?      @map("last_run_at")
+  nextRunAt    DateTime       @map("next_run_at")
+  jobId        String?        @map("job_id") @db.VarChar(255)
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  deletedAt    DateTime?      @map("deleted_at")
+
+  createdBy        User              @relation(fields: [createdById], references: [id])
+  generatedReports GeneratedReport[]
+
+  @@index([createdById])
+  @@index([reportType])
+  @@index([schedule])
+  @@index([isActive])
+  @@index([nextRunAt])
+  @@index([isActive, nextRunAt], map: "idx_scheduled_report_due")
+  @@index([deletedAt])
+  @@map("scheduled_reports")
+}
+
+model GeneratedReport {
+  id                   String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requestedById        String                @map("requested_by") @db.Uuid
+  reportType           ReportType            @map("report_type")
+  format               ReportFormat
+  status               GeneratedReportStatus @default(QUEUED)
+  scheduledReportId    String?               @map("scheduled_report_id") @db.Uuid
+  dateFrom             DateTime              @map("date_from")
+  dateTo               DateTime              @map("date_to")
+  filters              Json?
+  fileId               String?               @map("file_id") @db.Uuid
+  downloadExpiresAt    DateTime?             @map("download_expires_at")
+  jobId                String?               @map("job_id") @db.VarChar(255)
+  generationStartedAt  DateTime?             @map("generation_started_at")
+  generationCompletedAt DateTime?            @map("generation_completed_at")
+  generationDurationMs Int?                  @map("generation_duration_ms")
+  failureReason        String?               @map("failure_reason")
+  failedAt             DateTime?             @map("failed_at")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime              @updatedAt @map("updated_at")
+
+  requestedBy     User             @relation(fields: [requestedById], references: [id])
+  scheduledReport ScheduledReport? @relation(fields: [scheduledReportId], references: [id])
+  file            File?            @relation(fields: [fileId], references: [id])
+
+  @@index([requestedById])
+  @@index([reportType])
+  @@index([status])
+  @@index([scheduledReportId])
+  @@index([fileId])
+  @@index([downloadExpiresAt])
+  @@index([status, createdAt], map: "idx_generated_status_time")
+  @@index([requestedById, createdAt], map: "idx_generated_requester_time")
+  @@index([status, downloadExpiresAt], map: "idx_generated_expiry")
+  @@map("generated_reports")
+}
+
+enum HeartbeatJobStatus {
+  HEALTHY
+  MISSED
+  DISABLED
+}
+
+model JobHeartbeatRegistry {
+  id                    String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobKey                String             @unique @map("job_key") @db.VarChar(100)
+  displayName           String             @map("display_name") @db.VarChar(255)
+  queueName             String             @map("queue_name") @db.VarChar(100)
+  expectedIntervalSeconds Int              @map("expected_interval_seconds")
+  gracePeriodSeconds    Int                @default(60) @map("grace_period_seconds")
+  lastHeartbeatAt       DateTime?          @map("last_heartbeat_at")
+  currentStatus         HeartbeatJobStatus @default(HEALTHY) @map("current_status")
+  statusChangedAt       DateTime           @default(now()) @map("status_changed_at")
+  alertFiring           Boolean            @default(false) @map("alert_firing")
+  alertFiredAt          DateTime?          @map("alert_fired_at")
+  alertResolvedAt       DateTime?          @map("alert_resolved_at")
+  isActive              Boolean            @default(true) @map("is_active")
+  disabledById          String?            @map("disabled_by") @db.Uuid
+  disabledAt            DateTime?          @map("disabled_at")
+  disableReason         String?            @map("disable_reason")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  disabledBy User? @relation(fields: [disabledById], references: [id])
+
+  @@index([currentStatus])
+  @@index([alertFiring])
+  @@index([isActive])
+  @@index([lastHeartbeatAt])
+  @@index([currentStatus, alertFiring], map: "idx_heartbeat_health")
+  @@map("job_heartbeat_registry")
+}
+
+
+enum LearningSnapshotScope {
+  STUDENT_SUBJECT
+  TUTOR_SUBJECT
+  PLATFORM_AGGREGATE
+}
+
+enum EngagementTrend {
+  IMPROVING
+  STABLE
+  DECLINING
+  INSUFFICIENT_DATA
+}
+
+model LearningAnalyticsSnapshot {
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scope              LearningSnapshotScope
+
+  studentProfileId   String?               @map("student_profile_id") @db.Uuid
+  tutorId            String?               @map("tutor_id") @db.Uuid
+  subjectId          String?               @map("subject_id") @db.Uuid
+
+  sessionsCompletedThisMonth Int?          @map("sessions_completed_this_month")
+  sessionsCompletedAllTime   Int?          @map("sessions_completed_all_time")
+  currentStreakWeeks         Int?          @map("current_streak_weeks")
+  longestStreakWeeks         Int?          @map("longest_streak_weeks")
+  streakActive               Boolean?     @map("streak_active")
+  consistencyScorePercent    Int?          @map("consistency_score_percent")
+  sessionFrequencyTrend      Int[]        @map("session_frequency_trend")
+  totalMaterialsAvailable    Int?          @map("total_materials_available")
+  totalMaterialsAccessed     Int?          @map("total_materials_accessed")
+  materialsAccessRatio       Int?          @map("materials_access_ratio")
+  lastMaterialAccessedAt     DateTime?    @map("last_material_accessed_at")
+  lastMaterialTitle          String?       @map("last_material_title") @db.VarChar(255)
+  topicsCoveredCount         Int?          @map("topics_covered_count")
+  topicsTotalCount           Int?          @map("topics_total_count")
+  engagementTrend            EngagementTrend? @map("engagement_trend")
+
+  studentOverview             Json?         @map("student_overview")
+  subjectRebookingRatePercent Int?          @map("subject_rebooking_rate_percent")
+  avgSessionsBeforeChurn      Decimal?     @map("avg_sessions_before_churn") @db.Decimal(4, 1)
+  materialsAccessRatePercent  Int?          @map("materials_access_rate_percent")
+  studentRetentionRatePercent Int?          @map("student_retention_rate_percent")
+  sessionsPerWeekTrend        Int[]        @map("sessions_per_week_trend")
+
+  platformAvgSessionsBeforeChurn        Decimal? @map("platform_avg_sessions_before_churn") @db.Decimal(4, 1)
+  materialUploadRebookingCorrelation    Decimal? @map("material_upload_rebooking_correlation") @db.Decimal(3, 2)
+  consistencyRebookingCorrelation       Decimal? @map("consistency_rebooking_correlation") @db.Decimal(3, 2)
+  avgTopicsBeforeChurn                  Decimal? @map("avg_topics_before_churn") @db.Decimal(4, 1)
+  avgStreakWeeks                        Decimal? @map("avg_streak_weeks") @db.Decimal(4, 1)
+
+  computedAt           DateTime @default(now()) @map("computed_at")
+  computationDurationMs Int?    @map("computation_duration_ms")
+  coversPeriodFrom     DateTime @map("covers_period_from")
+  coversPeriodTo       DateTime @map("covers_period_to")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  studentProfile StudentProfile? @relation(fields: [studentProfileId], references: [id])
+  tutor          User?           @relation(fields: [tutorId], references: [id])
+  subject        Subject?        @relation(fields: [subjectId], references: [id])
+
+  @@index([scope])
+  @@index([studentProfileId])
+  @@index([tutorId])
+  @@index([subjectId])
+  @@index([computedAt])
+  @@index([engagementTrend])
+  @@index([studentProfileId, subjectId, computedAt], map: "idx_learning_student_subject")
+  @@index([tutorId, subjectId, computedAt], map: "idx_learning_tutor_subject")
+  @@index([scope, computedAt], map: "idx_learning_scope_time")
+  @@map("learning_analytics_snapshots")
+}
+
+enum ConfigCategory {
+  RBAC
+  RATE_LIMITING
+  FEATURE_FLAGS
+  MEDIA
+  STORAGE
+  SECURITY
+  LOCALIZATION
+}
+
+model PlatformConfig {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key          String         @unique @db.VarChar(200)
+  value        Json
+  category     ConfigCategory
+  description  String
+  defaultValue Json           @map("default_value")
+  isSensitive  Boolean        @default(false) @map("is_sensitive")
+  updatedById  String         @map("updated_by") @db.Uuid
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  updatedBy User @relation(fields: [updatedById], references: [id])
+
+  @@index([category])
+  @@map("platform_configs")
+}
