@@ -7,6 +7,7 @@ import { app } from "./app";
 import prisma from "./config/database.config";
 
 import { initI18n } from "./shared/i18n/init";
+import { runSeeds } from "./seeds";
 
 process.on("uncaughtException", (err: Error) => {
   console.error({
@@ -24,6 +25,7 @@ async function bootstrap() {
   console.log("Database connected. ✅");
 
   await initI18n();
+  await runSeeds();
   console.log("i18n loaded. ✅");
 
   const httpServer = createServer(app);
