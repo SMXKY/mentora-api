@@ -7,3 +7,4 @@ prisma/generated/
 coverage/
 .DS_Store
 /src/generated/prisma
+.env.prod
