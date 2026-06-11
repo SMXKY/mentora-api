@@ -48,7 +48,7 @@ export abstract class BaseRepository<T> {
   ): Promise<T> {
     const record = await this.findById(id, include);
     if (!record) {
-      throw new AppError("error.db.not_found", StatusCodes.NOT_FOUND);
+      throw new AppError("common/errors:db.notFound", StatusCodes.NOT_FOUND);
     }
     return record;
   }
@@ -173,7 +173,7 @@ export abstract class BaseRepository<T> {
 
   async softDelete(id: string): Promise<T> {
     if (!this.softDeleteConfig.enabled) {
-      throw new AppError("error.db.soft_delete_not_supported", 405);
+      throw new AppError("common/errors:db.softDeleteNotSupported", 405);
     }
 
     const record = await this.findByIdOrThrow(id);
@@ -202,11 +202,14 @@ export abstract class BaseRepository<T> {
     const record = await this.model.findUnique({ where: { id } });
 
     if (!record) {
-      throw new AppError("error.db.not_found", StatusCodes.NOT_FOUND);
+      throw new AppError("common/errors:db.notFound", StatusCodes.NOT_FOUND);
     }
 
     if (record.deletedAt === null) {
-      throw new AppError("error.db.not_deleted", StatusCodes.BAD_REQUEST);
+      throw new AppError(
+        "common/errors:db.notDeleted",
+        StatusCodes.BAD_REQUEST
+      );
     }
 
     return this.model.update({
@@ -271,7 +274,7 @@ export abstract class BaseRepository<T> {
   ): Promise<T> {
     const record = await this.findDeletedById(id, include);
     if (!record) {
-      throw new AppError("error.db.not_found", StatusCodes.NOT_FOUND);
+      throw new AppError("common/errors:db.notFound", StatusCodes.NOT_FOUND);
     }
     return record;
   }
@@ -372,7 +375,7 @@ export abstract class BaseRepository<T> {
 
   protected assertNotSystem(record: any): void {
     if (this.hasSystemField && record?.isSystem === true) {
-      throw new AppError("error.db.system_record_immutable", 403);
+      throw new AppError("common/errors:db.systemRecordImmutable", 403);
     }
   }
 
