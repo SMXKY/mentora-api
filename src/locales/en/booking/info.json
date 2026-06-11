@@ -1,0 +1,6 @@
+{
+  "lessonCount_one": "{{count}} lesson",
+  "lessonCount_other": "{{count}} lessons",
+  "sessionsRemaining_one": "{{count}} session remaining",
+  "sessionsRemaining_other": "{{count}} sessions remaining"
+}

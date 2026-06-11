@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { SupportedLanguage } from "../utils/translate.util";
+import { Languages } from "../generated/prisma";
 
 export interface ServiceContext {
   userId?: string;
@@ -7,7 +7,7 @@ export interface ServiceContext {
   requestId?: string;
   ipAddress?: string;
   userAgent?: string;
-  lang?: SupportedLanguage;
+  lang?: Languages;
 }
 
 export interface OffsetPaginationParams {

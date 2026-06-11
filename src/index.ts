@@ -5,7 +5,8 @@ import "./utils/enviromentVariablesCheck.util";
 
 import { app } from "./app";
 import prisma from "./config/database.config";
-import { loadTranslations } from "./utils/translate.util";
+
+import { initI18n } from "./shared/i18n/init";
 
 process.on("uncaughtException", (err: Error) => {
   console.error({
@@ -22,8 +23,8 @@ async function bootstrap() {
   await prisma.$connect();
   console.log("Database connected. ✅");
 
-  await loadTranslations();
-  console.log("Translations loaded. ✅");
+  await initI18n();
+  console.log("i18n loaded. ✅");
 
   const httpServer = createServer(app);
 

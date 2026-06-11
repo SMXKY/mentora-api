@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "./AppError.util";
-import t from "./translate.util";
+import { t } from "../shared/i18n/t";
 import { StatusCodes } from "http-status-codes";
 
 const developmentResponse = (err: AppError, req: Request, res: Response) => {
@@ -9,7 +9,7 @@ const developmentResponse = (err: AppError, req: Request, res: Response) => {
   res.status(err.statusCode).json({
     ok: false,
     status: err.status,
-    message: t(err.messageKey, err.messageKey, lang, err.meta),
+    message: t(err.messageKey, err.messageKey, { lng: lang, ...err.meta }),
     error: err,
     stack: err.stack || "No stack trace available",
     path: req.originalUrl,
@@ -24,13 +24,15 @@ const productionResponse = (err: AppError, req: Request, res: Response) => {
     res.status(err.statusCode).json({
       ok: false,
       status: err.status,
-      message: t(err.messageKey, err.messageKey, lang, err.meta),
+      message: t(err.messageKey, err.messageKey, { lng: lang, ...err.meta }),
     });
   } else {
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       ok: false,
       status: "error",
-      message: t("error.unexpected", "Something went wrong", lang),
+      message: t("common/errors:server.unknown", "Something went wrong", {
+        lng: lang,
+      }),
     });
   }
 };

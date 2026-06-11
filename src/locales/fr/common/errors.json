@@ -1,0 +1,34 @@
+{
+  "validation": {
+    "required": "{{field}} est requis",
+    "invalidFormat": "{{field}} a un format invalide",
+    "tooLong": "{{field}} doit comporter au maximum {{max}} caractères",
+    "tooShort": "{{field}} doit comporter au moins {{min}} caractères"
+  },
+  "forbidden": "Vous n'avez pas la permission d'effectuer cette action",
+  "notFound": "La ressource demandée est introuvable",
+  "rateLimited": "Trop de requêtes. Veuillez réessayer plus tard",
+  "internalError": "Une erreur s'est produite. Veuillez réessayer",
+  "db": {
+    "duplicate": "Un enregistrement avec ce {{fields}} existe déjà",
+    "notFound": "L'enregistrement demandé est introuvable",
+    "invalidReference": "Référence invalide pour {{field}}",
+    "missingField": "{{field}} est requis",
+    "valueTooLong": "{{field}} est trop long",
+    "invalidValue": "Une ou plusieurs valeurs sont invalides",
+    "unavailable": "La base de données est actuellement indisponible. Veuillez réessayer sous peu",
+    "validation": "Données invalides : {{details}}",
+    "critical": "Une erreur critique de la base de données s'est produite"
+  },
+  "auth": {
+    "invalidToken": "Jeton d'authentification invalide",
+    "tokenExpired": "Votre session a expiré. Veuillez vous reconnecter"
+  },
+  "request": {
+    "invalidJson": "Le corps de la requête contient un JSON invalide",
+    "payloadTooLarge": "La charge utile de la requête est trop volumineuse"
+  },
+  "server": {
+    "unknown": "Une erreur inattendue s'est produite. Veuillez réessayer"
+  }
+}

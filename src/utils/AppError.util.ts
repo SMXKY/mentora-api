@@ -4,6 +4,7 @@ export class AppError extends Error {
   public readonly statusCode: number;
   public readonly status: string;
   public readonly isOperational: boolean;
+  /** Translation key in "namespace:path.to.key" format, e.g. "common/errors:db.duplicate" */
   public readonly messageKey: string;
   public readonly meta?: Record<string, any>;
 
@@ -41,7 +42,7 @@ export class AppError extends Error {
         ? match[1]
         : err?.meta?.target?.join(", ") || "field";
 
-      return new AppError("error.db.duplicate", 409, { fields });
+      return new AppError("common/errors:db.duplicate", 409, { fields });
     }
 
     if (
@@ -50,7 +51,7 @@ export class AppError extends Error {
       message.includes("Record to delete not found") ||
       message.includes("No record found")
     ) {
-      return new AppError("error.db.not_found", 404);
+      return new AppError("common/errors:db.notFound", 404);
     }
 
     if (
@@ -59,7 +60,7 @@ export class AppError extends Error {
     ) {
       const match = message.match(/field: `(.+?)`/);
       const field = match ? match[1] : err?.meta?.field_name || "reference";
-      return new AppError("error.db.invalid_reference", 400, { field });
+      return new AppError("common/errors:db.invalidReference", 400, { field });
     }
 
     if (
@@ -68,7 +69,7 @@ export class AppError extends Error {
     ) {
       const match = message.match(/column: `(.+?)`/);
       const field = match ? match[1] : err?.meta?.constraint || "field";
-      return new AppError("error.db.missing_field", 400, { field });
+      return new AppError("common/errors:db.missingField", 400, { field });
     }
 
     if (
@@ -78,19 +79,24 @@ export class AppError extends Error {
     ) {
       const match = message.match(/column: `(.+?)`/);
       const field = match ? match[1] : err?.meta?.column_name || "field";
-      return new AppError("error.db.value_too_long", 400, { field });
+      return new AppError("common/errors:db.valueTooLong", 400, { field });
     }
 
     if (err?.code === "P2006" || message.includes("Invalid value")) {
       console.log(err);
-      return new AppError("error.db.invalid_value", 400);
+      return new AppError("common/errors:db.invalidValue", 400);
     }
 
     if (
       err instanceof Prisma.PrismaClientInitializationError ||
       message.includes("Can't reach database")
     ) {
-      return new AppError("error.db.unavailable", 503, undefined, false);
+      return new AppError(
+        "common/errors:db.unavailable",
+        503,
+        undefined,
+        false
+      );
     }
 
     if (
@@ -100,34 +106,31 @@ export class AppError extends Error {
     ) {
       const lines = message.split("\n").filter((l: string) => l.trim());
       const lastLine = lines[lines.length - 1]?.trim() || "Invalid data";
-      return new AppError("error.db.validation", 400, { details: lastLine });
+      return new AppError("common/errors:db.validation", 400, {
+        details: lastLine,
+      });
     }
 
     if (err instanceof Prisma.PrismaClientRustPanicError) {
-      return new AppError("error.db.critical", 500, undefined, false);
+      return new AppError("common/errors:db.critical", 500, undefined, false);
     }
 
     if (err?.name === "JsonWebTokenError") {
-      return new AppError("error.auth.invalid_token", 401);
+      return new AppError("common/errors:auth.invalidToken", 401);
     }
 
     if (err?.name === "TokenExpiredError") {
-      return new AppError("error.auth.token_expired", 401);
+      return new AppError("common/errors:auth.tokenExpired", 401);
     }
 
     if (err instanceof SyntaxError && "body" in err) {
-      return new AppError("error.request.invalid_json", 400);
+      return new AppError("common/errors:request.invalidJson", 400);
     }
 
     if (err?.type === "entity.too.large") {
-      return new AppError("error.request.payload_too_large", 413);
+      return new AppError("common/errors:request.payloadTooLarge", 413);
     }
 
-    return new AppError(
-      err?.message || "error.server.unknown",
-      500,
-      undefined,
-      false
-    );
+    return new AppError("common/errors:server.unknown", 500, undefined, false);
   }
 }

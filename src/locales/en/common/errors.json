@@ -1,0 +1,34 @@
+{
+  "validation": {
+    "required": "{{field}} is required",
+    "invalidFormat": "{{field}} has an invalid format",
+    "tooLong": "{{field}} must be at most {{max}} characters",
+    "tooShort": "{{field}} must be at least {{min}} characters"
+  },
+  "forbidden": "You do not have permission to perform this action",
+  "notFound": "The requested resource was not found",
+  "rateLimited": "Too many requests. Please try again later",
+  "internalError": "Something went wrong. Please try again",
+  "db": {
+    "duplicate": "A record with this {{fields}} already exists",
+    "notFound": "The requested record was not found",
+    "invalidReference": "Invalid reference for {{field}}",
+    "missingField": "{{field}} is required",
+    "valueTooLong": "{{field}} is too long",
+    "invalidValue": "One or more values are invalid",
+    "unavailable": "The database is currently unavailable. Please try again shortly",
+    "validation": "Invalid data: {{details}}",
+    "critical": "A critical database error occurred"
+  },
+  "auth": {
+    "invalidToken": "Invalid authentication token",
+    "tokenExpired": "Your session has expired. Please log in again"
+  },
+  "request": {
+    "invalidJson": "The request body contains invalid JSON",
+    "payloadTooLarge": "The request payload is too large"
+  },
+  "server": {
+    "unknown": "An unexpected error occurred. Please try again"
+  }
+}

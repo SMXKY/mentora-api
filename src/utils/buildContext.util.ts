@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { ServiceContext } from "../base/base.types";
-import { SupportedLanguage } from "./translate.util";
+import { Languages } from "../generated/prisma";
 
 export const buildContext = (req: Request, res: Response): ServiceContext => ({
   // Clerk attaches the authenticated user to req.auth
@@ -24,5 +24,5 @@ export const buildContext = (req: Request, res: Response): ServiceContext => ({
 
   // Locale resolved by getUserLanguage middleware
   // Defaults to English if middleware has not run
-  lang: (res.locals.lang as SupportedLanguage) || "en",
+  lang: (res.locals.lang as Languages) || "en",
 });

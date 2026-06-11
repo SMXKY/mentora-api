@@ -46,6 +46,7 @@ app.use(
       "Authorization",
       "X-Request-ID",
       "X-Lang",
+      "Accept-Language",
     ],
   })
 );

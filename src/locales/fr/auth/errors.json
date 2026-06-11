@@ -1,0 +1,13 @@
+{
+  "invalidCredentials": "Email ou mot de passe invalide",
+  "emailNotVerified": "Veuillez vérifier votre email avant de continuer",
+  "accountSuspended": "Votre compte a été suspendu",
+  "login": {
+    "tooManyAttempts": "Trop de tentatives de connexion échouées. Réessayez dans {{minutes}} minutes",
+    "accountLocked": "Ce compte est verrouillé. Contactez le support pour obtenir de l'aide"
+  },
+  "registration": {
+    "emailTaken": "Un compte avec cet email existe déjà",
+    "weakPassword": "Le mot de passe doit contenir au moins une majuscule, une minuscule et un chiffre"
+  }
+}

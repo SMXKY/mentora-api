@@ -1,0 +1,6 @@
+{
+  "lessonCount_one": "{{count}} leçon",
+  "lessonCount_other": "{{count}} leçons",
+  "sessionsRemaining_one": "{{count}} séance restante",
+  "sessionsRemaining_other": "{{count}} séances restantes"
+}
