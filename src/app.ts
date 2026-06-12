@@ -11,6 +11,7 @@ import { globalErrorController } from "./utils/error.controller";
 import { AppError } from "./utils/AppError.util";
 import { CORS_ORIGINS } from "./utils/enviromentVariablesCheck.util";
 import { StatusCodes } from "http-status-codes";
+import roleRouter from "./modules/role";
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -117,6 +118,7 @@ try {
 // TODO: register module routers here as they are built
 // import { authRouter } from './modules/auth'
 // app.use('/api/v1/auth', authRouter)
+app.use("/api/v1/roles", roleRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(

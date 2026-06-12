@@ -27,6 +27,7 @@ model Role {
 
   name        String   @unique @db.VarChar(100)
   description String?
+  allowsMultiple Boolean @default(true) @map("allows_multiple")
 
   isSystem    Boolean  @default(false) @map("is_system")
   isActive    Boolean  @default(true) @map("is_active")
@@ -224,6 +225,7 @@ enum LogOperation {
   RESET_PASSWORD
   CHANGE_PASSWORD
   CHANGE_USER_CREDENTIALS
+  ROLE_MODIFICATION
 }
 
 enum LogCategory {

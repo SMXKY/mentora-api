@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { Languages } from "../generated/prisma";
+import { Languages, LogCategory, LogOperation } from "../generated/prisma";
 
 export interface ServiceContext {
   userId?: string;
@@ -61,16 +61,18 @@ export interface CursorFindOptions {
   select?: Record<string, boolean>;
 }
 
-export type AuditOperation = "CREATE" | "UPDATE" | "DELETE" | "RESTORE";
-export type AuditCategory = "WRITE" | "READ" | "AUTH" | "SYSTEM";
+export type AuditOperation = LogOperation;
+export type AuditCategory = LogCategory;
 
 export interface AuditLogOptions {
-  operation: AuditOperation;
-  category: AuditCategory;
+  operation: LogOperation;
+  category: LogCategory;
   recordId: string;
   previousState?: Record<string, any> | null;
   newState?: Record<string, any> | null;
   changedFields?: string[];
+  eventType?: string;
+  targetType?: string;
 }
 
 export type FilterParams = Record<

@@ -1,5 +1,5 @@
+import { AuditService } from "../utils/logUserActivity.util";
 import { BaseRepository } from "./BaseRepository";
-import { AppError } from "../utils/AppError.util";
 import {
   ServiceContext,
   OffsetFindOptions,
@@ -187,30 +187,7 @@ export abstract class BaseService<
   }
 
   protected log(ctx: ServiceContext, options: AuditLogOptions): void {
-    Promise.resolve().then(() => {
-      try {
-        // TODO: replace with AuditService.record(ctx, options) in Phase 5
-        console.log({
-          event: "audit_log",
-          tableName: this.tableName,
-          operation: options.operation,
-          category: options.category,
-          recordId: options.recordId,
-          changedFields: options.changedFields,
-          userId: ctx.userId,
-          userEmail: ctx.userEmail,
-          requestId: ctx.requestId,
-          timestamp: new Date().toISOString(),
-        });
-      } catch (err) {
-        console.error({
-          event: "audit_log_failed",
-          tableName: this.tableName,
-          recordId: options.recordId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    });
+    AuditService.record(ctx, this.tableName, options);
   }
 
   protected getChangedFields(

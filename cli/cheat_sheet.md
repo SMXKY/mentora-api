@@ -53,3 +53,5 @@ npm run scaffold logs --type=readonly --no-soft-delete
    - `src/locales/en/<moduleName>.json`
    - `src/locales/fr/<moduleName>.json`
    - (PLEINGAZ rule: include all error/success message keys with empty string values)
+
+   

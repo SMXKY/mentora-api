@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import { BaseService } from "./BaseService";
 import { appResponder } from "../utils/appResponder.util";
 import { buildContext } from "../utils/buildContext.util";
-import { AppError } from "../utils/AppError.util";
 import { catchAsync } from "../utils/catchAsync.util";
 import {
   OffsetFindOptions,
