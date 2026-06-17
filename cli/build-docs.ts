@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 
 //module docs
-import "../src/modules/testResource/testResource.openapi";
+import "../src/modules/auth/auth.openapi";
 
 async function main() {
   const generator = new OpenApiGeneratorV3(registry.definitions);
@@ -17,8 +17,10 @@ async function main() {
       description: "MENTORA tutoring marketplace REST API",
     },
     servers: [
-      { url: "http://localhost:3000", description: "Development" },
-      { url: "https://api.mentora.cm", description: "Production" },
+      {
+        url: "https://mentora.api.tallamichael.online",
+        description: "Production",
+      },
     ],
   });
 

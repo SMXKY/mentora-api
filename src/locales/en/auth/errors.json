@@ -1,13 +1,8 @@
 {
-  "invalidCredentials": "Invalid email or password",
-  "emailNotVerified": "Please verify your email before continuing",
-  "accountSuspended": "Your account has been suspended",
-  "login": {
-    "tooManyAttempts": "Too many failed login attempts. Try again in {{minutes}} minutes",
-    "accountLocked": "This account is locked. Contact support for assistance"
-  },
-  "registration": {
-    "emailTaken": "An account with this email already exists",
-    "weakPassword": "Password must contain at least one uppercase letter, one lowercase letter, and one number"
-  }
+  "noToken": "",
+  "userNotFound": "",
+  "invalidRole": "",
+  "alreadyRegistered": "",
+  "noEmailOnClerkAccount": "",
+  "roleNotFound": ""
 }

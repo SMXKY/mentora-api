@@ -27,6 +27,8 @@ npm run scaffold sessions --type=external
 npm run scaffold logs --type=readonly --no-soft-delete
 ```
 
+> NB: correct command to avoint type or other options not sent: npm run scaffold auth -- --type=tableless
+
 ## After scaffolding — checklist
 
 1. **Register the route** (in `src/modules/index.ts` or `src/app.ts`):

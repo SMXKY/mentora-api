@@ -108,6 +108,12 @@ if (!process.env.DEFAULT_PAGE_SIZE)
 if (!process.env.MAX_PAGE_SIZE)
   throw new Error("MAX_PAGE_SIZE environment variable not set");
 
+if (!process.env.CLERK_PUBLISHABLE_KEY)
+  throw new Error("CLERK_PUBLISHABLE_KEY environment variable not set");
+
+if (!process.env.CLERK_SECRET_KEY)
+  throw new Error("CLERK_SECRET_KEY environment variable not set");
+
 // =============================================
 // Typed exports — use these throughout the app
 // never use process.env directly outside this file
