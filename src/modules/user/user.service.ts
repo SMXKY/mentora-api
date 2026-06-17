@@ -3,15 +3,13 @@ import { UserRepository } from "./user.repository";
 import { ServiceContext } from "../../base/base.types";
 import { CreateUserInput, UpdateUserInput } from "./user.types";
 
-
-export class UserService extends BaseService
+export class UserService extends BaseService<
   any,
   CreateUserInput,
   UpdateUserInput
 > {
   protected repository = new UserRepository();
   protected tableName = "user";
-
 
   // ============================================================
   // LIFECYCLE HOOKS
