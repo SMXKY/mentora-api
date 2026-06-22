@@ -114,6 +114,9 @@ if (!process.env.CLERK_PUBLISHABLE_KEY)
 if (!process.env.CLERK_SECRET_KEY)
   throw new Error("CLERK_SECRET_KEY environment variable not set");
 
+if (!process.env.PERMISSION_CACHE_TTL_SECONDS)
+  throw new Error("PERMISSION_CACHE_TTL_SECONDS environment variable not set");
+
 // =============================================
 // Typed exports — use these throughout the app
 // never use process.env directly outside this file
@@ -174,3 +177,5 @@ export const SOCKET_IO_CORS_ORIGIN = process.env.SOCKET_IO_CORS_ORIGIN!;
 export const DEFAULT_PAGE_SIZE = Number(process.env.DEFAULT_PAGE_SIZE);
 export const MAX_PAGE_SIZE = Number(process.env.MAX_PAGE_SIZE);
 export const CORS_ORIGINS = process.env.CORS_ORIGINS;
+export const PERMISSION_CACHE_TTL_SECONDS =
+  process.env.PERMISSION_CACHE_TTL_SECONDS;

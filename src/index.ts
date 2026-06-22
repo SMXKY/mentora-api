@@ -5,9 +5,10 @@ import "./utils/enviromentVariablesCheck.util";
 
 import { app } from "./app";
 import prisma from "./config/database.config";
-
+import { connectRedis } from "./config/redis.config";
 import { initI18n } from "./shared/i18n/init";
 import { runSeeds } from "./seeds";
+import { PORT } from "./utils/enviromentVariablesCheck.util";
 
 process.on("uncaughtException", (err: Error) => {
   console.error({
@@ -18,15 +19,19 @@ process.on("uncaughtException", (err: Error) => {
   process.exit(1);
 });
 
-const port = Number(process.env.PORT) || 3000;
+const port = Number(PORT) || 3000;
 
 async function bootstrap() {
   await prisma.$connect();
   console.log("Database connected. ✅");
 
+  await connectRedis();
+  console.log("Redis connected. ✅");
+
   await initI18n();
-  await runSeeds();
   console.log("i18n loaded. ✅");
+
+  await runSeeds();
 
   const httpServer = createServer(app);
 
