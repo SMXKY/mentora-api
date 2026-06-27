@@ -36,4 +36,20 @@ export const SessionStatusResponseSchema = z
   ])
   .openapi("SessionStatus");
 
+export const RequestPhoneOtpSchema = z
+  .object({
+    phone: z.string().min(1, "auth/errors:phoneRequired"),
+  })
+  .openapi("RequestPhoneOtp");
+
+export const VerifyPhoneOtpSchema = z
+  .object({
+    phone: z.string().min(1, "auth/errors:phoneRequired"),
+    code: z.string().length(6, "auth/errors:invalidOtpLength"),
+  })
+  .openapi("VerifyPhoneOtp");
+
+export type RequestPhoneOtpInput = z.infer<typeof RequestPhoneOtpSchema>;
+export type VerifyPhoneOtpInput = z.infer<typeof VerifyPhoneOtpSchema>;
+
 export type SessionStatusResponse = z.infer<typeof SessionStatusResponseSchema>;

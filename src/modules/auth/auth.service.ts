@@ -2,115 +2,67 @@ import prisma from "../../config/database.config";
 import { ServiceContext } from "../../base/base.types";
 import { AppError } from "../../utils/AppError.util";
 import { StatusCodes } from "http-status-codes";
-import { Languages, WalletType } from "../../generated/prisma";
-import { CompleteRegistrationInput, SessionStatusResponse } from "./auth.types";
+import { UserStatus } from "../../generated/prisma";
+import { SessionStatusResponse } from "./auth.types";
+import { OtpService } from "../../services/otp";
+import { signRegistrationToken } from "./utils/signRegistrationToken.util";
 
-export type ClerkSessionClaims = {
-  email?: string;
-  email_verified?: boolean;
-  first_name?: string | null;
-  last_name?: string | null;
-  username?: string | null;
-  image_url?: string | null;
-  phone_number?: string | null;
-};
-
-const ROLE_TO_WALLET_TYPE: Record<string, WalletType> = {
-  Parent: WalletType.PARENT,
-  Student: WalletType.STUDENT,
-  Tutor: WalletType.TUTOR,
-};
-
-const ALLOWED_SELF_REGISTRATION_ROLES = ["Parent", "Student", "Tutor"];
+const CAMEROON_PHONE_REGEX = /^\+237[6-9][0-9]{7}$/;
 
 export class AuthService {
-  static async completeRegistration(
-    input: CompleteRegistrationInput,
-    ctx: ServiceContext,
-    claims: ClerkSessionClaims,
-    langHeader?: string
-  ) {
-    const { role } = input;
-
-    if (!ALLOWED_SELF_REGISTRATION_ROLES.includes(role)) {
-      throw new AppError("auth/errors:invalidRole", StatusCodes.FORBIDDEN);
-    }
-
-    const clerkUserId = ctx.userId;
-
-    const existing = await prisma.user.findUnique({
-      where: { clerkId: clerkUserId },
-    });
-
-    if (existing) {
-      throw new AppError("auth/errors:alreadyRegistered", StatusCodes.CONFLICT);
-    }
-
-    if (!claims.email) {
+  static async requestPhoneOtp(phone: string): Promise<void> {
+    if (!CAMEROON_PHONE_REGEX.test(phone)) {
       throw new AppError(
-        "auth/errors:noEmailOnClerkAccount",
+        "auth/errors:invalidPhoneFormat",
         StatusCodes.BAD_REQUEST
       );
     }
 
-    const role_ = await prisma.role.findUnique({
-      where: { name: role },
+    const existing = await prisma.user.findFirst({
+      where: {
+        phoneNumber: phone,
+        status: UserStatus.ACTIVE,
+        deletedAt: null,
+      },
+      select: { id: true },
     });
 
-    if (!role_) {
+    if (existing) {
       throw new AppError(
-        "auth/errors:roleNotFound",
-        StatusCodes.INTERNAL_SERVER_ERROR
+        "auth/errors:phoneAlreadyRegistered",
+        StatusCodes.CONFLICT
       );
     }
 
-    const walletType = ROLE_TO_WALLET_TYPE[role];
+    await OtpService.requestOtp(phone);
+  }
 
-    const preferredLanguage =
-      langHeader?.toUpperCase() === "FR" ? Languages.FR : Languages.EN;
+  static async verifyPhoneOtp(
+    phone: string,
+    code: string
+  ): Promise<{ registrationToken: string }> {
+    if (!CAMEROON_PHONE_REGEX.test(phone)) {
+      throw new AppError(
+        "auth/errors:invalidPhoneFormat",
+        StatusCodes.BAD_REQUEST
+      );
+    }
 
-    const user = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: {
-          clerkId: String(clerkUserId),
-          email: claims.email!,
-          isEmailVerified: claims.email_verified ?? false,
-          firstName: claims.first_name ?? undefined,
-          lastName: claims.last_name ?? undefined,
-          username: claims.username ?? undefined,
-          profilePictureUrl: claims.image_url ?? undefined,
-          phoneNumber: claims.phone_number ?? undefined,
-          preferredLanguage,
-        },
-      });
+    await OtpService.verifyOtp(phone, code);
 
-      await tx.wallet.create({
-        data: {
-          userId: newUser.id,
-          walletType,
-          balanceXaf: 0,
-        },
-      });
-
-      await tx.userRole.create({
-        data: {
-          userId: newUser.id,
-          roleId: role_.id,
-          createdById: newUser.id,
-        },
-      });
-
-      return newUser;
-    });
-
-    return user;
+    return {
+      registrationToken: signRegistrationToken({
+        identity: phone,
+        identityType: "phone",
+      }),
+    };
   }
 
   static async getSessionStatus(
     ctx: ServiceContext
   ): Promise<SessionStatusResponse> {
     const user = await prisma.user.findUnique({
-      where: { clerkId: ctx.userId },
+      where: { id: ctx.userId },
       include: {
         userRoles: {
           where: { isActive: true },

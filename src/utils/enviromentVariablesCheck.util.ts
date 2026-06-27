@@ -131,6 +131,9 @@ if (!process.env.AT_USERNAME) {
   throw new Error("AT_USERNAME environment variable not set");
 }
 
+if (!process.env.REGISTRATION_TOKEN_EXPIRY)
+  throw new Error("REGISTRATION_TOKEN_EXPIRY environment variable not set");
+
 // =============================================
 // Typed exports — use these throughout the app
 // never use process.env directly outside this file
@@ -198,3 +201,4 @@ export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
 export const AT_API_KEY = process.env.AT_API_KEY;
 export const AT_USERNAME = process.env.AT_USERNAME;
 export const AT_SANDBOX = process.env.AT_SANDBOX;
+export const REGISTRATION_TOKEN_EXPIRY = process.env.REGISTRATION_TOKEN_EXPIRY;
