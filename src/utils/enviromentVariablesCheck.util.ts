@@ -35,7 +35,7 @@ if (!process.env.LIVEKIT_URL)
   throw new Error("LIVEKIT_URL environment variable not set");
 if (!process.env.LIVEKIT_API_KEY)
   throw new Error("LIVEKIT_API_KEY environment variable not set");
-if (!process.env.LIVEKIT_API_SECRET)
+if (!process.env.LIVEKIT_API_ECRET)
   throw new Error("LIVEKIT_API_SECRET environment variable not set");
 
 // Interserver Storage
@@ -117,6 +117,13 @@ if (!process.env.CLERK_SECRET_KEY)
 if (!process.env.PERMISSION_CACHE_TTL_SECONDS)
   throw new Error("PERMISSION_CACHE_TTL_SECONDS environment variable not set");
 
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET enviroment variable not set");
+}
+
+if (!process.env.JWT_EXPIRES_IN) {
+  throw new Error("JWT_EXPIRES_IN enviroment variable not set");
+}
 // =============================================
 // Typed exports — use these throughout the app
 // never use process.env directly outside this file
@@ -179,3 +186,5 @@ export const MAX_PAGE_SIZE = Number(process.env.MAX_PAGE_SIZE);
 export const CORS_ORIGINS = process.env.CORS_ORIGINS;
 export const PERMISSION_CACHE_TTL_SECONDS =
   process.env.PERMISSION_CACHE_TTL_SECONDS;
+export const JWT_SECRET = process.env.JWT_SECRET;
+export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;

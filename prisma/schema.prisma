@@ -72,6 +72,13 @@ model PermissionSubmodule {
   @@map("permission_submodules")
 }
 
+enum PermissionRiskLevel {
+  LOW
+  STANDARD
+  SENSITIVE
+  CRITICAL
+}
+
 model Permission {
   id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
@@ -94,6 +101,7 @@ model Permission {
   implies             PermissionImplication[] @relation("ImplicationSource")
 
   impliedBy           PermissionImplication[] @relation("ImplicationTarget")
+  riskLevel PermissionRiskLevel @default(STANDARD) @map("risk_level")
 
   @@index([permissionModuleId])
   @@index([permissionSubmoduleId])
@@ -331,6 +339,7 @@ model User {
   whatsappNumber  String?   @map("whatsapp_number") @db.VarChar(20)
   whatsappOptIn   Boolean   @default(false) @map("whatsapp_opt_in")
   whatsappOptInAt DateTime? @map("whatsapp_opt_in_at")
+  passwordChangedAt DateTime? @map("password_changed_at")
 
   dob               DateTime?  @db.Date
   gender            UserGender @default(PREFER_NOT_TO_SAY)

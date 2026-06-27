@@ -1,45 +1,123 @@
 import { Request, Response, NextFunction } from "express";
-import { getAuth } from "@clerk/express";
-import prisma from "../config/database.config";
+import * as jwt from "jsonwebtoken";
 import { AppError } from "../utils/AppError.util";
 import { StatusCodes } from "http-status-codes";
-import { catchAsync } from "../utils/catchAsync.util";
+import prisma from "../config/database.config";
 import getUserPermissions from "../utils/getUserPermissions.util";
-import { UserStatus as Status } from "../generated/prisma";
+import { catchAsync } from "../utils/catchAsync.util";
+import { JWT_SECRET } from "../utils/enviromentVariablesCheck.util";
+import { UserStatus } from "../generated/prisma";
 
-export const protect = catchAsync(
+const protect = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
-    const { userId: clerkUserId } = getAuth(req);
+    let token: string | undefined;
 
-    if (!clerkUserId) {
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer")
+    ) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+
+    if (!token) {
       return next(
-        new AppError("auth.errors.no_token", StatusCodes.UNAUTHORIZED)
+        new AppError("auth/errors:noToken", StatusCodes.UNAUTHORIZED)
       );
     }
 
-    res.locals.clerkUserId = clerkUserId;
+    let decoded: jwt.JwtPayload;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+    } catch (err) {
+      if (err instanceof jwt.TokenExpiredError) {
+        return next(
+          new AppError("auth/errors:tokenExpired", StatusCodes.UNAUTHORIZED)
+        );
+      }
+      return next(
+        new AppError("auth/errors:invalidToken", StatusCodes.UNAUTHORIZED)
+      );
+    }
+
+    if (!decoded.id || !decoded.iat) {
+      return next(
+        new AppError("auth/errors:invalidToken", StatusCodes.UNAUTHORIZED)
+      );
+    }
 
     const user = await prisma.user.findUnique({
-      where: { clerkId: clerkUserId },
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        phoneNumber: true,
+        profilePictureUrl: true,
+        preferredLanguage: true,
+        isEmailVerified: true,
+        isAccountComplete: true,
+        status: true,
+        passwordChangedAt: true,
+        deletedAt: true,
+        lastLoggedInAt: true,
+        userRoles: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            role: {
+              select: {
+                id: true,
+                name: true,
+                description: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    if (!user || user.deletedAt) {
+    if (!user) {
       return next(
-        new AppError("auth.errors.user_not_found", StatusCodes.UNAUTHORIZED)
+        new AppError("auth/errors:userNotFound", StatusCodes.UNAUTHORIZED)
       );
     }
 
-    if (user.status === Status.SUSPENDED || user.status === Status.BANNED) {
+    if (user.deletedAt) {
       return next(
-        new AppError("auth.errors.account_suspended", StatusCodes.FORBIDDEN)
+        new AppError("auth/errors:accountDeactivated", StatusCodes.FORBIDDEN)
       );
     }
 
-    // Resolve permissions — served from Redis cache when available
-    const permissions = await getUserPermissions(user.id);
+    if (user.status === UserStatus.SUSPENDED) {
+      return next(
+        new AppError("auth/errors:accountSuspended", StatusCodes.FORBIDDEN)
+      );
+    }
 
-    res.locals.user = { ...user, permissions };
-    res.locals.lang = user.preferredLanguage;
+    if (user.status === UserStatus.BANNED) {
+      return next(
+        new AppError("auth/errors:accountBanned", StatusCodes.FORBIDDEN)
+      );
+    }
+
+    if (
+      user.passwordChangedAt &&
+      Math.floor(user.passwordChangedAt.getTime() / 1000) > decoded.iat
+    ) {
+      return next(
+        new AppError("auth/errors:passwordChanged", StatusCodes.UNAUTHORIZED)
+      );
+    }
+
+    const { passwordChangedAt, deletedAt, ...safeUser } = user;
+
+    res.locals.user = {
+      ...safeUser,
+      roles: user.userRoles.map((ur) => ur.role),
+      permissions: await getUserPermissions(user.id),
+    };
 
     next();
   }
