@@ -46,6 +46,7 @@
     "@react-pdf/renderer": "^4.5.1",
     "@socket.io/redis-adapter": "^8.3.0",
     "africastalking": "^0.7.9",
+    "argon2": "^0.44.0",
     "axios": "^1.16.1",
     "bullmq": "^5.77.6",
     "clamav.js": "^0.12.0",

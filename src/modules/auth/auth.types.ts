@@ -7,7 +7,10 @@ export const SelfRegisterableRole = z.enum(["Parent", "Student", "Tutor"]);
 
 export const CompleteRegistrationSchema = z
   .object({
+    registrationToken: z.string().min(1),
     role: SelfRegisterableRole,
+    password: z.string().optional(),
+    confirmPassword: z.string().optional(),
   })
   .openapi("CompleteRegistration");
 

@@ -323,7 +323,6 @@ enum Languages{
 model User {
   id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
  
-  clerkId        String  @unique @map("clerk_id") @db.VarChar(255)
   googleAuthId   String? @unique @map("google_auth_id") @db.VarChar(255)
   facebookAuthId String? @unique @map("facebook_auth_id") @db.VarChar(255)
 
