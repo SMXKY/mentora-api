@@ -9,10 +9,12 @@ import {
   signRegistrationToken,
   verifyRegistrationToken,
 } from "./utils/signRegistrationToken.util";
+import { deliverEmailOtp } from "../../services/otp/dliverEmail";
 import argon2 from "argon2";
 import signToken from "./utils/signToken.util";
 
 const CAMEROON_PHONE_REGEX = /^\+237[6-9][0-9]{7}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const SELF_REGISTRATION_ROLES = ["Parent", "Student", "Tutor"] as const;
 type SelfRegistrationRole = (typeof SELF_REGISTRATION_ROLES)[number];
@@ -48,6 +50,8 @@ const validatePassword = (password: string): void => {
 };
 
 export class AuthService {
+  // ── Phone registration ────────────────────────────────────────────────
+
   static async requestPhoneOtp(phone: string): Promise<void> {
     if (!CAMEROON_PHONE_REGEX.test(phone)) {
       throw new AppError(
@@ -57,11 +61,7 @@ export class AuthService {
     }
 
     const existing = await prisma.user.findFirst({
-      where: {
-        phoneNumber: phone,
-        status: UserStatus.ACTIVE,
-        deletedAt: null,
-      },
+      where: { phoneNumber: phone, status: UserStatus.ACTIVE, deletedAt: null },
       select: { id: true },
     });
 
@@ -95,6 +95,55 @@ export class AuthService {
       }),
     };
   }
+
+  // ── Email registration ────────────────────────────────────────────────
+
+  static async requestEmailOtp(email: string): Promise<void> {
+    if (!EMAIL_REGEX.test(email)) {
+      throw new AppError(
+        "auth/errors:invalidEmailFormat",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    const existing = await prisma.user.findFirst({
+      where: { email, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new AppError(
+        "auth/errors:emailAlreadyRegistered",
+        StatusCodes.CONFLICT
+      );
+    }
+
+    const code = await OtpService.generateAndStoreOtp(email);
+    await deliverEmailOtp(email, code);
+  }
+
+  static async verifyEmailOtp(
+    email: string,
+    code: string
+  ): Promise<{ registrationToken: string }> {
+    if (!EMAIL_REGEX.test(email)) {
+      throw new AppError(
+        "auth/errors:invalidEmailFormat",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    await OtpService.verifyOtp(email, code);
+
+    return {
+      registrationToken: signRegistrationToken({
+        identity: email,
+        identityType: "email",
+      }),
+    };
+  }
+
+  // ── Complete registration ─────────────────────────────────────────────
 
   static async completeRegistration(
     input: CompleteRegistrationInput
@@ -168,27 +217,20 @@ export class AuthService {
     const user = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
+          email: identityType === "email" ? identity : "",
           ...(identityType === "phone" && { phoneNumber: identity }),
-          ...(identityType === "email" && {
-            email: identity,
-            isEmailVerified: true,
-          }),
+          ...(identityType === "email" && { isEmailVerified: true }),
           ...(identityType === "google" && {
             googleAuthId,
             isEmailVerified: true,
           }),
           ...(passwordHash && { password: passwordHash }),
-          email: identityType === "email" ? identity : "",
         },
         select: { id: true },
       });
 
       await tx.wallet.create({
-        data: {
-          userId: newUser.id,
-          walletType,
-          balanceXaf: 0,
-        },
+        data: { userId: newUser.id, walletType, balanceXaf: 0 },
       });
 
       await tx.userRole.create({
@@ -204,6 +246,8 @@ export class AuthService {
 
     return { token: signToken(user.id) };
   }
+
+  // ── Session ───────────────────────────────────────────────────────────
 
   static async getSessionStatus(
     ctx: ServiceContext
