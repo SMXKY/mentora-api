@@ -124,6 +124,13 @@ if (!process.env.JWT_SECRET) {
 if (!process.env.JWT_EXPIRES_IN) {
   throw new Error("JWT_EXPIRES_IN enviroment variable not set");
 }
+if (!process.env.AT_API_KEY) {
+  throw new Error("AT_API_KEY environment variable not set");
+}
+if (!process.env.AT_USERNAME) {
+  throw new Error("AT_USERNAME environment variable not set");
+}
+
 // =============================================
 // Typed exports — use these throughout the app
 // never use process.env directly outside this file
@@ -188,3 +195,6 @@ export const PERMISSION_CACHE_TTL_SECONDS =
   process.env.PERMISSION_CACHE_TTL_SECONDS;
 export const JWT_SECRET = process.env.JWT_SECRET;
 export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
+export const AT_API_KEY = process.env.AT_API_KEY;
+export const AT_USERNAME = process.env.AT_USERNAME;
+export const AT_SANDBOX = process.env.AT_SANDBOX;

@@ -1,0 +1,6 @@
+{
+  "otp/errors:rateLimitExceeded": "",
+  "otp/errors:deliveryFailed": "",
+  "otp/errors:expiredOrNotFound": "",
+  "otp/errors:invalidCode": ""
+}
