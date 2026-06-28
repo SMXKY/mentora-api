@@ -4,7 +4,7 @@ import { Languages } from "../generated/prisma";
 
 export const buildContext = (req: Request, res: Response): ServiceContext => ({
   // Clerk attaches the authenticated user to req.auth
-  userId: (req as any).auth?.userId,
+  userId: res.locals.user?.id,
 
   // Set by the protect middleware after Clerk verification
   userEmail: res.locals.user?.email,

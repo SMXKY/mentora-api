@@ -5,7 +5,6 @@ import cors from "cors";
 import swaggerUi from "swagger-ui-express";
 import basicAuth from "express-basic-auth";
 import path from "path";
-import { clerkMiddleware } from "@clerk/express";
 
 import { requestId } from "./middlewares/requestId.middleware";
 import { globalErrorController } from "./utils/error.controller";
@@ -13,7 +12,6 @@ import { AppError } from "./utils/AppError.util";
 import { CORS_ORIGINS } from "./utils/enviromentVariablesCheck.util";
 import { StatusCodes } from "http-status-codes";
 import roleRouter from "./modules/role";
-import authWebhookRouter from "./modules/auth/auth.webhook.route";
 import authRouter from "./modules/auth";
 
 (BigInt.prototype as any).toJSON = function () {
@@ -56,29 +54,6 @@ app.use(
 );
 
 app.use(requestId);
-
-// ============================================================
-// CLERK WEBHOOK — RAW BODY EXCEPTION
-// Clerk signs webhook payloads with svix, which verifies against
-// the raw request bytes. This route MUST be registered with
-// express.raw() BEFORE express.json() runs globally, or signature
-// verification will fail (json() consumes/transforms the body).
-//
-// Do not move this below the express.json() lines.
-// ============================================================
-app.use(
-  "/api/v1/auth/webhook",
-  express.raw({ type: "application/json" }),
-  authWebhookRouter
-);
-
-// ============================================================
-// CLERK AUTH MIDDLEWARE
-// Populates req.auth on every request (non-blocking — does not
-// require a token to be present). Routes that need auth use
-// requireClerkAuth or protect middleware to enforce it.
-// ============================================================
-app.use(clerkMiddleware());
 
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));

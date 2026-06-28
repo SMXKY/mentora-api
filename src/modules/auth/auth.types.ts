@@ -52,6 +52,52 @@ export const VerifyPhoneOtpSchema = z
   })
   .openapi("VerifyPhoneOtp");
 
+export const AdminAssignableRole = z.enum([
+  "Admin",
+  "Moderator",
+  "Support Agent",
+]);
+
+export const CreateAdminSchema = z
+  .object({
+    email: z.string().email("auth/errors:invalidEmailFormat"),
+    firstName: z.string().min(1, "auth/errors:firstNameRequired"),
+    lastName: z.string().min(1, "auth/errors:lastNameRequired"),
+    roles: z.array(AdminAssignableRole).min(1, "auth/errors:rolesRequired"),
+    password: z.string().min(1, "auth/errors:passwordRequired"),
+    confirmPassword: z.string().min(1, "auth/errors:passwordRequired"),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: "auth/errors:passwordsDoNotMatch",
+    path: ["confirmPassword"],
+  })
+  .openapi("CreateAdmin");
+
+export const RequestEmailOtpSchema = z
+  .object({
+    email: z.string().email("auth/errors:invalidEmailFormat"),
+  })
+  .openapi("RequestEmailOtp");
+
+export const VerifyEmailOtpSchema = z
+  .object({
+    email: z.string().email("auth/errors:invalidEmailFormat"),
+    code: z.string().length(6, "auth/errors:invalidOtpLength"),
+  })
+  .openapi("VerifyEmailOtp");
+
+export const GoogleAuthSchema = z
+  .object({
+    idToken: z.string().min(1, "auth/errors:idTokenRequired"),
+  })
+  .openapi("GoogleAuth");
+
+export type RequestEmailOtpInput = z.infer<typeof RequestEmailOtpSchema>;
+export type VerifyEmailOtpInput = z.infer<typeof VerifyEmailOtpSchema>;
+export type GoogleAuthInput = z.infer<typeof GoogleAuthSchema>;
+
+export type CreateAdminInput = z.infer<typeof CreateAdminSchema>;
+
 export type RequestPhoneOtpInput = z.infer<typeof RequestPhoneOtpSchema>;
 export type VerifyPhoneOtpInput = z.infer<typeof VerifyPhoneOtpSchema>;
 

@@ -35,7 +35,7 @@ if (!process.env.LIVEKIT_URL)
   throw new Error("LIVEKIT_URL environment variable not set");
 if (!process.env.LIVEKIT_API_KEY)
   throw new Error("LIVEKIT_API_KEY environment variable not set");
-if (!process.env.LIVEKIT_API_ECRET)
+if (!process.env.LIVEKIT_API_SECRET)
   throw new Error("LIVEKIT_API_SECRET environment variable not set");
 
 // Interserver Storage
@@ -134,6 +134,12 @@ if (!process.env.AT_USERNAME) {
 if (!process.env.REGISTRATION_TOKEN_EXPIRY)
   throw new Error("REGISTRATION_TOKEN_EXPIRY environment variable not set");
 
+if (!process.env.GOOGLE_CLIENT_ID)
+  throw new Error("GOOGLE_CLIENT_ID environment variable not set");
+
+if (!process.env.BREVO_API_KEY)
+  throw new Error("BREVO_API_KEY environment variable not set");
+
 // =============================================
 // Typed exports — use these throughout the app
 // never use process.env directly outside this file
@@ -202,3 +208,5 @@ export const AT_API_KEY = process.env.AT_API_KEY;
 export const AT_USERNAME = process.env.AT_USERNAME;
 export const AT_SANDBOX = process.env.AT_SANDBOX;
 export const REGISTRATION_TOKEN_EXPIRY = process.env.REGISTRATION_TOKEN_EXPIRY;
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+export const BREVO_API_KEY = process.env.BREVO_API_KEY;

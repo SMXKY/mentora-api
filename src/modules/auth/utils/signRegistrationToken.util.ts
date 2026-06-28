@@ -10,6 +10,8 @@ export type RegistrationTokenPayload = {
   identity: string;
   identityType: "phone" | "email" | "google";
   googleAuthId?: string;
+  firstName?: string;
+  lastName?: string;
   purpose: "registration";
 };
 

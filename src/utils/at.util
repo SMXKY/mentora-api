@@ -1,5 +1,9 @@
 import axios from "axios";
-import { BREVO_API_KEY } from "../../utils/enviromentVariablesCheck.util";
+import {
+  AT_API_KEY,
+  AT_SANDBOX,
+  AT_USERNAME,
+} from "./enviromentVariablesCheck.util";
 
 type DeliveryResult =
   | { success: true; channel: "sms" }
@@ -8,38 +12,44 @@ type DeliveryResult =
 const buildOtpMessage = (code: string): string =>
   `Your Mentora verification code is ${code}. It expires in 10 minutes. Do not share it with anyone.`;
 
-const BREVO_SMS_URL = "https://api.brevo.com/v3/transactionalSMS/send";
+const AT_SMS_URL = "https://api.africastalking.com/version1/messaging/bulk";
 
 export const deliverOtp = async (
   phone: string,
   code: string
 ): Promise<DeliveryResult> => {
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`[OTP Dev] Code for ${phone}: ${code}`);
-    return { success: true, channel: "sms" };
-  }
-
   const message = buildOtpMessage(code);
+  const username = AT_SANDBOX === "true" ? "sandbox" : AT_USERNAME;
 
   try {
-    await axios.post(
-      BREVO_SMS_URL,
+    const response = await axios.post(
+      AT_SMS_URL,
       {
-        sender: "Mentora",
-        recipient: phone.replace("+", ""),
-        content: message,
-        type: "transactional",
+        username,
+        message,
+        phoneNumbers: [phone],
       },
       {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          "api-key": BREVO_API_KEY!,
+          apiKey: AT_API_KEY,
         },
       }
     );
 
-    console.log(`[OTP Delivery] SMS sent to ${phone}`);
+    const recipient = response.data?.SMSMessageData?.Recipients?.[0];
+
+    if (!recipient || recipient.status !== "Success") {
+      console.error(
+        `[OTP Delivery] SMS failed for ${phone}: statusCode=${recipient?.statusCode} status=${recipient?.status}`
+      );
+      return { success: false, reason: recipient?.status ?? "unknown status" };
+    }
+
+    console.log(
+      `[OTP Delivery] SMS sent to ${phone}. messageId=${recipient.messageId}`
+    );
     return { success: true, channel: "sms" };
   } catch (err: any) {
     const reason = err.response?.data
