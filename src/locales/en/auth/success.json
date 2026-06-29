@@ -1,3 +1,5 @@
 {
-  "registrationComplete": ""
+  "adminCreated": "Admin account created successfully.",
+  "passwordChanged": "Your password has been changed successfully.",
+  "passwordReset": "Your password has been reset successfully."
 }

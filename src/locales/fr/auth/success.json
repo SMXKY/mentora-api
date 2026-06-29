@@ -1,3 +1,5 @@
 {
-  "registrationComplete": ""
+  "adminCreated": "Le compte administrateur a été créé avec succès.",
+  "passwordChanged": "Votre mot de passe a été modifié avec succès.",
+  "passwordReset": "Votre mot de passe a été réinitialisé avec succès."
 }
