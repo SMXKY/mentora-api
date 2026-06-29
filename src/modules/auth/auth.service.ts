@@ -238,7 +238,7 @@ export class AuthService {
         })
         .catch(() => {});
 
-      return { token: signToken(existingUser.id) };
+      return AuthService.buildLoginResponse(existingUser.id);
     }
 
     return {
@@ -489,20 +489,9 @@ export class AuthService {
         id: true,
         email: true,
         firstName: true,
-        lastName: true,
-        username: true,
-        phoneNumber: true,
-        profilePictureUrl: true,
-        preferredLanguage: true,
-        isEmailVerified: true,
-        isAccountComplete: true,
         password: true,
         status: true,
         passwordChangedAt: true,
-        userRoles: {
-          where: { isActive: true },
-          select: { role: { select: { name: true } } },
-        },
       },
     });
 
@@ -595,9 +584,6 @@ export class AuthService {
       .update({ where: { id: user.id }, data: { lastLoggedInAt: new Date() } })
       .catch(() => {});
 
-    const permissions = await getUserPermissions(user.id);
-    const { password: _pw, passwordChangedAt: _pc, ...safeUser } = user;
-
     const ctx: ServiceContext = {
       userId: user.id,
       userEmail: user.email ?? undefined,
@@ -613,17 +599,7 @@ export class AuthService {
       eventType: "user.login",
     });
 
-    return {
-      user: {
-        ...safeUser,
-        roles: user.userRoles.map((ur) => ur.role.name),
-        profilePictureUrl: user.profilePictureUrl
-          ? applyFtpUrlTransform(user.profilePictureUrl)
-          : null,
-        permissions,
-      },
-      token: signToken(user.id),
-    };
+    return AuthService.buildLoginResponse(user.id, ip, userAgent);
   }
 
   static async changePassword(
@@ -877,6 +853,50 @@ export class AuthService {
         preferredLanguage: user.preferredLanguage,
         role: user.userRoles[0].role.name,
       },
+    };
+  }
+
+  private static async buildLoginResponse(
+    userId: string,
+    ip?: string,
+    userAgent?: string
+  ): Promise<{ user: any; token: string }> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        username: true,
+        phoneNumber: true,
+        profilePictureUrl: true,
+        preferredLanguage: true,
+        isEmailVerified: true,
+        isAccountComplete: true,
+        userRoles: {
+          where: { isActive: true },
+          select: { role: { select: { name: true } } },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new AppError("auth/errors:userNotFound", StatusCodes.UNAUTHORIZED);
+    }
+
+    const permissions = await getUserPermissions(userId);
+
+    return {
+      user: {
+        ...user,
+        roles: user.userRoles.map((ur) => ur.role.name),
+        profilePictureUrl: user.profilePictureUrl
+          ? applyFtpUrlTransform(user.profilePictureUrl)
+          : null,
+        permissions,
+      },
+      token: signToken(userId),
     };
   }
 }
