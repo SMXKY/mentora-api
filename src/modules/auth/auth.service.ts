@@ -15,11 +15,21 @@ import {
 } from "./utils/signRegistrationToken.util";
 import { deliverEmailOtp } from "../../services/otp/dliverEmail";
 import { buildAdminWelcomeEmailTemplate } from "../../emailTemplates/welcomeEmail.template";
+import { buildNewDeviceEmailTemplate } from "../../emailTemplates/newDevice.template";
+import { buildPasswordChangedEmailTemplate } from "../../emailTemplates/passwordChanged.template";
+import { buildPasswordResetOtpEmailTemplate } from "../../emailTemplates/passwordResetOTP.template";
 import { sendEmail } from "../../utils/sendEmail.util";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
 import { GOOGLE_CLIENT_ID } from "../../utils/enviromentVariablesCheck.util";
 import signToken from "./utils/signToken.util";
 import argon2 from "argon2";
+import { getDeviceInfo } from "./utils/deviceFingerprint.util";
+import { signResetToken, verifyResetToken } from "./utils/signResetToken";
+import { deliverOtp } from "../../services/otp/dilivery";
+import getUserPermissions from "../../utils/getUserPermissions.util";
+import { applyFtpUrlTransform } from "../../utils/applyFtpUrl.util";
+import { AuditService } from "../../utils/logUserActivity.util";
+import { LogCategory, LogOperation } from "../../generated/prisma";
 
 const CAMEROON_PHONE_REGEX = /^\+237[6-9][0-9]{8}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -60,8 +70,6 @@ const validatePassword = (password: string): void => {
 };
 
 export class AuthService {
-  // ── Phone registration ────────────────────────────────────────────────────
-
   static async requestPhoneOtp(phone: string): Promise<void> {
     if (!CAMEROON_PHONE_REGEX.test(phone)) {
       throw new AppError(
@@ -105,8 +113,6 @@ export class AuthService {
       }),
     };
   }
-
-  // ── Email registration ────────────────────────────────────────────────────
 
   static async requestEmailOtp(email: string): Promise<void> {
     if (!EMAIL_REGEX.test(email)) {
@@ -153,8 +159,6 @@ export class AuthService {
     };
   }
 
-  // ── Google auth ───────────────────────────────────────────────────────────
-
   static async googleAuth(
     idToken: string
   ): Promise<{ token: string } | { registrationToken: string }> {
@@ -174,7 +178,6 @@ export class AuthService {
       });
 
       const result = ticket.getPayload();
-
       if (!result) {
         throw new AppError(
           "auth/errors:invalidGoogleToken",
@@ -206,15 +209,8 @@ export class AuthService {
     }
 
     const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ googleAuthId }, { email }],
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-        status: true,
-        googleAuthId: true,
-      },
+      where: { OR: [{ googleAuthId }, { email }], deletedAt: null },
+      select: { id: true, status: true, googleAuthId: true },
     });
 
     if (existingUser) {
@@ -224,12 +220,10 @@ export class AuthService {
           StatusCodes.FORBIDDEN
         );
       }
-
       if (existingUser.status === UserStatus.BANNED) {
         throw new AppError("auth/errors:accountBanned", StatusCodes.FORBIDDEN);
       }
 
-      // Link googleAuthId if user previously registered via email
       if (!existingUser.googleAuthId) {
         await prisma.user.update({
           where: { id: existingUser.id },
@@ -247,7 +241,6 @@ export class AuthService {
       return { token: signToken(existingUser.id) };
     }
 
-    // New user — needs to select a role before account is created
     return {
       registrationToken: signRegistrationToken({
         identity: email,
@@ -259,10 +252,9 @@ export class AuthService {
     };
   }
 
-  // ── Complete registration ─────────────────────────────────────────────────
-
   static async completeRegistration(
-    input: CompleteRegistrationInput
+    input: CompleteRegistrationInput,
+    ctx: ServiceContext
   ): Promise<{ token: string }> {
     const { registrationToken, role, password, confirmPassword } = input;
 
@@ -367,10 +359,17 @@ export class AuthService {
       return newUser;
     });
 
+    AuditService.record(ctx, "users", {
+      operation: LogOperation.AUTH,
+      category: LogCategory.AUTH,
+      recordId: user.id,
+      newState: { identityType, role },
+      changedFields: [],
+      eventType: "user.registered",
+    });
+
     return { token: signToken(user.id) };
   }
-
-  // ── Admin account creation ────────────────────────────────────────────────
 
   static async createAdminUser(
     input: CreateAdminInput,
@@ -381,7 +380,6 @@ export class AuthService {
     const invalidRoles = roles.filter(
       (r) => !ADMIN_ASSIGNABLE_ROLES.includes(r as any)
     );
-
     if (invalidRoles.length > 0) {
       throw new AppError(
         "auth/errors:invalidAdminRole",
@@ -417,36 +415,43 @@ export class AuthService {
 
     const passwordHash = await argon2.hash(password);
 
-    try {
-      await prisma.$transaction(async (tx) => {
-        const newUser = await tx.user.create({
-          data: {
-            email,
-            firstName,
-            lastName,
-            password: passwordHash,
-            passwordChangedAt: new Date(),
-            isEmailVerified: true,
-          },
-          select: { id: true },
-        });
+    let newUserId: string;
 
-        console.log("[Debug] roleRows:", roleRows);
-
-        for (const role of roleRows) {
-          await tx.userRole.create({
-            data: {
-              userId: newUser.id,
-              roleId: role.id,
-              createdById: ctx.userId!,
-            },
-          });
-        }
+    await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          email,
+          firstName,
+          lastName,
+          password: passwordHash,
+          passwordChangedAt: new Date(),
+          isEmailVerified: true,
+        },
+        select: { id: true },
       });
-    } catch (err) {
-      console.log(err);
-      throw err;
-    }
+
+      newUserId = newUser.id;
+
+      for (const role of roleRows) {
+        await tx.userRole.create({
+          data: {
+            userId: newUser.id,
+            roleId: role.id,
+            createdById: ctx.userId!,
+          },
+        });
+      }
+    });
+
+    AuditService.record(ctx, "users", {
+      operation: LogOperation.CREATE,
+      category: LogCategory.WRITE,
+      recordId: newUserId!,
+      newState: { email, roles },
+      changedFields: [],
+      eventType: "admin.created",
+      targetType: "users",
+    });
 
     const html = buildAdminWelcomeEmailTemplate({
       firstName,
@@ -458,14 +463,386 @@ export class AuthService {
     await sendEmail(
       email,
       "Welcome to Mentora — Your admin account is ready",
-      `Welcome ${firstName}! Your Mentora admin account has been created. Email: ${email} Password: ${password} Please change your password immediately after logging in.`,
+      `Welcome ${firstName}! Email: ${email} Password: ${password} Please change your password immediately.`,
       html
     );
 
     return { message: "auth/success:adminCreated" };
   }
 
-  // ── Session status ────────────────────────────────────────────────────────
+  static async login(
+    identifier: string,
+    password: string,
+    userAgent: string | undefined,
+    ip: string | undefined
+  ): Promise<{ user: any; token: string }> {
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: identifier },
+          { phoneNumber: identifier },
+          { username: identifier },
+        ],
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        username: true,
+        phoneNumber: true,
+        profilePictureUrl: true,
+        preferredLanguage: true,
+        isEmailVerified: true,
+        isAccountComplete: true,
+        password: true,
+        status: true,
+        passwordChangedAt: true,
+        userRoles: {
+          where: { isActive: true },
+          select: { role: { select: { name: true } } },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new AppError(
+        "auth/errors:invalidCredentials",
+        StatusCodes.UNAUTHORIZED
+      );
+    }
+
+    if (!user.password) {
+      throw new AppError(
+        "auth/errors:noPasswordAccount",
+        StatusCodes.UNAUTHORIZED
+      );
+    }
+
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new AppError("auth/errors:accountSuspended", StatusCodes.FORBIDDEN);
+    }
+
+    if (user.status === UserStatus.BANNED) {
+      throw new AppError("auth/errors:accountBanned", StatusCodes.FORBIDDEN);
+    }
+
+    const isValid = await argon2.verify(user.password, password);
+    if (!isValid) {
+      throw new AppError(
+        "auth/errors:invalidCredentials",
+        StatusCodes.UNAUTHORIZED
+      );
+    }
+
+    const deviceInfo = getDeviceInfo(userAgent, ip);
+
+    const existingDevice = await prisma.userDevice.findFirst({
+      where: {
+        userId: user.id,
+        deviceFingerprintHash: deviceInfo.fingerprintHash,
+      },
+      select: { id: true },
+    });
+
+    if (!existingDevice) {
+      prisma.userDevice
+        .create({
+          data: {
+            userId: user.id,
+            deviceFingerprintHash: deviceInfo.fingerprintHash,
+            ipAddress: deviceInfo.ipAddress,
+            os: deviceInfo.os,
+            browser: deviceInfo.browser,
+            browserVersion: deviceInfo.browserVersion,
+            deviceType: deviceInfo.deviceType,
+            lastSeenAt: new Date(),
+          },
+        })
+        .catch(() => {});
+
+      if (user.email) {
+        const html = buildNewDeviceEmailTemplate({
+          firstName: user.firstName,
+          deviceType: deviceInfo.deviceType,
+          browser: deviceInfo.browser,
+          os: deviceInfo.os,
+          ipAddress: deviceInfo.ipAddress,
+          timestamp: new Date().toLocaleString("en-GB", {
+            dateStyle: "long",
+            timeStyle: "short",
+          }),
+        });
+
+        sendEmail(
+          user.email,
+          "New device login detected — Mentora",
+          `A new device logged into your Mentora account from ${deviceInfo.ipAddress}.`,
+          html
+        ).catch(() => {});
+      }
+    } else {
+      prisma.userDevice
+        .update({
+          where: { id: existingDevice.id },
+          data: { lastSeenAt: new Date(), ipAddress: deviceInfo.ipAddress },
+        })
+        .catch(() => {});
+    }
+
+    prisma.user
+      .update({ where: { id: user.id }, data: { lastLoggedInAt: new Date() } })
+      .catch(() => {});
+
+    const permissions = await getUserPermissions(user.id);
+    const { password: _pw, passwordChangedAt: _pc, ...safeUser } = user;
+
+    const ctx: ServiceContext = {
+      userId: user.id,
+      userEmail: user.email ?? undefined,
+      ipAddress: ip,
+      userAgent,
+    };
+
+    AuditService.record(ctx, "users", {
+      operation: LogOperation.AUTH,
+      category: LogCategory.AUTH,
+      recordId: user.id,
+      changedFields: [],
+      eventType: "user.login",
+    });
+
+    return {
+      user: {
+        ...safeUser,
+        roles: user.userRoles.map((ur) => ur.role.name),
+        profilePictureUrl: user.profilePictureUrl
+          ? applyFtpUrlTransform(user.profilePictureUrl)
+          : null,
+        permissions,
+      },
+      token: signToken(user.id),
+    };
+  }
+
+  static async changePassword(
+    ctx: ServiceContext,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ message: string }> {
+    const user = await prisma.user.findUnique({
+      where: { id: ctx.userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        password: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError("auth/errors:userNotFound", StatusCodes.UNAUTHORIZED);
+    }
+
+    if (!user.password) {
+      throw new AppError(
+        "auth/errors:noPasswordAccount",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    const isValid = await argon2.verify(user.password, currentPassword);
+    if (!isValid) {
+      throw new AppError(
+        "auth/errors:invalidCurrentPassword",
+        StatusCodes.UNAUTHORIZED
+      );
+    }
+
+    validatePassword(newPassword);
+
+    const passwordHash = await argon2.hash(newPassword);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: passwordHash, passwordChangedAt: new Date() },
+    });
+
+    AuditService.record(ctx, "users", {
+      operation: LogOperation.CHANGE_PASSWORD,
+      category: LogCategory.AUTH,
+      recordId: user.id,
+      changedFields: ["password"],
+      eventType: "user.password_changed",
+    });
+
+    if (user.email) {
+      const html = buildPasswordChangedEmailTemplate({
+        firstName: user.firstName,
+        timestamp: new Date().toLocaleString("en-GB", {
+          dateStyle: "long",
+          timeStyle: "short",
+        }),
+      });
+
+      sendEmail(
+        user.email,
+        "Your Mentora password has been changed",
+        `Your Mentora account password was changed successfully.`,
+        html
+      ).catch(() => {});
+    }
+
+    return { message: "auth/success:passwordChanged" };
+  }
+
+  static async forgotPassword(identity: string): Promise<void> {
+    const isEmail = EMAIL_REGEX.test(identity);
+    const isPhone = CAMEROON_PHONE_REGEX.test(identity);
+
+    if (!isEmail && !isPhone) {
+      throw new AppError(
+        "auth/errors:invalidIdentityFormat",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          isEmail ? { email: identity } : {},
+          isPhone ? { phoneNumber: identity } : {},
+        ],
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        phoneNumber: true,
+        status: true,
+      },
+    });
+
+    if (!user || user.status === UserStatus.BANNED) return;
+
+    const code = await OtpService.generateAndStoreOtpWithTTL(identity, 30 * 60);
+
+    if (isEmail && user.email) {
+      const html = buildPasswordResetOtpEmailTemplate({
+        firstName: user.firstName,
+        code,
+      });
+
+      await sendEmail(
+        user.email,
+        "Reset your Mentora password",
+        `Your Mentora password reset code is ${code}. It expires in 30 minutes.`,
+        html
+      );
+    } else if (isPhone) {
+      await deliverOtp(identity, code);
+    }
+  }
+
+  static async verifyResetOtp(
+    identity: string,
+    code: string
+  ): Promise<{ resetToken: string }> {
+    const isEmail = EMAIL_REGEX.test(identity);
+    const isPhone = CAMEROON_PHONE_REGEX.test(identity);
+
+    if (!isEmail && !isPhone) {
+      throw new AppError(
+        "auth/errors:invalidIdentityFormat",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    await OtpService.verifyOtp(identity, code);
+
+    return {
+      resetToken: signResetToken(identity, isEmail ? "email" : "phone"),
+    };
+  }
+
+  static async resetPassword(
+    resetToken: string,
+    newPassword: string,
+    confirmPassword: string,
+    ctx: ServiceContext
+  ): Promise<{ message: string }> {
+    if (newPassword !== confirmPassword) {
+      throw new AppError(
+        "auth/errors:passwordsDoNotMatch",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    validatePassword(newPassword);
+
+    const payload = verifyResetToken(resetToken);
+    const { identity, identityType } = payload;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          identityType === "email" ? { email: identity } : {},
+          identityType === "phone" ? { phoneNumber: identity } : {},
+        ],
+        deletedAt: null,
+      },
+      select: { id: true, email: true, firstName: true, status: true },
+    });
+
+    if (!user) {
+      throw new AppError("auth/errors:userNotFound", StatusCodes.NOT_FOUND);
+    }
+
+    if (user.status === UserStatus.BANNED) {
+      throw new AppError("auth/errors:accountBanned", StatusCodes.FORBIDDEN);
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: passwordHash, passwordChangedAt: new Date() },
+    });
+
+    AuditService.record(
+      { ...ctx, userId: user.id, userEmail: user.email ?? undefined },
+      "users",
+      {
+        operation: LogOperation.RESET_PASSWORD,
+        category: LogCategory.AUTH,
+        recordId: user.id,
+        changedFields: ["password"],
+        eventType: "user.password_reset",
+      }
+    );
+
+    if (user.email) {
+      const html = buildPasswordChangedEmailTemplate({
+        firstName: user.firstName,
+        timestamp: new Date().toLocaleString("en-GB", {
+          dateStyle: "long",
+          timeStyle: "short",
+        }),
+      });
+
+      sendEmail(
+        user.email,
+        "Your Mentora password has been changed",
+        `Your Mentora account password was reset successfully.`,
+        html
+      ).catch(() => {});
+    }
+
+    return { message: "auth/success:passwordReset" };
+  }
 
   static async getSessionStatus(
     ctx: ServiceContext

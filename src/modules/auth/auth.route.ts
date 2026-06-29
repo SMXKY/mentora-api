@@ -10,6 +10,11 @@ import {
   GoogleAuthSchema,
   CompleteRegistrationSchema,
   CreateAdminSchema,
+  ForgotPasswordSchema,
+  LoginSchema,
+  VerifyResetOtpSchema,
+  ResetPasswordSchema,
+  ChangePasswordSchema,
 } from "./auth.types";
 import restrictTo from "../../middlewares/restrictTo.middleware";
 
@@ -56,5 +61,32 @@ router.post(
 );
 
 router.get("/me", protect, authController.me);
+
+router.post("/login", validate(LoginSchema), authController.login);
+
+router.post(
+  "/forgot-password",
+  validate(ForgotPasswordSchema),
+  authController.forgotPassword
+);
+
+router.post(
+  "/forgot-password/verify-otp",
+  validate(VerifyResetOtpSchema),
+  authController.verifyResetOtp
+);
+
+router.post(
+  "/reset-password",
+  validate(ResetPasswordSchema),
+  authController.resetPassword
+);
+
+router.post(
+  "/change-password",
+  protect,
+  validate(ChangePasswordSchema),
+  authController.changePassword
+);
 
 export default router;

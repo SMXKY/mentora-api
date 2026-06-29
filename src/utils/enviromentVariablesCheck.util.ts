@@ -139,6 +139,8 @@ if (!process.env.GOOGLE_CLIENT_ID)
 
 if (!process.env.BREVO_API_KEY)
   throw new Error("BREVO_API_KEY environment variable not set");
+if (!process.env.RESET_TOKEN_EXPIRY)
+  throw new Error("RESET_TOKEN_EXPIRY environment variable not set");
 
 // =============================================
 // Typed exports — use these throughout the app
@@ -210,3 +212,4 @@ export const AT_SANDBOX = process.env.AT_SANDBOX;
 export const REGISTRATION_TOKEN_EXPIRY = process.env.REGISTRATION_TOKEN_EXPIRY;
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 export const BREVO_API_KEY = process.env.BREVO_API_KEY;
+export const RESET_TOKEN_EXPIRY = process.env.RESET_TOKEN_EXPIRY;

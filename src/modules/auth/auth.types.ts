@@ -92,6 +92,56 @@ export const GoogleAuthSchema = z
   })
   .openapi("GoogleAuth");
 
+export const LoginSchema = z
+  .object({
+    identifier: z.string().min(1, "auth/errors:identifierRequired"),
+    password: z.string().min(1, "auth/errors:passwordRequired"),
+  })
+  .openapi("Login");
+
+export const ChangePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "auth/errors:passwordRequired"),
+    newPassword: z.string().min(1, "auth/errors:passwordRequired"),
+    confirmPassword: z.string().min(1, "auth/errors:passwordRequired"),
+  })
+  .refine((d) => d.newPassword === d.confirmPassword, {
+    message: "auth/errors:passwordsDoNotMatch",
+    path: ["confirmPassword"],
+  })
+  .openapi("ChangePassword");
+
+export const ForgotPasswordSchema = z
+  .object({
+    identity: z.string().min(1, "auth/errors:identifierRequired"),
+  })
+  .openapi("ForgotPassword");
+
+export const VerifyResetOtpSchema = z
+  .object({
+    identity: z.string().min(1, "auth/errors:identifierRequired"),
+    code: z.string().length(6, "auth/errors:invalidOtpLength"),
+  })
+  .openapi("VerifyResetOtp");
+
+export const ResetPasswordSchema = z
+  .object({
+    resetToken: z.string().min(1, "auth/errors:resetTokenRequired"),
+    newPassword: z.string().min(1, "auth/errors:passwordRequired"),
+    confirmPassword: z.string().min(1, "auth/errors:passwordRequired"),
+  })
+  .refine((d) => d.newPassword === d.confirmPassword, {
+    message: "auth/errors:passwordsDoNotMatch",
+    path: ["confirmPassword"],
+  })
+  .openapi("ResetPassword");
+
+export type LoginInput = z.infer<typeof LoginSchema>;
+export type ChangePasswordInput = z.infer<typeof ChangePasswordSchema>;
+export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
+export type VerifyResetOtpInput = z.infer<typeof VerifyResetOtpSchema>;
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
+
 export type RequestEmailOtpInput = z.infer<typeof RequestEmailOtpSchema>;
 export type VerifyEmailOtpInput = z.infer<typeof VerifyEmailOtpSchema>;
 export type GoogleAuthInput = z.infer<typeof GoogleAuthSchema>;

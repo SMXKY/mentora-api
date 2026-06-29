@@ -39,6 +39,16 @@ export class OtpService {
     return code;
   }
 
+  static async generateAndStoreOtpWithTTL(
+    identity: string,
+    ttlSeconds: number
+  ): Promise<string> {
+    await OtpService.checkRateLimit(identity);
+    const code = generateOtp();
+    await redis.set(otpKey(identity), code, { EX: ttlSeconds });
+    return code;
+  }
+
   // Generates, stores, and delivers via AT (phone only)
   static async requestOtp(phone: string): Promise<void> {
     const code = await OtpService.generateAndStoreOtp(phone);

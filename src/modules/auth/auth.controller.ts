@@ -48,7 +48,8 @@ export class AuthController {
 
   completeRegistration = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
-      const result = await AuthService.completeRegistration(req.body);
+      const ctx = buildContext(req, res);
+      const result = await AuthService.completeRegistration(req.body, ctx);
       appResponder(StatusCodes.CREATED, result, res);
     }
   );
@@ -66,6 +67,61 @@ export class AuthController {
     const result = await AuthService.getSessionStatus(ctx);
     appResponder(StatusCodes.OK, result, res);
   });
+
+  login = catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const { identifier, password } = req.body;
+    const userAgent = req.headers["user-agent"];
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.socket.remoteAddress ||
+      req.ip;
+
+    const result = await AuthService.login(identifier, password, userAgent, ip);
+    appResponder(StatusCodes.OK, result, res);
+  });
+
+  changePassword = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const { currentPassword, newPassword } = req.body;
+      const result = await AuthService.changePassword(
+        ctx,
+        currentPassword,
+        newPassword
+      );
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
+
+  forgotPassword = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { identity } = req.body;
+      await AuthService.forgotPassword(identity);
+      appResponder(StatusCodes.OK, {}, res);
+    }
+  );
+
+  verifyResetOtp = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { identity, code } = req.body;
+      const result = await AuthService.verifyResetOtp(identity, code);
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
+
+  resetPassword = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { resetToken, newPassword, confirmPassword } = req.body;
+      const ctx = buildContext(req, res);
+      const result = await AuthService.resetPassword(
+        resetToken,
+        newPassword,
+        confirmPassword,
+        ctx
+      );
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
 }
 
 export const authController = new AuthController();
