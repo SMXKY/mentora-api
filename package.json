@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
-    "build": "tsc && npx prisma generate && cp -r src/generated dist/src/generated && cp -r src/public dist/src/public && cp -r src/locales dist/src/locales",
+    "build": "npx prisma generate && tsc && cp -r src/generated dist/src/generated && cp -r src/public dist/src/public && cp -r src/locales dist/src/locales && cp -r docs dist/docs",
     "start": "node dist/index.js",
     "scaffold": "ts-node cli/scaffold.ts",
     "docs:build": "ts-node cli/build-docs.ts",
