@@ -1,29 +1,36 @@
 import { Router } from "express";
 import { permissionController } from "./permission.controller";
-import { validate, ParamsId, PaginationQuery } from "../../middlewares/validate.middleware";
-// import { protect } from "../../middlewares/protect.middleware";
-// import { restrictTo } from "../../middlewares/restrictTo.middleware";
+import {
+  validate,
+  ParamsId,
+  PaginationQuery,
+} from "../../middlewares/validate.middleware";
+import protect from "../../middlewares/protect.middleware";
+import restrictTo from "../../middlewares/restrictTo.middleware";
+import { permissions } from "../../data/permission.data";
 
 const router = Router();
 
-// Read-only routes
 router.get(
   "/",
-  // protect,
+  protect,
+  restrictTo(permissions.rbac.permissionsRead),
   validate(PaginationQuery, "query"),
   permissionController.findMany
 );
 
 router.get(
   "/search",
-  // protect,
+  protect,
+  restrictTo(permissions.rbac.permissionsRead),
   validate(PaginationQuery, "query"),
   permissionController.search
 );
 
 router.get(
   "/:id",
-  // protect,
+  restrictTo(permissions.rbac.permissionsRead),
+  protect,
   validate(ParamsId, "params"),
   permissionController.findById
 );

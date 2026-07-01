@@ -32,6 +32,28 @@ export class RoleController extends BaseController<any> {
     );
   });
 
+  getPermissionCatalog = catchAsync(async (req, res) => {
+    const ctx = buildContext(req, res);
+    const { id } = req.params;
+    const result = await this.service.getPermissionCatalogForRole(id, ctx);
+    appResponder(
+      StatusCodes.OK,
+      { message: "roles/success:permission_catalog_retrieved", result },
+      res
+    );
+  });
+
+  updatePermissions = catchAsync(async (req, res) => {
+    const ctx = buildContext(req, res);
+    const { id } = req.params;
+    const result = await this.service.updatePermissions(id, req.body, ctx);
+    appResponder(
+      StatusCodes.OK,
+      { message: "roles/success:permissions_updated", result },
+      res
+    );
+  });
+
   roleHistory = catchAsync(async (req, res) => {
     const ctx = buildContext(req, res);
     const { userId } = req.params;

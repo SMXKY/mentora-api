@@ -10,6 +10,7 @@ import {
   UpdateRoleSchema,
   AssignRoleSchema,
 } from "./role.schema";
+import { UpdateRolePermissionsSchema } from "./role.schema";
 import protect from "../../middlewares/protect.middleware";
 import restrictTo from "../../middlewares/restrictTo.middleware";
 import { permissions } from "../../data/permission.data";
@@ -87,6 +88,23 @@ router.delete(
   restrictTo(permissions.rbac.rolesDelete),
   validate(ParamsId, "params"),
   roleController.delete
+);
+
+router.get(
+  "/:id/permissions",
+  protect,
+  restrictTo(permissions.rbac.permissionsRead),
+  validate(ParamsId, "params"),
+  roleController.getPermissionCatalog
+);
+
+router.put(
+  "/:id/permissions",
+  protect,
+  restrictTo(permissions.rbac.permissionsWrite),
+  validate(ParamsId, "params"),
+  validate(UpdateRolePermissionsSchema),
+  roleController.updatePermissions
 );
 
 router.post(

@@ -48,3 +48,19 @@ export const UserRoleResponseSchema = z
     updatedAt: z.string().datetime(),
   })
   .openapi("UserRoleResponse");
+
+export const UpdateRolePermissionsSchema = z
+  .object({
+    permissionCodes: z
+      .array(z.string().min(1))
+      .min(0)
+      .max(500)
+      .refine((codes) => new Set(codes).size === codes.length, {
+        message: "roles/errors:duplicate_permission_codes",
+      }),
+  })
+  .openapi("UpdateRolePermissions");
+
+export type UpdateRolePermissionsInput = z.infer<
+  typeof UpdateRolePermissionsSchema
+>;

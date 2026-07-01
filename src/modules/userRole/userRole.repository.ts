@@ -14,9 +14,7 @@ export class UserRoleRepository extends BaseRepository<any> {
   protected allowedIncludes: string[] = ["user", "role", "createdBy"];
 
   protected softDeleteConfig = {
-    enabled: true,
-    // TODO: add unique fields that need _deleted_timestamp suffix
-    // uniqueFields: ['name', 'email'],
+    enabled: false,
     uniqueFields: [] as string[],
   };
 

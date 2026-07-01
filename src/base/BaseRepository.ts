@@ -37,7 +37,7 @@ export abstract class BaseRepository<T> {
     include?: Record<string, boolean | object>
   ): Promise<T | null> {
     return this.model.findUnique({
-      where: { id, deletedAt: null },
+      where: this.softDeleteConfig.enabled ? { id, deletedAt: null } : { id },
       include: this.sanitiseInclude(include),
     });
   }
@@ -302,7 +302,9 @@ export abstract class BaseRepository<T> {
     filters: FilterParams,
     search?: string
   ): Record<string, any> {
-    const where: Record<string, any> = { deletedAt: null };
+    const where: Record<string, any> = this.softDeleteConfig.enabled
+      ? { deletedAt: null }
+      : {};
 
     for (const [key, value] of Object.entries(filters)) {
       if (value === undefined || value === "") continue;
@@ -330,6 +332,10 @@ export abstract class BaseRepository<T> {
     search?: string
   ): Record<string, any> {
     const where: Record<string, any> = { deletedAt: { not: null } };
+
+    if (!this.softDeleteConfig.enabled) {
+      throw new AppError("common/errors:db.softDeleteNotSupported", 405);
+    }
 
     for (const [key, value] of Object.entries(filters)) {
       if (value === undefined || value === "") continue;
@@ -370,7 +376,9 @@ export abstract class BaseRepository<T> {
   }
 
   protected addSoftDeleteFilter(where: Partial<T>): Record<string, any> {
-    return { ...where, deletedAt: null };
+    return this.softDeleteConfig.enabled
+      ? { ...where, deletedAt: null }
+      : { ...where };
   }
 
   protected assertNotSystem(record: any): void {

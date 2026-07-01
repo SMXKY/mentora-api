@@ -11,11 +11,18 @@ export class PermissionRepository extends BaseRepository<any> {
 
   // Allowlist for ?include= query param
   // Any relation not listed here is stripped before the Prisma call
-  protected allowedIncludes: string[] = ["permissionModule", "permissionSubmodule", "rolePermissions", "overrides", "implies", "impliedBy"];
+  protected allowedIncludes: string[] = [
+    "permissionModule",
+    "permissionSubmodule",
+    "rolePermissions",
+    "overrides",
+    "implies",
+    "impliedBy",
+  ];
 
-    protected softDeleteConfig = {
+  protected softDeleteConfig = {
     enabled: false,
-    uniqueFields: [] as string[],
+    uniqueFields: [],
   };
 
   // Set to true if this model has an isSystem boolean field
