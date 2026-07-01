@@ -7,7 +7,7 @@ export const CreateRoleSchema = z
   .object({
     name: z.string(),
     description: z.string().optional(),
-    isSystem: z.boolean(),
+    isSystem: z.boolean().default(false),
     isActive: z.boolean().optional(),
   })
   .openapi("CreateRole");

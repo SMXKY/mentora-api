@@ -20,45 +20,44 @@ export class RoleService extends BaseService<
   protected tableName = "role";
   protected userRoleRepository = new UserRoleRepository();
 
-  // ============================================================
-  // LIFECYCLE HOOKS
-  // Uncomment and implement as needed
-  // ============================================================
+  protected async beforeUpdate(
+    id: string,
+    data: UpdateRoleInput,
+    ctx: ServiceContext
+  ) {
+    const role = await this.repository.findByIdOrThrow(id);
 
-  // protected async beforeCreate(data: CreateRoleInput, ctx: ServiceContext) {
-  //   // Enrich or validate data before insert
-  //   // e.g. hash a password, generate a reference number
-  //   return data
-  // }
+    if (role.isSystem) {
+      throw new AppError(
+        "roles/errors:system_role_immutable",
+        StatusCodes.FORBIDDEN
+      );
+    }
 
-  // protected async afterCreate(record: any, ctx: ServiceContext) {
-  //   // Side effects after successful insert
-  //   // e.g. send notification, update a counter
-  // }
-
-  // protected async beforeUpdate(id: string, data: UpdateRoleInput, ctx: ServiceContext) {
-  //   // Modify data before update
-  //   // e.g. strip fields the user should not change
-  //   return data
-  // }
+    return data;
+  }
 
   // protected async afterUpdate(record: any, ctx: ServiceContext) {
   //   // Side effects after successful update
   // }
 
-  // protected async beforeDelete(id: string, ctx: ServiceContext) {
-  //   // Run checks before deletion
-  //   // e.g. check no active bookings exist before deleting a tutor
-  // }
+  protected async beforeDelete(id: string, ctx: ServiceContext) {
+    const role = await this.repository.findByIdOrThrow(id);
+
+    if (role.isSystem) {
+      throw new AppError(
+        "roles/errors:system_role_immutable",
+        StatusCodes.FORBIDDEN
+      );
+    }
+  }
 
   // protected async afterDelete(record: any, ctx: ServiceContext) {
   //   // Side effects after deletion
-  //   // e.g. release associated escrow, cancel scheduled jobs
   // }
 
   // ============================================================
   // CUSTOM METHODS
-  // Add business logic methods here beyond standard CRUD
   // ============================================================
 
   async assignRole(userId: string, data: AssignRoleInput, ctx: ServiceContext) {

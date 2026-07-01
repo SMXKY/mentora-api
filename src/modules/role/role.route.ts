@@ -10,122 +10,104 @@ import {
   UpdateRoleSchema,
   AssignRoleSchema,
 } from "./role.schema";
-// import { protect } from "../../middlewares/protect.middleware";
-// import { restrictTo } from "../../middlewares/restrictTo.middleware";
+import protect from "../../middlewares/protect.middleware";
+import restrictTo from "../../middlewares/restrictTo.middleware";
+import { permissions } from "../../data/permission.data";
 
 const router = Router();
 
-// ============================================================
-// STANDARD CRUD ROUTES
-// Uncomment protect and restrictTo as you implement auth
-// Add the correct permission string to restrictTo
-// ============================================================
-
-// CREATE
 router.post(
   "/",
-  // protect,
-  // restrictTo("resource.create"),
+  protect,
+  restrictTo(permissions.rbac.rolesCreate),
   validate(CreateRoleSchema),
   roleController.create
 );
 
-// READ — offset paginated list (admin)
 router.get(
   "/",
-  // protect,
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   validate(PaginationQuery, "query"),
   roleController.findMany
 );
 
-// READ — cursor paginated search (public)
 router.get(
   "/search",
-  // protect,
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   validate(PaginationQuery, "query"),
   roleController.search
 );
 
-// READ — soft deleted records (admin only)
 router.get(
   "/deleted",
-  // protect,
-  // restrictTo("resource.read_deleted"),
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   validate(PaginationQuery, "query"),
   roleController.findDeleted
 );
 
-// READ — single soft deleted record (admin only)
 router.get(
   "/deleted/:id",
-  // protect,
-  // restrictTo("resource.read_deleted"),
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   validate(ParamsId, "params"),
   roleController.findDeletedById
 );
 
-// READ — single record
 router.get(
   "/:id",
-  // protect,
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   validate(ParamsId, "params"),
   roleController.findById
 );
 
-// UPDATE
 router.patch(
   "/:id",
-  // protect,
-  // restrictTo("resource.update"),
+  protect,
+  restrictTo(permissions.rbac.rolesUpdate),
   validate(ParamsId, "params"),
   validate(UpdateRoleSchema),
   roleController.update
 );
 
-// RESTORE
 router.patch(
   "/:id/restore",
-  // protect,
-  // restrictTo("resource.restore"),
+  protect,
+  restrictTo(permissions.rbac.rolesCreate),
   validate(ParamsId, "params"),
   roleController.restore
 );
 
-// DELETE
 router.delete(
   "/:id",
-  // protect,
-  // restrictTo("resource.delete"),
+  protect,
+  restrictTo(permissions.rbac.rolesDelete),
   validate(ParamsId, "params"),
   roleController.delete
 );
 
-// ============================================================
-// USER ROLE ASSIGNMENT ROUTES
-// ============================================================
-
-// ASSIGN — assign a role to a user
 router.post(
-  "/asign/:userId",
-  // protect,
-  // restrictTo("roles.assign"),
+  "/assign/:userId",
+  protect,
+  restrictTo(permissions.rbac.rolesUpdate),
   validate(AssignRoleSchema),
   roleController.assignRole
 );
 
-// UNASSIGN — deactivate a user's role assignment
 router.patch(
   "/unassign/:userId/:userRoleId",
-  // protect,
-  // restrictTo("roles.unassign"),
+  protect,
+  restrictTo(permissions.rbac.rolesUpdate),
   roleController.unassignRole
 );
 
-// HISTORY — view a user's role assignment history
 router.get(
   "/history/:userId",
-  // protect,
-  // restrictTo("roles.view_history"),
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   roleController.roleHistory
 );
 
