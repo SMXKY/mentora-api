@@ -43,5 +43,7 @@
   "passwordChanged": "Your password was recently changed. Please sign in again.",
   "firstNameRequired": "Please enter a first name.",
   "lastNameRequired": "Please enter a last name.",
-  "idTokenRequired": "A Google ID token is required."
+  "idTokenRequired": "A Google ID token is required.",
+  "notAuthenticated": "You must be signed in to access this resource.",
+  "insufficientPermissions": "You do not have permission to perform this action."
 }

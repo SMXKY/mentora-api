@@ -1,0 +1,3 @@
+{
+  "readOnly": "Les permissions sont gérées via les données d'amorçage et ne peuvent pas être créées, modifiées ou supprimées via l'API."
+}

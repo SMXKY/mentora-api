@@ -4,31 +4,34 @@ import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 extendZodWithOpenApi(z);
 
 // Fields used when creating a new User
-// System fields (id, createdAt, updatedAt, deletedAt) are excluded
+// System-managed fields (id, createdAt, updatedAt, deletedAt, isSystem,
+// lastLoggedInAt) are excluded — those are never client-settable.
+// `password` is intentionally excluded too: password creation/hashing
+// only happens through the auth module (register/complete,
+// admin/create), never through this generic admin CRUD endpoint.
 export const CreateUserSchema = z
   .object({
-  clerkId: z.string(),
-  googleAuthId: z.string().optional(),
-  facebookAuthId: z.string().optional(),
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  username: z.string().optional(),
-  email: z.string(),
-  isEmailVerified: z.boolean(),
-  phoneNumber: z.string().optional(),
-  whatsappNumber: z.string().optional(),
-  whatsappOptIn: z.boolean(),
-  whatsappOptInAt: z.string().datetime().optional(),
-  dob: z.string().datetime().optional(),
-  gender: z.string().optional(),
-  profilePictureUrl: z.string().optional(),
-  address: z.string().optional(),
-  preferredLanguage: z.string().optional(),
-  notificationsMuted: z.boolean(),
-  status: z.string().optional(),
-  isSystem: z.boolean(),
-  isAccountComplete: z.boolean(),
-  lastLoggedInAt: z.string().datetime().optional(),
+    googleAuthId: z.string().optional(),
+    facebookAuthId: z.string().optional(),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    username: z.string().optional(),
+    email: z.string().email().optional(),
+    isEmailVerified: z.boolean().optional(),
+    phoneNumber: z.string().optional(),
+    whatsappNumber: z.string().optional(),
+    whatsappOptIn: z.boolean().optional(),
+    whatsappOptInAt: z.string().datetime().optional(),
+    dob: z.string().datetime().optional(),
+    gender: z.enum(["MALE", "FEMALE", "PREFER_NOT_TO_SAY"]).optional(),
+    profilePictureUrl: z.string().optional(),
+    address: z.string().optional(),
+    preferredLanguage: z.enum(["EN", "FR"]).optional(),
+    notificationsMuted: z.boolean().optional(),
+    status: z
+      .enum(["ACTIVE", "INACTIVE", "SUSPENDED", "DEACTIVATED", "BANNED"])
+      .optional(),
+    isAccountComplete: z.boolean().optional(),
   })
   .openapi("CreateUser");
 
@@ -37,33 +40,34 @@ export const UpdateUserSchema = CreateUserSchema.partial().openapi(
   "UpdateUser"
 );
 
-// Full response shape returned to the client
+// Full response shape returned to the client — password is never
+// included here (see user.repository.ts, which strips it from every
+// record before it reaches this layer).
 export const UserResponseSchema = z
   .object({
-  id: z.string().uuid(),
-  clerkId: z.string(),
-  googleAuthId: z.string().optional(),
-  facebookAuthId: z.string().optional(),
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  username: z.string().optional(),
-  email: z.string(),
-  isEmailVerified: z.boolean(),
-  phoneNumber: z.string().optional(),
-  whatsappNumber: z.string().optional(),
-  whatsappOptIn: z.boolean(),
-  whatsappOptInAt: z.string().datetime().optional(),
-  dob: z.string().datetime().optional(),
-  gender: z.string(),
-  profilePictureUrl: z.string().optional(),
-  address: z.string().optional(),
-  preferredLanguage: z.string(),
-  notificationsMuted: z.boolean(),
-  status: z.string(),
-  isSystem: z.boolean(),
-  isAccountComplete: z.boolean(),
-  lastLoggedInAt: z.string().datetime().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+    id: z.string().uuid(),
+    googleAuthId: z.string().nullable().optional(),
+    facebookAuthId: z.string().nullable().optional(),
+    firstName: z.string().nullable().optional(),
+    lastName: z.string().nullable().optional(),
+    username: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    isEmailVerified: z.boolean(),
+    phoneNumber: z.string().nullable().optional(),
+    whatsappNumber: z.string().nullable().optional(),
+    whatsappOptIn: z.boolean(),
+    whatsappOptInAt: z.string().datetime().nullable().optional(),
+    dob: z.string().datetime().nullable().optional(),
+    gender: z.string(),
+    profilePictureUrl: z.string().nullable().optional(),
+    address: z.string().nullable().optional(),
+    preferredLanguage: z.string(),
+    notificationsMuted: z.boolean(),
+    status: z.string(),
+    isSystem: z.boolean(),
+    isAccountComplete: z.boolean(),
+    lastLoggedInAt: z.string().datetime().nullable().optional(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
   })
   .openapi("User");

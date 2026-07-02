@@ -1,0 +1,7 @@
+{
+  "assigned": "Rôle attribué avec succès.",
+  "unassigned": "Rôle retiré avec succès.",
+  "permissionCatalogRetrieved": "Catalogue des permissions récupéré avec succès.",
+  "permissionsUpdated": "Permissions du rôle mises à jour avec succès.",
+  "historyRetrieved": "Historique des attributions de rôle récupéré avec succès."
+}

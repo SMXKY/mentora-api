@@ -127,10 +127,10 @@ app.use("/api/v1/users", userRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(
-    new AppError(
-      `Route ${req.method} ${req.originalUrl} not found`,
-      StatusCodes.NOT_FOUND
-    )
+    new AppError("common/errors:notFound", StatusCodes.NOT_FOUND, {
+      method: req.method,
+      path: req.originalUrl,
+    })
   );
 });
 

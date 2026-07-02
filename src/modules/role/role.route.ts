@@ -3,6 +3,8 @@ import { roleController } from "./role.controller";
 import {
   validate,
   ParamsId,
+  ParamsUserId,
+  ParamsUserIdAndUserRoleId,
   PaginationQuery,
 } from "../../middlewares/validate.middleware";
 import {
@@ -111,6 +113,7 @@ router.post(
   "/assign/:userId",
   protect,
   restrictTo(permissions.rbac.rolesUpdate),
+  validate(ParamsUserId, "params"),
   validate(AssignRoleSchema),
   roleController.assignRole
 );
@@ -119,6 +122,7 @@ router.patch(
   "/unassign/:userId/:userRoleId",
   protect,
   restrictTo(permissions.rbac.rolesUpdate),
+  validate(ParamsUserIdAndUserRoleId, "params"),
   roleController.unassignRole
 );
 
@@ -126,6 +130,7 @@ router.get(
   "/history/:userId",
   protect,
   restrictTo(permissions.rbac.rolesRead),
+  validate(ParamsUserId, "params"),
   roleController.roleHistory
 );
 

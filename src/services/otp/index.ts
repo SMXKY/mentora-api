@@ -79,4 +79,12 @@ export class OtpService {
 
     await redis.del(key);
   }
+
+  // Non-production-only helper so automated tooling (e.g. the k6 load
+  // test suite) can read back an OTP that was sent by email, the same
+  // way the SMS channel already logs its code to the console outside
+  // production. Never wired to a route in production (see auth.route.ts).
+  static async peekOtp(identity: string): Promise<string | null> {
+    return redis.get(otpKey(identity));
+  }
 }

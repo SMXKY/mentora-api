@@ -1,0 +1,14 @@
+{
+  "systemRoleImmutable": "Il s'agit d'un rôle système qui ne peut être ni modifié ni supprimé.",
+  "roleHasAssignedUsers": "Ce rôle ne peut pas être supprimé tant qu'il est encore attribué à des utilisateurs.",
+  "systemRolePermissionsImmutable": "Les permissions d'un rôle système ne peuvent pas être modifiées.",
+  "invalidPermissionCodes": "Un ou plusieurs des codes de permission soumis n'existent pas.",
+  "cannotModifySelfRegistrationUser": "Cet utilisateur a un rôle d'auto-inscription et ses rôles ne peuvent pas être modifiés ici.",
+  "notFound": "Le rôle sélectionné n'existe pas.",
+  "alreadyAssigned": "Cet utilisateur possède déjà ce rôle.",
+  "multipleNotAllowed": "Cet utilisateur a déjà un rôle et ce rôle n'autorise pas les attributions multiples.",
+  "userHasExclusiveRole": "Cet utilisateur a déjà un rôle exclusif qui ne peut pas être combiné avec un autre.",
+  "assignmentNotFound": "Cette attribution de rôle n'existe pas pour cet utilisateur.",
+  "alreadyInactive": "Cette attribution de rôle est déjà inactive.",
+  "duplicatePermissionCodes": "Les codes de permission soumis contiennent des doublons."
+}

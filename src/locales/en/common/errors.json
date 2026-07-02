@@ -12,6 +12,9 @@
   "db": {
     "duplicate": "A record with this {{fields}} already exists",
     "notFound": "The requested record was not found",
+    "notDeleted": "This record has not been deleted",
+    "softDeleteNotSupported": "This resource does not support soft deletion",
+    "systemRecordImmutable": "This is a protected system record and cannot be modified",
     "invalidReference": "Invalid reference for {{field}}",
     "missingField": "{{field}} is required",
     "valueTooLong": "{{field}} is too long",
@@ -29,6 +32,7 @@
     "payloadTooLarge": "The request payload is too large"
   },
   "server": {
-    "unknown": "An unexpected error occurred. Please try again"
+    "unknown": "An unexpected error occurred. Please try again",
+    "ftpConfigMissing": "File storage is not configured correctly. Please try again later"
   }
 }

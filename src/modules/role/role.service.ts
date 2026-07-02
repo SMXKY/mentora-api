@@ -35,7 +35,7 @@ export class RoleService extends BaseService<
 
     if (role.isSystem) {
       throw new AppError(
-        "roles/errors:system_role_immutable",
+        "role/errors:systemRoleImmutable",
         StatusCodes.FORBIDDEN
       );
     }
@@ -48,7 +48,7 @@ export class RoleService extends BaseService<
 
     if (role.isSystem) {
       throw new AppError(
-        "roles/errors:system_role_immutable",
+        "role/errors:systemRoleImmutable",
         StatusCodes.FORBIDDEN
       );
     }
@@ -60,7 +60,7 @@ export class RoleService extends BaseService<
 
     if (assignedCount > 0) {
       throw new AppError(
-        "roles/errors:role_has_assigned_users",
+        "role/errors:roleHasAssignedUsers",
         StatusCodes.BAD_REQUEST
       );
     }
@@ -169,7 +169,7 @@ export class RoleService extends BaseService<
 
     if (role.isSystem) {
       throw new AppError(
-        "roles/errors:system_role_permissions_immutable",
+        "role/errors:systemRolePermissionsImmutable",
         StatusCodes.FORBIDDEN
       );
     }
@@ -193,7 +193,7 @@ export class RoleService extends BaseService<
 
     if (invalidCodes.length > 0) {
       throw new AppError(
-        "roles/errors:invalid_permission_codes",
+        "role/errors:invalidPermissionCodes",
         StatusCodes.BAD_REQUEST
       );
     }
@@ -260,14 +260,14 @@ export class RoleService extends BaseService<
 
     if (hasSelfRegistrationRole) {
       throw new AppError(
-        "roles/errors:cannot_modify_self_registration_user",
+        "role/errors:cannotModifySelfRegistrationUser",
         StatusCodes.FORBIDDEN
       );
     }
 
     const role = await this.repository.findById(roleId);
     if (!role) {
-      throw new AppError("roles/errors:notFound", StatusCodes.NOT_FOUND);
+      throw new AppError("role/errors:notFound", StatusCodes.NOT_FOUND);
     }
 
     const existingExact = await this.userRoleRepository.findOne({
@@ -277,7 +277,7 @@ export class RoleService extends BaseService<
 
     if (existingExact && existingExact.isActive) {
       throw new AppError(
-        "roles/errors:already_assigned",
+        "role/errors:alreadyAssigned",
         StatusCodes.BAD_REQUEST
       );
     }
@@ -285,7 +285,7 @@ export class RoleService extends BaseService<
     if (activeRoles.length > 0) {
       if (!role.allowsMultiple) {
         throw new AppError(
-          "roles/errors:multiple_not_allowed",
+          "role/errors:multipleNotAllowed",
           StatusCodes.BAD_REQUEST
         );
       }
@@ -294,7 +294,7 @@ export class RoleService extends BaseService<
       );
       if (hasExclusiveRole) {
         throw new AppError(
-          "roles/errors:user_has_exclusive_role",
+          "role/errors:userHasExclusiveRole",
           StatusCodes.BAD_REQUEST
         );
       }
@@ -335,7 +335,7 @@ export class RoleService extends BaseService<
 
     if (hasSelfRegistrationRole) {
       throw new AppError(
-        "roles/errors:cannot_modify_self_registration_user",
+        "role/errors:cannotModifySelfRegistrationUser",
         StatusCodes.FORBIDDEN
       );
     }
@@ -344,14 +344,14 @@ export class RoleService extends BaseService<
 
     if (!existing || existing.userId !== userId) {
       throw new AppError(
-        "roles/errors:assignment_not_found",
+        "role/errors:assignmentNotFound",
         StatusCodes.NOT_FOUND
       );
     }
 
     if (!existing.isActive) {
       throw new AppError(
-        "roles/errors:already_inactive",
+        "role/errors:alreadyInactive",
         StatusCodes.BAD_REQUEST
       );
     }

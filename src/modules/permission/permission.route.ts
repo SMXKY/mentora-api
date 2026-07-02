@@ -29,8 +29,8 @@ router.get(
 
 router.get(
   "/:id",
-  restrictTo(permissions.rbac.permissionsRead),
   protect,
+  restrictTo(permissions.rbac.permissionsRead),
   validate(ParamsId, "params"),
   permissionController.findById
 );

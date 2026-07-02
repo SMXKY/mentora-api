@@ -1,10 +1,11 @@
 import { BaseService } from "../../base/BaseService";
 import { PermissionRepository } from "./permission.repository";
+import { AppError } from "../../utils/AppError.util";
+import { StatusCodes } from "http-status-codes";
 
 // ============================================================
 // PERMISSION SERVICE — READONLY
 // No create, update, or delete operations.
-// Extend with custom read methods as needed.
 // ============================================================
 
 export class PermissionService extends BaseService<any, never, never> {
@@ -13,16 +14,23 @@ export class PermissionService extends BaseService<any, never, never> {
 
   // Override create/update/delete to prevent accidental use
   async create(): Promise<never> {
-    throw new Error("Permission is read-only");
+    throw new AppError(
+      "permission/errors:readOnly",
+      StatusCodes.METHOD_NOT_ALLOWED
+    );
   }
 
   async update(): Promise<never> {
-    throw new Error("Permission is read-only");
+    throw new AppError(
+      "permission/errors:readOnly",
+      StatusCodes.METHOD_NOT_ALLOWED
+    );
   }
 
   async delete(): Promise<never> {
-    throw new Error("Permission is read-only");
+    throw new AppError(
+      "permission/errors:readOnly",
+      StatusCodes.METHOD_NOT_ALLOWED
+    );
   }
-
-  // TODO: add custom read methods
 }

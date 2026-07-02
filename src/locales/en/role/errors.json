@@ -1,0 +1,14 @@
+{
+  "systemRoleImmutable": "This is a system role and cannot be modified or deleted.",
+  "roleHasAssignedUsers": "This role cannot be deleted while it is still assigned to users.",
+  "systemRolePermissionsImmutable": "The permissions on a system role cannot be changed.",
+  "invalidPermissionCodes": "One or more of the submitted permission codes do not exist.",
+  "cannotModifySelfRegistrationUser": "This user has a self-registration role and cannot have their roles changed here.",
+  "notFound": "The selected role does not exist.",
+  "alreadyAssigned": "This user already has this role.",
+  "multipleNotAllowed": "This user already has a role and this role does not allow multiple assignments.",
+  "userHasExclusiveRole": "This user already has an exclusive role that cannot be combined with another.",
+  "assignmentNotFound": "This role assignment does not exist for this user.",
+  "alreadyInactive": "This role assignment is already inactive.",
+  "duplicatePermissionCodes": "The submitted permission codes contain duplicates."
+}

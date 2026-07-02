@@ -4,6 +4,8 @@ import { appResponder } from "../../utils/appResponder.util";
 import { buildContext } from "../../utils/buildContext.util";
 import { AuthService } from "./auth.service";
 import { StatusCodes } from "http-status-codes";
+import { OtpService } from "../../services/otp";
+import { AppError } from "../../utils/AppError.util";
 
 export class AuthController {
   requestPhoneOtp = catchAsync(
@@ -41,7 +43,13 @@ export class AuthController {
   googleAuth = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
       const { idToken } = req.body;
-      const result = await AuthService.googleAuth(idToken);
+      const userAgent = req.headers["user-agent"];
+      const ip =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+        req.socket.remoteAddress ||
+        req.ip;
+
+      const result = await AuthService.googleAuth(idToken, userAgent, ip);
       appResponder(StatusCodes.OK, result, res);
     }
   );
@@ -120,6 +128,23 @@ export class AuthController {
         ctx
       );
       appResponder(StatusCodes.OK, result, res);
+    }
+  );
+
+  // ============================================================
+  // DEV-ONLY: read back a pending email/phone OTP without needing
+  // a real inbox/SMS. Disabled entirely in production. Exists so
+  // automated tooling (k6 load tests) can exercise the OTP-verify
+  // paths end to end against local/staging environments.
+  // ============================================================
+  devPeekOtp = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      if (process.env.NODE_ENV === "production") {
+        throw new AppError("common/errors:notFound", StatusCodes.NOT_FOUND);
+      }
+      const identity = req.query.identity as string;
+      const code = await OtpService.peekOtp(identity);
+      appResponder(StatusCodes.OK, { code }, res);
     }
   );
 }

@@ -1,0 +1,7 @@
+{
+  "assigned": "Role assigned successfully.",
+  "unassigned": "Role unassigned successfully.",
+  "permissionCatalogRetrieved": "Permission catalog retrieved successfully.",
+  "permissionsUpdated": "Role permissions updated successfully.",
+  "historyRetrieved": "Role assignment history retrieved successfully."
+}

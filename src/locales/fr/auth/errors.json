@@ -43,5 +43,7 @@
   "passwordChanged": "Votre mot de passe a été récemment modifié. Veuillez vous reconnecter.",
   "firstNameRequired": "Veuillez entrer un prénom.",
   "lastNameRequired": "Veuillez entrer un nom de famille.",
-  "idTokenRequired": "Un jeton Google ID est requis."
+  "idTokenRequired": "Un jeton Google ID est requis.",
+  "notAuthenticated": "Vous devez être connecté pour accéder à cette ressource.",
+  "insufficientPermissions": "Vous n'avez pas la permission d'effectuer cette action."
 }

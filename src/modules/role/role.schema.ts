@@ -56,7 +56,7 @@ export const UpdateRolePermissionsSchema = z
       .min(0)
       .max(500)
       .refine((codes) => new Set(codes).size === codes.length, {
-        message: "roles/errors:duplicate_permission_codes",
+        message: "role/errors:duplicatePermissionCodes",
       }),
   })
   .openapi("UpdateRolePermissions");

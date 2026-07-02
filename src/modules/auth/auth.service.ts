@@ -160,7 +160,9 @@ export class AuthService {
   }
 
   static async googleAuth(
-    idToken: string
+    idToken: string,
+    userAgent?: string,
+    ip?: string
   ): Promise<{ token: string } | { registrationToken: string }> {
     if (!GOOGLE_CLIENT_ID) {
       throw new Error(
@@ -229,6 +231,18 @@ export class AuthService {
           where: { id: existingUser.id },
           data: { googleAuthId },
         });
+
+        AuditService.record(
+          { userId: existingUser.id, userEmail: email, ipAddress: ip, userAgent },
+          "users",
+          {
+            operation: LogOperation.UPDATE,
+            category: LogCategory.AUTH,
+            recordId: existingUser.id,
+            changedFields: ["googleAuthId"],
+            eventType: "user.google_account_linked",
+          }
+        );
       }
 
       prisma.user
@@ -460,12 +474,15 @@ export class AuthService {
       roles,
     });
 
-    await sendEmail(
+    // Fire-and-forget, matching login/changePassword/resetPassword —
+    // the account is already committed; a flaky email provider should
+    // not turn a successful creation into a failed request.
+    sendEmail(
       email,
       "Welcome to Mentora — Your admin account is ready",
       `Welcome ${firstName}! Email: ${email} Password: ${password} Please change your password immediately.`,
       html
-    );
+    ).catch(() => {});
 
     return { message: "auth/success:adminCreated" };
   }

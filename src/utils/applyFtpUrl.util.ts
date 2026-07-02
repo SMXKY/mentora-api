@@ -8,7 +8,7 @@ export const applyFtpUrlTransform = (
   const baseUrl = process.env.FTP_BASE_URL;
   if (!baseUrl) {
     throw new AppError(
-      "No FTP base URL found in environment configuration.",
+      "common/errors:server.ftpConfigMissing",
       StatusCodes.INTERNAL_SERVER_ERROR
     );
   }

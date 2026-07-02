@@ -1,40 +1,19 @@
 import { registry } from "../../docs/openapi.registry";
-import {
-  CreatePermissionSchema,
-  UpdatePermissionSchema,
-  PermissionResponseSchema,
-} from "./permission.schema";
+import { PermissionResponseSchema } from "./permission.schema";
 import { z } from "zod";
 
 // ============================================================
 // PERMISSION — OPENAPI ROUTE REGISTRATIONS
-// Run npm run docs:build after updating this file to
-// regenerate the OpenAPI spec at docs/api/openapi.json
+// This module is READ-ONLY (see permission.service.ts) — there is
+// no create/update/delete route. Run npm run docs:build after
+// updating this file to regenerate docs/api/openapi.json
 // ============================================================
 
 const tags = ["Permission"];
 const basePath = "/api/v1/permissions";
 
-registry.registerPath({
-  method: "post",
-  path: basePath,
-  tags,
-  summary: "Create a new permission",
-  request: {
-    body: {
-      content: { "application/json": { schema: CreatePermissionSchema } },
-    },
-  },
-  responses: {
-    201: {
-      description: "Permission created successfully",
-      content: { "application/json": { schema: PermissionResponseSchema } },
-    },
-    400: { description: "Validation error" },
-    401: { description: "Unauthorised" },
-    403: { description: "Forbidden" },
-  },
-});
+const envelope = <T extends z.ZodTypeAny>(data: T) =>
+  z.object({ success: z.boolean(), data, meta: z.any().optional() });
 
 registry.registerPath({
   method: "get",
@@ -48,6 +27,7 @@ registry.registerPath({
       sortBy: z.string().optional(),
       sortOrder: z.enum(["asc", "desc"]).optional(),
       search: z.string().optional(),
+      include: z.string().optional(),
     }),
   },
   responses: {
@@ -55,21 +35,13 @@ registry.registerPath({
       description: "List of permissions",
       content: {
         "application/json": {
-          schema: z.object({
-            success: z.boolean(),
-            data: z.array(PermissionResponseSchema),
-            meta: z.object({
-              total: z.number(),
-              page: z.number(),
-              limit: z.number(),
-              totalPages: z.number(),
-              hasNextPage: z.boolean(),
-              hasPrevPage: z.boolean(),
-            }),
-          }),
+          schema: envelope(z.array(PermissionResponseSchema)),
         },
       },
     },
+    400: { description: "Invalid query parameters" },
+    401: { description: "Not authenticated" },
+    403: { description: "Caller lacks rbac.permissions.read" },
   },
 });
 
@@ -80,9 +52,10 @@ registry.registerPath({
   summary: "Search permissions (cursor paginated)",
   request: {
     query: z.object({
-      cursor: z.string().optional(),
+      cursor: z.string().uuid().optional(),
       limit: z.string().optional(),
       search: z.string().optional(),
+      include: z.string().optional(),
     }),
   },
   responses: {
@@ -90,18 +63,13 @@ registry.registerPath({
       description: "Search results",
       content: {
         "application/json": {
-          schema: z.object({
-            success: z.boolean(),
-            data: z.array(PermissionResponseSchema),
-            meta: z.object({
-              nextCursor: z.string().nullable(),
-              hasNextPage: z.boolean(),
-              limit: z.number(),
-            }),
-          }),
+          schema: envelope(z.array(PermissionResponseSchema)),
         },
       },
     },
+    400: { description: "Invalid query parameters" },
+    401: { description: "Not authenticated" },
+    403: { description: "Caller lacks rbac.permissions.read" },
   },
 });
 
@@ -114,40 +82,13 @@ registry.registerPath({
   responses: {
     200: {
       description: "Permission found",
-      content: { "application/json": { schema: PermissionResponseSchema } },
+      content: {
+        "application/json": { schema: envelope(PermissionResponseSchema) },
+      },
     },
-    404: { description: "Permission not found" },
-  },
-});
-
-registry.registerPath({
-  method: "patch",
-  path: `${basePath}/{id}`,
-  tags,
-  summary: "Update permission",
-  request: {
-    params: z.object({ id: z.string().uuid() }),
-    body: {
-      content: { "application/json": { schema: UpdatePermissionSchema } },
-    },
-  },
-  responses: {
-    200: {
-      description: "Permission updated",
-      content: { "application/json": { schema: PermissionResponseSchema } },
-    },
-    404: { description: "Permission not found" },
-  },
-});
-
-registry.registerPath({
-  method: "delete",
-  path: `${basePath}/{id}`,
-  tags,
-  summary: "Delete permission",
-  request: { params: z.object({ id: z.string().uuid() }) },
-  responses: {
-    200: { description: "Permission deleted" },
+    400: { description: "Invalid id format" },
+    401: { description: "Not authenticated" },
+    403: { description: "Caller lacks rbac.permissions.read" },
     404: { description: "Permission not found" },
   },
 });

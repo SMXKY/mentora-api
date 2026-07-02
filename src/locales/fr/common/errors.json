@@ -12,6 +12,9 @@
   "db": {
     "duplicate": "Un enregistrement avec ce {{fields}} existe déjà",
     "notFound": "L'enregistrement demandé est introuvable",
+    "notDeleted": "Cet enregistrement n'a pas été supprimé",
+    "softDeleteNotSupported": "Cette ressource ne prend pas en charge la suppression réversible",
+    "systemRecordImmutable": "Ceci est un enregistrement système protégé et ne peut pas être modifié",
     "invalidReference": "Référence invalide pour {{field}}",
     "missingField": "{{field}} est requis",
     "valueTooLong": "{{field}} est trop long",
@@ -29,6 +32,7 @@
     "payloadTooLarge": "La charge utile de la requête est trop volumineuse"
   },
   "server": {
-    "unknown": "Une erreur inattendue s'est produite. Veuillez réessayer"
+    "unknown": "Une erreur inattendue s'est produite. Veuillez réessayer",
+    "ftpConfigMissing": "Le stockage de fichiers n'est pas configuré correctement. Veuillez réessayer plus tard"
   }
 }

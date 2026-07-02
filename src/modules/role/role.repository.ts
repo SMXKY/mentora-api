@@ -5,19 +5,17 @@ export class RoleRepository extends BaseRepository<any> {
   protected modelName = "role";
 
   // Fields the ?search= query param searches across
-  // Empty means search is silently ignored
-  // TODO: update with the fields that make sense to search
-  protected searchableFields: string[] = [];
+  protected searchableFields: string[] = ["name", "description"];
 
   // Allowlist for ?include= query param
   // Any relation not listed here is stripped before the Prisma call
   protected allowedIncludes: string[] = ["rolePermissions", "userRoles", "storageQuotaDefaults"];
 
-    protected softDeleteConfig = {
+  protected softDeleteConfig = {
     enabled: true,
-    // TODO: add unique fields that need _deleted_timestamp suffix
-    // uniqueFields: ['name', 'email'],
-    uniqueFields: [] as string[],
+    // `name` is unique — free it up on soft-delete so a new role
+    // can reuse the name without hitting a unique constraint
+    uniqueFields: ["name"] as string[],
   };
 
   // Set to true if this model has an isSystem boolean field

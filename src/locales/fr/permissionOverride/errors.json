@@ -1,0 +1,5 @@
+{
+  "userNotFound": "L'utilisateur spécifié n'existe pas.",
+  "permissionNotFound": "La permission spécifiée n'existe pas.",
+  "expiresAtMustBeFuture": "La date d'expiration doit être dans le futur."
+}

@@ -36,7 +36,16 @@ export const validate =
 import { z } from "zod";
 
 export const ParamsId = z.object({
-  id: z.string().uuid("Invalid ID format"),
+  id: z.string().uuid("common/errors:validation.invalidFormat"),
+});
+
+export const ParamsUserId = z.object({
+  userId: z.string().uuid("common/errors:validation.invalidFormat"),
+});
+
+export const ParamsUserIdAndUserRoleId = z.object({
+  userId: z.string().uuid("common/errors:validation.invalidFormat"),
+  userRoleId: z.string().uuid("common/errors:validation.invalidFormat"),
 });
 
 export const PaginationQuery = z.object({

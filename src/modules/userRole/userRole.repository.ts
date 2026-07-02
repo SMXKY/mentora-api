@@ -5,9 +5,7 @@ export class UserRoleRepository extends BaseRepository<any> {
   protected modelName = "userRole";
 
   // Fields the ?search= query param searches across
-  // Empty means search is silently ignored
-  // TODO: update with the fields that make sense to search
-  protected searchableFields: string[] = [];
+  protected searchableFields: string[] = ["reason"];
 
   // Allowlist for ?include= query param
   // Any relation not listed here is stripped before the Prisma call

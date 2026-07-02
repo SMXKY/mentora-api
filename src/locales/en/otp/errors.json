@@ -1,0 +1,6 @@
+{
+  "rateLimitExceeded": "Too many attempts. Please wait before trying again.",
+  "deliveryFailed": "We could not send the verification code. Please try again.",
+  "expiredOrNotFound": "This code has expired or does not exist. Please request a new one.",
+  "invalidCode": "The code you entered is incorrect. Please try again."
+}

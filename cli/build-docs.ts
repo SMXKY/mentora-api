@@ -5,6 +5,12 @@ import path from "path";
 
 //module docs
 import "../src/modules/auth/auth.openapi";
+import "../src/modules/permission/permission.openapi";
+import "../src/modules/permissionOverride/permissionOverride.openapi";
+import "../src/modules/role/role.openapi";
+import "../src/modules/user/user.openapi";
+import "../src/modules/userRole/userRole.openapi";
+// testResource is a scaffold template, not a mounted module — excluded on purpose
 
 async function main() {
   const generator = new OpenApiGeneratorV3(registry.definitions);

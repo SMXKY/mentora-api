@@ -1,142 +1,102 @@
 import { registry } from "../../docs/openapi.registry";
 import {
-  CreatePermissionOverrideSchema,
-  UpdatePermissionOverrideSchema,
+  GrantPermissionOverrideSchema,
+  RevokePermissionOverrideSchema,
   PermissionOverrideResponseSchema,
 } from "./permissionOverride.schema";
 import { z } from "zod";
 
 // ============================================================
 // PERMISSIONOVERRIDE — OPENAPI ROUTE REGISTRATIONS
-// Run npm run docs:build after updating this file to
-// regenerate the OpenAPI spec at docs/api/openapi.json
+// This module exposes grant/revoke/list/clear, not generic CRUD —
+// see permissionOverride.route.ts. Run npm run docs:build after
+// updating this file to regenerate docs/api/openapi.json
 // ============================================================
 
 const tags = ["PermissionOverride"];
-const basePath = "/api/v1/permissionOverrides";
+const basePath = "/api/v1/permission-overrides";
 
 registry.registerPath({
   method: "post",
-  path: basePath,
+  path: `${basePath}/grant`,
   tags,
-  summary: "Create a new permissionOverride",
+  summary: "Grant a user a permission directly, independent of their role",
   request: {
     body: {
-      content: { "application/json": { schema: CreatePermissionOverrideSchema } },
+      content: { "application/json": { schema: GrantPermissionOverrideSchema } },
     },
   },
   responses: {
     201: {
-      description: "PermissionOverride created successfully",
-      content: { "application/json": { schema: PermissionOverrideResponseSchema } },
-    },
-    400: { description: "Validation error" },
-    401: { description: "Unauthorised" },
-    403: { description: "Forbidden" },
-  },
-});
-
-registry.registerPath({
-  method: "get",
-  path: basePath,
-  tags,
-  summary: "Get all permissionOverrides (offset paginated)",
-  request: {
-    query: z.object({
-      page: z.string().optional(),
-      limit: z.string().optional(),
-      sortBy: z.string().optional(),
-      sortOrder: z.enum(["asc", "desc"]).optional(),
-      search: z.string().optional(),
-    }),
-  },
-  responses: {
-    200: {
-      description: "List of permissionOverrides",
+      description: "Override granted successfully",
       content: {
         "application/json": {
           schema: z.object({
-            success: z.boolean(),
-            data: z.array(PermissionOverrideResponseSchema),
-            meta: z.object({
-              total: z.number(),
-              page: z.number(),
-              limit: z.number(),
-              totalPages: z.number(),
-              hasNextPage: z.boolean(),
-              hasPrevPage: z.boolean(),
-            }),
+            message: z.string(),
+            result: PermissionOverrideResponseSchema,
           }),
         },
       },
     },
+    400: { description: "Validation error (e.g. expiresAt not in the future)" },
+    401: { description: "Not authenticated" },
+    403: { description: "Caller lacks rbac.overrides.grant" },
+    404: { description: "User or permission not found" },
   },
 });
 
 registry.registerPath({
-  method: "get",
-  path: `${basePath}/search`,
+  method: "post",
+  path: `${basePath}/revoke`,
   tags,
-  summary: "Search permissionOverrides (cursor paginated)",
+  summary: "Revoke a permission from a user directly, overriding their role",
   request: {
-    query: z.object({
-      cursor: z.string().optional(),
-      limit: z.string().optional(),
-      search: z.string().optional(),
-    }),
-  },
-  responses: {
-    200: {
-      description: "Search results",
-      content: {
-        "application/json": {
-          schema: z.object({
-            success: z.boolean(),
-            data: z.array(PermissionOverrideResponseSchema),
-            meta: z.object({
-              nextCursor: z.string().nullable(),
-              hasNextPage: z.boolean(),
-              limit: z.number(),
-            }),
-          }),
-        },
-      },
-    },
-  },
-});
-
-registry.registerPath({
-  method: "get",
-  path: `${basePath}/{id}`,
-  tags,
-  summary: "Get permissionOverride by ID",
-  request: { params: z.object({ id: z.string().uuid() }) },
-  responses: {
-    200: {
-      description: "PermissionOverride found",
-      content: { "application/json": { schema: PermissionOverrideResponseSchema } },
-    },
-    404: { description: "PermissionOverride not found" },
-  },
-});
-
-registry.registerPath({
-  method: "patch",
-  path: `${basePath}/{id}`,
-  tags,
-  summary: "Update permissionOverride",
-  request: {
-    params: z.object({ id: z.string().uuid() }),
     body: {
-      content: { "application/json": { schema: UpdatePermissionOverrideSchema } },
+      content: {
+        "application/json": { schema: RevokePermissionOverrideSchema },
+      },
     },
   },
   responses: {
-    200: {
-      description: "PermissionOverride updated",
-      content: { "application/json": { schema: PermissionOverrideResponseSchema } },
+    201: {
+      description: "Override revoked successfully",
+      content: {
+        "application/json": {
+          schema: z.object({
+            message: z.string(),
+            result: PermissionOverrideResponseSchema,
+          }),
+        },
+      },
     },
-    404: { description: "PermissionOverride not found" },
+    400: { description: "Validation error (e.g. expiresAt not in the future)" },
+    401: { description: "Not authenticated" },
+    403: { description: "Caller lacks rbac.overrides.revoke" },
+    404: { description: "User or permission not found" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: `${basePath}/user/{userId}`,
+  tags,
+  summary: "List active permission overrides for a user",
+  request: { params: z.object({ userId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Active overrides for the user",
+      content: {
+        "application/json": {
+          schema: z.object({
+            message: z.string(),
+            result: z.array(PermissionOverrideResponseSchema),
+          }),
+        },
+      },
+    },
+    400: { description: "Invalid userId format" },
+    401: { description: "Not authenticated" },
+    403: { description: "Caller lacks rbac.overrides.read" },
   },
 });
 
@@ -144,10 +104,23 @@ registry.registerPath({
   method: "delete",
   path: `${basePath}/{id}`,
   tags,
-  summary: "Delete permissionOverride",
+  summary: "Clear (permanently remove) a permission override",
   request: { params: z.object({ id: z.string().uuid() }) },
   responses: {
-    200: { description: "PermissionOverride deleted" },
-    404: { description: "PermissionOverride not found" },
+    200: {
+      description: "Override cleared successfully",
+      content: {
+        "application/json": {
+          schema: z.object({
+            message: z.string(),
+            result: z.object({ cleared: z.literal(true) }),
+          }),
+        },
+      },
+    },
+    400: { description: "Invalid id format" },
+    401: { description: "Not authenticated" },
+    403: { description: "Caller lacks rbac.overrides.revoke" },
+    404: { description: "Override not found" },
   },
 });

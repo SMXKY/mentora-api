@@ -52,7 +52,7 @@ export class PermissionOverrideService extends BaseService<any, any, any> {
 
     if (!targetUser) {
       throw new AppError(
-        "permissionOverrides/errors:userNotFound",
+        "permissionOverride/errors:userNotFound",
         StatusCodes.NOT_FOUND
       );
     }
@@ -64,48 +64,50 @@ export class PermissionOverrideService extends BaseService<any, any, any> {
 
     if (!permission) {
       throw new AppError(
-        "permissionOverrides/errors:permissionNotFound",
+        "permissionOverride/errors:permissionNotFound",
         StatusCodes.NOT_FOUND
       );
     }
 
-    const existing = await prisma.permissionOverride.findFirst({
+    // Upsert on the (userId, permissionId) unique constraint instead of a
+    // manual findFirst-then-create/update — the manual version has a real
+    // TOCTOU race under concurrent requests for the same pair (two
+    // requests can both see "no existing row" and both attempt create(),
+    // and the loser gets a raw 409 unique-constraint error instead of a
+    // clean upsert). This also means an override that's expired but not
+    // yet cleaned up gets correctly reactivated/overwritten rather than
+    // producing a duplicate-row conflict.
+    const wasExisting = await prisma.permissionOverride.findUnique({
       where: {
-        userId,
-        permissionId: permission.id,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        userId_permissionId: { userId, permissionId: permission.id },
       },
+      select: { id: true },
     });
 
-    let override;
-
-    if (existing) {
-      override = await prisma.permissionOverride.update({
-        where: { id: existing.id },
-        data: {
-          grantType,
-          reason,
-          expiresAt: expiresAt ?? null,
-          createdById: ctx.userId,
-        },
-      });
-    } else {
-      override = await prisma.permissionOverride.create({
-        data: {
-          userId,
-          permissionId: permission.id,
-          grantType,
-          reason,
-          expiresAt: expiresAt ?? null,
-          createdById: ctx.userId,
-        },
-      });
-    }
+    const override = await prisma.permissionOverride.upsert({
+      where: {
+        userId_permissionId: { userId, permissionId: permission.id },
+      },
+      update: {
+        grantType,
+        reason,
+        expiresAt: expiresAt ?? null,
+        createdById: ctx.userId,
+      },
+      create: {
+        userId,
+        permissionId: permission.id,
+        grantType,
+        reason,
+        expiresAt: expiresAt ?? null,
+        createdById: ctx.userId,
+      },
+    });
 
     await invalidatePermissionCache(userId);
 
     this.log(ctx, {
-      operation: existing ? "UPDATE" : "CREATE",
+      operation: wasExisting ? "UPDATE" : "CREATE",
       category: "WRITE",
       recordId: override.id,
       eventType:
@@ -150,7 +152,7 @@ export class PermissionOverrideService extends BaseService<any, any, any> {
   async clear(overrideId: string, ctx: ServiceContext) {
     const override = await this.repository.findByIdOrThrow(overrideId);
 
-    await prisma.permissionOverride.delete({ where: { id: overrideId } });
+    await this.repository.delete(overrideId);
 
     await invalidatePermissionCache(override.userId);
 

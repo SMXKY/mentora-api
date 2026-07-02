@@ -42,7 +42,7 @@ const baseOverrideFields = {
   expiresAt: z.coerce
     .date()
     .refine((date) => date > new Date(), {
-      message: "permissionOverrides/errors:expiresAtMustBeFuture",
+      message: "permissionOverride/errors:expiresAtMustBeFuture",
     })
     .optional(),
 };

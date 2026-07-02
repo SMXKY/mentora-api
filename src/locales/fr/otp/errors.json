@@ -1,0 +1,6 @@
+{
+  "rateLimitExceeded": "Trop de tentatives. Veuillez patienter avant de réessayer.",
+  "deliveryFailed": "Nous n'avons pas pu envoyer le code de vérification. Veuillez réessayer.",
+  "expiredOrNotFound": "Ce code a expiré ou n'existe pas. Veuillez en demander un nouveau.",
+  "invalidCode": "Le code que vous avez saisi est incorrect. Veuillez réessayer."
+}

@@ -14,8 +14,7 @@ export class RoleController extends BaseController<any> {
     const result = await this.service.assignRole(userId, req.body, ctx);
     appResponder(
       StatusCodes.CREATED,
-      { message: "roles/success:assigned" },
-      result,
+      { message: "role/success:assigned", result },
       res
     );
   });
@@ -26,8 +25,7 @@ export class RoleController extends BaseController<any> {
     const result = await this.service.unassignRole(userId, userRoleId, ctx);
     appResponder(
       StatusCodes.OK,
-      { message: "roles/success:unassigned" },
-      result,
+      { message: "role/success:unassigned", result },
       res
     );
   });
@@ -38,7 +36,7 @@ export class RoleController extends BaseController<any> {
     const result = await this.service.getPermissionCatalogForRole(id, ctx);
     appResponder(
       StatusCodes.OK,
-      { message: "roles/success:permission_catalog_retrieved", result },
+      { message: "role/success:permissionCatalogRetrieved", result },
       res
     );
   });
@@ -49,7 +47,7 @@ export class RoleController extends BaseController<any> {
     const result = await this.service.updatePermissions(id, req.body, ctx);
     appResponder(
       StatusCodes.OK,
-      { message: "roles/success:permissions_updated", result },
+      { message: "role/success:permissionsUpdated", result },
       res
     );
   });
@@ -60,8 +58,7 @@ export class RoleController extends BaseController<any> {
     const result = await this.service.getRoleHistory(userId, ctx);
     appResponder(
       StatusCodes.OK,
-      { message: "roles/success:history_retrieved" },
-      result,
+      { message: "role/success:historyRetrieved", result },
       res
     );
   });

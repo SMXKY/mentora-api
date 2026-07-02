@@ -8,7 +8,7 @@ const restrictTo = (...permissions: string[]) => {
 
     if (!user) {
       return next(
-        new AppError("auth.errors.not_authenticated", StatusCodes.UNAUTHORIZED)
+        new AppError("auth/errors:notAuthenticated", StatusCodes.UNAUTHORIZED)
       );
     }
 
@@ -21,7 +21,7 @@ const restrictTo = (...permissions: string[]) => {
     if (!hasPermission) {
       return next(
         new AppError(
-          "auth.errors.insufficient_permissions",
+          "auth/errors:insufficientPermissions",
           StatusCodes.FORBIDDEN
         )
       );

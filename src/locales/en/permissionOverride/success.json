@@ -1,0 +1,6 @@
+{
+  "granted": "Permission override granted successfully.",
+  "revoked": "Permission override revoked successfully.",
+  "retrieved": "Active permission overrides retrieved successfully.",
+  "cleared": "Permission override cleared successfully."
+}

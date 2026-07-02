@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { permissionOverrideController } from "./permissionOverride.controller";
-import { validate, ParamsId } from "../../middlewares/validate.middleware";
+import {
+  validate,
+  ParamsId,
+  ParamsUserId,
+} from "../../middlewares/validate.middleware";
 import {
   GrantPermissionOverrideSchema,
   RevokePermissionOverrideSchema,
@@ -31,7 +35,7 @@ router.get(
   "/user/:userId",
   protect,
   restrictTo(permissions.rbac.overridesRead),
-  validate(ParamsId, "params"),
+  validate(ParamsUserId, "params"),
   permissionOverrideController.listActiveForUser
 );
 

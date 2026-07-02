@@ -5,18 +5,18 @@ export class PermissionOverrideRepository extends BaseRepository<any> {
   protected modelName = "permissionOverride";
 
   // Fields the ?search= query param searches across
-  // Empty means search is silently ignored
-  // TODO: update with the fields that make sense to search
-  protected searchableFields: string[] = [];
+  protected searchableFields: string[] = ["reason"];
 
   // Allowlist for ?include= query param
   // Any relation not listed here is stripped before the Prisma call
   protected allowedIncludes: string[] = ["user", "permission", "createdBy"];
 
-    protected softDeleteConfig = {
-    enabled: true,
-    // TODO: add unique fields that need _deleted_timestamp suffix
-    // uniqueFields: ['name', 'email'],
+  // PermissionOverride has no deletedAt column — overrides are removed
+  // outright via clear() (hard delete) or superseded via GRANT/REVOKE
+  // rows, not soft-deleted. Keep this false or every read/write path
+  // in BaseRepository will inject a `deletedAt` filter Prisma rejects.
+  protected softDeleteConfig = {
+    enabled: false,
     uniqueFields: [] as string[],
   };
 

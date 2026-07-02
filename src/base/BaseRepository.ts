@@ -173,7 +173,10 @@ export abstract class BaseRepository<T> {
 
   async softDelete(id: string): Promise<T> {
     if (!this.softDeleteConfig.enabled) {
-      throw new AppError("common/errors:db.softDeleteNotSupported", 405);
+      throw new AppError(
+        "common/errors:db.softDeleteNotSupported",
+        StatusCodes.METHOD_NOT_ALLOWED
+      );
     }
 
     const record = await this.findByIdOrThrow(id);
@@ -334,7 +337,10 @@ export abstract class BaseRepository<T> {
     const where: Record<string, any> = { deletedAt: { not: null } };
 
     if (!this.softDeleteConfig.enabled) {
-      throw new AppError("common/errors:db.softDeleteNotSupported", 405);
+      throw new AppError(
+        "common/errors:db.softDeleteNotSupported",
+        StatusCodes.METHOD_NOT_ALLOWED
+      );
     }
 
     for (const [key, value] of Object.entries(filters)) {
@@ -383,7 +389,10 @@ export abstract class BaseRepository<T> {
 
   protected assertNotSystem(record: any): void {
     if (this.hasSystemField && record?.isSystem === true) {
-      throw new AppError("common/errors:db.systemRecordImmutable", 403);
+      throw new AppError(
+        "common/errors:db.systemRecordImmutable",
+        StatusCodes.FORBIDDEN
+      );
     }
   }
 

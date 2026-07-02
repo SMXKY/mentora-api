@@ -13,7 +13,7 @@ export class PermissionOverrideController extends BaseController<any> {
     const result = await this.service.grant(req.body, ctx);
     appResponder(
       StatusCodes.CREATED,
-      { message: "permissionOverrides/success:granted", result },
+      { message: "permissionOverride/success:granted", result },
 
       res
     );
@@ -24,7 +24,7 @@ export class PermissionOverrideController extends BaseController<any> {
     const result = await this.service.revoke(req.body, ctx);
     appResponder(
       StatusCodes.CREATED,
-      { message: "permissionOverrides/success:revoked", result },
+      { message: "permissionOverride/success:revoked", result },
 
       res
     );
@@ -36,7 +36,7 @@ export class PermissionOverrideController extends BaseController<any> {
     const result = await this.service.listActiveForUser(userId, ctx);
     appResponder(
       StatusCodes.OK,
-      { message: "permissionOverrides/success:retrieved", result },
+      { message: "permissionOverride/success:retrieved", result },
 
       res
     );
@@ -48,7 +48,7 @@ export class PermissionOverrideController extends BaseController<any> {
     const result = await this.service.clear(id, ctx);
     appResponder(
       StatusCodes.OK,
-      { message: "permissionOverrides/success:cleared", result },
+      { message: "permissionOverride/success:cleared", result },
       res
     );
   });

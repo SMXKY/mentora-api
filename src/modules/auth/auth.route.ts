@@ -17,6 +17,7 @@ import {
   ChangePasswordSchema,
 } from "./auth.types";
 import restrictTo from "../../middlewares/restrictTo.middleware";
+import { permissions } from "../../data/permission.data";
 
 const router = Router();
 
@@ -55,7 +56,7 @@ router.post(
 router.post(
   "/admin/create",
   protect,
-  // restrictTo("can_create_admin_account"),
+  restrictTo(permissions.users.manage),
   validate(CreateAdminSchema),
   authController.createAdminUser
 );
@@ -88,5 +89,10 @@ router.post(
   validate(ChangePasswordSchema),
   authController.changePassword
 );
+
+// Dev/staging-only debug route — never registered in production.
+if (process.env.NODE_ENV !== "production") {
+  router.get("/dev/otp", authController.devPeekOtp);
+}
 
 export default router;

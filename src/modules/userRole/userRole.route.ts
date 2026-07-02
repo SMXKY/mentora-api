@@ -9,22 +9,25 @@ import {
   CreateUserRoleSchema,
   UpdateUserRoleSchema,
 } from "./userRole.schema";
-// import { protect } from "../../middlewares/protect.middleware";
-// import { restrictTo } from "../../middlewares/restrictTo.middleware";
+import protect from "../../middlewares/protect.middleware";
+import restrictTo from "../../middlewares/restrictTo.middleware";
+import { permissions } from "../../data/permission.data";
 
 const router = Router();
 
 // ============================================================
 // STANDARD CRUD ROUTES
-// Uncomment protect and restrictTo as you implement auth
-// Add the correct permission string to restrictTo
+// Not currently mounted in src/app.ts (see docs/permissionModuleAudit.md).
+// Auth is wired up so this module is safe to mount later —
+// it operates on the same UserRole model as role.route.ts's
+// assign/unassign endpoints, so it reuses the same rbac.roles* codes.
 // ============================================================
 
 // CREATE
 router.post(
   "/",
-  // protect,
-  // restrictTo("resource.create"),
+  protect,
+  restrictTo(permissions.rbac.rolesUpdate),
   validate(CreateUserRoleSchema),
   userRoleController.create
 );
@@ -32,15 +35,17 @@ router.post(
 // READ — offset paginated list (admin)
 router.get(
   "/",
-  // protect,
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   validate(PaginationQuery, "query"),
   userRoleController.findMany
 );
 
-// READ — cursor paginated search (public)
+// READ — cursor paginated search (admin)
 router.get(
   "/search",
-  // protect,
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   validate(PaginationQuery, "query"),
   userRoleController.search
 );
@@ -48,8 +53,8 @@ router.get(
 // READ — soft deleted records (admin only)
 router.get(
   "/deleted",
-  // protect,
-  // restrictTo("resource.read_deleted"),
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   validate(PaginationQuery, "query"),
   userRoleController.findDeleted
 );
@@ -57,8 +62,8 @@ router.get(
 // READ — single soft deleted record (admin only)
 router.get(
   "/deleted/:id",
-  // protect,
-  // restrictTo("resource.read_deleted"),
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   validate(ParamsId, "params"),
   userRoleController.findDeletedById
 );
@@ -66,7 +71,8 @@ router.get(
 // READ — single record
 router.get(
   "/:id",
-  // protect,
+  protect,
+  restrictTo(permissions.rbac.rolesRead),
   validate(ParamsId, "params"),
   userRoleController.findById
 );
@@ -74,8 +80,8 @@ router.get(
 // UPDATE
 router.patch(
   "/:id",
-  // protect,
-  // restrictTo("resource.update"),
+  protect,
+  restrictTo(permissions.rbac.rolesUpdate),
   validate(ParamsId, "params"),
   validate(UpdateUserRoleSchema),
   userRoleController.update
@@ -84,8 +90,8 @@ router.patch(
 // RESTORE
 router.patch(
   "/:id/restore",
-  // protect,
-  // restrictTo("resource.restore"),
+  protect,
+  restrictTo(permissions.rbac.rolesUpdate),
   validate(ParamsId, "params"),
   userRoleController.restore
 );
@@ -93,8 +99,8 @@ router.patch(
 // DELETE
 router.delete(
   "/:id",
-  // protect,
-  // restrictTo("resource.delete"),
+  protect,
+  restrictTo(permissions.rbac.rolesDelete),
   validate(ParamsId, "params"),
   userRoleController.delete
 );
