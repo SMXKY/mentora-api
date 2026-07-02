@@ -14,6 +14,8 @@ import { StatusCodes } from "http-status-codes";
 import roleRouter from "./modules/role";
 import authRouter from "./modules/auth";
 import permissionRouter from "./modules/permission";
+import permissionOverideRouter from "./modules/permissionOverride";
+import userRouter from "./modules/user";
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -120,6 +122,8 @@ try {
 app.use("/api/v1/roles", roleRouter);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/permissions", permissionRouter);
+app.use("/api/v1/permission-overrides", permissionOverideRouter);
+app.use("/api/v1/users", userRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(

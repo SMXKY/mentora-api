@@ -5,96 +5,82 @@ import {
   ParamsId,
   PaginationQuery,
 } from "../../middlewares/validate.middleware";
-import {
-  CreateUserSchema,
-  UpdateUserSchema,
-} from "./user.schema";
-// import { protect } from "../../middlewares/protect.middleware";
-// import { restrictTo } from "../../middlewares/restrictTo.middleware";
+import { CreateUserSchema, UpdateUserSchema } from "./user.schema";
+import protect from "../../middlewares/protect.middleware";
+import restrictTo from "../../middlewares/restrictTo.middleware";
+import { permissions } from "../../data/permission.data";
 
 const router = Router();
 
-// ============================================================
-// STANDARD CRUD ROUTES
-// Uncomment protect and restrictTo as you implement auth
-// Add the correct permission string to restrictTo
-// ============================================================
-
-// CREATE
 router.post(
   "/",
-  // protect,
-  // restrictTo("resource.create"),
+  protect,
+  restrictTo(permissions.users.manage),
   validate(CreateUserSchema),
   userController.create
 );
 
-// READ — offset paginated list (admin)
 router.get(
   "/",
-  // protect,
+  protect,
+  restrictTo(permissions.users.readAll),
   validate(PaginationQuery, "query"),
   userController.findMany
 );
 
-// READ — cursor paginated search (public)
 router.get(
   "/search",
-  // protect,
+  protect,
+  restrictTo(permissions.users.readAll),
   validate(PaginationQuery, "query"),
   userController.search
 );
 
-// READ — soft deleted records (admin only)
 router.get(
   "/deleted",
-  // protect,
-  // restrictTo("resource.read_deleted"),
+  protect,
+  restrictTo(permissions.users.readAll),
   validate(PaginationQuery, "query"),
   userController.findDeleted
 );
 
-// READ — single soft deleted record (admin only)
 router.get(
   "/deleted/:id",
-  // protect,
-  // restrictTo("resource.read_deleted"),
+  protect,
+  restrictTo(permissions.users.manage),
   validate(ParamsId, "params"),
   userController.findDeletedById
 );
 
-// READ — single record
 router.get(
   "/:id",
-  // protect,
+  protect,
+  restrictTo(permissions.users.read),
   validate(ParamsId, "params"),
   userController.findById
 );
 
-// UPDATE
 router.patch(
   "/:id",
-  // protect,
-  // restrictTo("resource.update"),
+  protect,
+  restrictTo(permissions.users.manage),
   validate(ParamsId, "params"),
   validate(UpdateUserSchema),
   userController.update
 );
 
-// RESTORE
 router.patch(
   "/:id/restore",
-  // protect,
-  // restrictTo("resource.restore"),
+  protect,
+  restrictTo(permissions.users.manage),
   validate(ParamsId, "params"),
   userController.restore
 );
 
-// DELETE
 router.delete(
   "/:id",
-  // protect,
-  // restrictTo("resource.delete"),
+  protect,
+  restrictTo(permissions.users.manage),
   validate(ParamsId, "params"),
   userController.delete
 );

@@ -245,9 +245,25 @@ export class RoleService extends BaseService<
   // ============================================================
   // CUSTOM METHODS
   // ============================================================
+  SELF_REGISTRATION_ROLE_NAMES = ["Parent", "Student", "Tutor"];
 
   async assignRole(userId: string, data: AssignRoleInput, ctx: ServiceContext) {
     const { roleId, reason, expiresAt } = data;
+
+    const activeRoles = await this.userRoleRepository.findActiveByUserId(
+      userId
+    );
+
+    const hasSelfRegistrationRole = activeRoles.some((ur: any) =>
+      this.SELF_REGISTRATION_ROLE_NAMES.includes(ur.role.name)
+    );
+
+    if (hasSelfRegistrationRole) {
+      throw new AppError(
+        "roles/errors:cannot_modify_self_registration_user",
+        StatusCodes.FORBIDDEN
+      );
+    }
 
     const role = await this.repository.findById(roleId);
     if (!role) {
@@ -265,10 +281,6 @@ export class RoleService extends BaseService<
         StatusCodes.BAD_REQUEST
       );
     }
-
-    const activeRoles = await this.userRoleRepository.findActiveByUserId(
-      userId
-    );
 
     if (activeRoles.length > 0) {
       if (!role.allowsMultiple) {
@@ -313,6 +325,21 @@ export class RoleService extends BaseService<
   }
 
   async unassignRole(userId: string, userRoleId: string, ctx: ServiceContext) {
+    const activeRoles = await this.userRoleRepository.findActiveByUserId(
+      userId
+    );
+
+    const hasSelfRegistrationRole = activeRoles.some((ur: any) =>
+      this.SELF_REGISTRATION_ROLE_NAMES.includes(ur.role.name)
+    );
+
+    if (hasSelfRegistrationRole) {
+      throw new AppError(
+        "roles/errors:cannot_modify_self_registration_user",
+        StatusCodes.FORBIDDEN
+      );
+    }
+
     const existing = await this.userRoleRepository.findById(userRoleId);
 
     if (!existing || existing.userId !== userId) {
