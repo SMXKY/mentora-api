@@ -30,6 +30,14 @@ import getUserPermissions from "../../utils/getUserPermissions.util";
 import { applyFtpUrlTransform } from "../../utils/applyFtpUrl.util";
 import { AuditService } from "../../utils/logUserActivity.util";
 import { LogCategory, LogOperation } from "../../generated/prisma";
+import {
+  isAccountLocked,
+  isIpLocked,
+  recordFailedAccountAttempt,
+  recordFailedIpAttempt,
+  clearBruteForceCounters,
+} from "../../utils/bruteforce.util";
+import { buildAccountLockedEmailTemplate } from "../../emailTemplates/accountLocked.template";
 
 const CAMEROON_PHONE_REGEX = /^\+237[6-9][0-9]{8}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -233,7 +241,12 @@ export class AuthService {
         });
 
         AuditService.record(
-          { userId: existingUser.id, userEmail: email, ipAddress: ip, userAgent },
+          {
+            userId: existingUser.id,
+            userEmail: email,
+            ipAddress: ip,
+            userAgent,
+          },
           "users",
           {
             operation: LogOperation.UPDATE,
@@ -472,6 +485,7 @@ export class AuthService {
       email,
       password,
       roles,
+      lng: "en",
     });
 
     // Fire-and-forget, matching login/changePassword/resetPassword —
@@ -493,6 +507,13 @@ export class AuthService {
     userAgent: string | undefined,
     ip: string | undefined
   ): Promise<{ user: any; token: string }> {
+    if (ip && (await isIpLocked(ip))) {
+      throw new AppError(
+        "auth/errors:ipBlocked",
+        StatusCodes.TOO_MANY_REQUESTS
+      );
+    }
+
     const user = await prisma.user.findFirst({
       where: {
         OR: [
@@ -513,6 +534,7 @@ export class AuthService {
     });
 
     if (!user) {
+      if (ip) await recordFailedIpAttempt(ip);
       throw new AppError(
         "auth/errors:invalidCredentials",
         StatusCodes.UNAUTHORIZED
@@ -534,13 +556,56 @@ export class AuthService {
       throw new AppError("auth/errors:accountBanned", StatusCodes.FORBIDDEN);
     }
 
+    if (await isAccountLocked(user.id)) {
+      if (ip) await recordFailedIpAttempt(ip);
+      throw new AppError(
+        "auth/errors:accountLocked",
+        StatusCodes.TOO_MANY_REQUESTS
+      );
+    }
+
     const isValid = await argon2.verify(user.password, password);
     if (!isValid) {
+      if (ip) await recordFailedIpAttempt(ip);
+      const justLocked = await recordFailedAccountAttempt(user.id);
+
+      if (justLocked && user.email) {
+        const html = buildAccountLockedEmailTemplate({
+          firstName: user.firstName,
+          ipAddress: String(ip),
+          timestamp: new Date().toLocaleString("en-GB", {
+            dateStyle: "long",
+            timeStyle: "short",
+          }),
+        });
+
+        sendEmail(
+          user.email,
+          "Your Mentora account was temporarily locked",
+          `Your account was locked for 30 minutes after repeated failed login attempts from ${ip}.`,
+          html
+        ).catch(() => {});
+
+        AuditService.record(
+          { userId: user.id, ipAddress: ip, userAgent },
+          "users",
+          {
+            operation: LogOperation.AUTH,
+            category: LogCategory.AUTH,
+            recordId: user.id,
+            changedFields: [],
+            eventType: "user.account_locked",
+          }
+        );
+      }
+
       throw new AppError(
         "auth/errors:invalidCredentials",
         StatusCodes.UNAUTHORIZED
       );
     }
+
+    if (ip) await clearBruteForceCounters(ip, user.id);
 
     const deviceInfo = getDeviceInfo(userAgent, ip);
 
