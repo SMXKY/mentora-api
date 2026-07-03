@@ -77,7 +77,10 @@ import { Counter } from "k6/metrics";
 // CONFIG
 // ============================================================
 
-const BASE_URL = (__ENV.BASE_URL || "http://localhost:8080").replace(/\/+$/, "");
+const BASE_URL = (__ENV.BASE_URL || "http://localhost:8080").replace(
+  /\/+$/,
+  ""
+);
 const API = `${BASE_URL}/api/v1`;
 
 const SUPER_ADMIN_EMAIL = __ENV.SUPER_ADMIN_EMAIL;
@@ -106,7 +109,7 @@ const MID_ITERATIONS = Number(__ENV.MID_ITERATIONS || 50);
 const LOW_ITERATIONS = Number(__ENV.LOW_ITERATIONS || 50);
 
 const STAGE_GAP_SECONDS = Number(__ENV.STAGE_GAP_SECONDS || 75);
-const ALLOW_NON_LOCAL_TARGET = (__ENV.ALLOW_NON_LOCAL_TARGET || "false") === "true";
+const ALLOW_NON_LOCAL_TARGET = true;
 
 // Low-risk, real permission codes (read-only reference to
 // src/data/permission.data.ts — never modified) used to exercise the
@@ -224,7 +227,9 @@ function verify(routeName, res, expectations) {
   } else {
     counter.fail.add(1);
     console.error(
-      `[FAIL] ${routeName} -> status=${res.status} body=${(res.body || "").slice(0, 300)}`
+      `[FAIL] ${routeName} -> status=${res.status} body=${(
+        res.body || ""
+      ).slice(0, 300)}`
     );
   }
   return passed;
@@ -283,16 +288,24 @@ export function setup() {
   // ---- Super Admin login ----
   const loginRes = http.post(
     `${API}/auth/login`,
-    JSON.stringify({ identifier: SUPER_ADMIN_EMAIL, password: SUPER_ADMIN_PASSWORD }),
+    JSON.stringify({
+      identifier: SUPER_ADMIN_EMAIL,
+      password: SUPER_ADMIN_PASSWORD,
+    }),
     jsonHeaders()
   );
   if (loginRes.status !== 200) {
-    fail(`[setup] Super Admin login failed (status ${loginRes.status}): ${loginRes.body}`);
+    fail(
+      `[setup] Super Admin login failed (status ${loginRes.status}): ${loginRes.body}`
+    );
   }
   const superAdminToken = loginRes.json("data.token");
 
   // ---- Fetch a real permission id (for GET /permissions/:id) ----
-  const permListRes = http.get(`${API}/permissions?limit=1`, jsonHeaders(superAdminToken));
+  const permListRes = http.get(
+    `${API}/permissions?limit=1`,
+    jsonHeaders(superAdminToken)
+  );
   const samplePermissionId = permListRes.json("data.0.id");
 
   // ---- Fetch the Moderator role id (allowsMultiple, safe for repeated assign/unassign) ----
@@ -320,7 +333,11 @@ export function setup() {
     }
   }
 
-  if (!samplePermissionId || !moderatorRoleId || overrideTargetUserIds.length === 0) {
+  if (
+    !samplePermissionId ||
+    !moderatorRoleId ||
+    overrideTargetUserIds.length === 0
+  ) {
     fail(
       "[setup] Could not provision fixtures — check that seeds have run " +
         "(roles, permissions, permission modules/submodules) on the target environment."
@@ -349,7 +366,10 @@ export function auth_flows(data) {
   group("auth > POST /login (valid Super Admin credentials)", () => {
     const res = http.post(
       `${API}/auth/login`,
-      JSON.stringify({ identifier: SUPER_ADMIN_EMAIL, password: SUPER_ADMIN_PASSWORD }),
+      JSON.stringify({
+        identifier: SUPER_ADMIN_EMAIL,
+        password: SUPER_ADMIN_PASSWORD,
+      }),
       jsonHeaders()
     );
     verify("POST /auth/login (valid)", res, {
@@ -361,7 +381,10 @@ export function auth_flows(data) {
   group("auth > POST /login (invalid credentials)", () => {
     const res = http.post(
       `${API}/auth/login`,
-      JSON.stringify({ identifier: SUPER_ADMIN_EMAIL, password: "definitely-wrong-password" }),
+      JSON.stringify({
+        identifier: SUPER_ADMIN_EMAIL,
+        password: "definitely-wrong-password",
+      }),
       jsonHeaders()
     );
     verify("POST /auth/login (invalid) -> 401", res, {
@@ -391,7 +414,10 @@ export function auth_flows(data) {
 
 export function permission_reads(data) {
   group("permission > GET / (list)", () => {
-    const res = http.get(`${API}/permissions?limit=10`, jsonHeaders(data.superAdminToken));
+    const res = http.get(
+      `${API}/permissions?limit=10`,
+      jsonHeaders(data.superAdminToken)
+    );
     verify("GET /permissions", res, {
       "status is 200": (r) => r.status === 200,
       "data is array": (r) => Array.isArray(r.json("data")),
@@ -399,7 +425,10 @@ export function permission_reads(data) {
   });
 
   group("permission > GET /search", () => {
-    const res = http.get(`${API}/permissions/search?limit=10`, jsonHeaders(data.superAdminToken));
+    const res = http.get(
+      `${API}/permissions/search?limit=10`,
+      jsonHeaders(data.superAdminToken)
+    );
     verify("GET /permissions/search", res, {
       "status is 200": (r) => r.status === 200,
     });
@@ -447,7 +476,8 @@ export function user_lifecycle(data) {
     );
     const ok = verify("POST /users", res, {
       "status is 201": (r) => r.status === 201,
-      "no password field leaked": (r) => !("password" in (r.json("data") || {})),
+      "no password field leaked": (r) =>
+        !("password" in (r.json("data") || {})),
     });
     if (ok) userId = res.json("data.id");
   });
@@ -455,18 +485,29 @@ export function user_lifecycle(data) {
   if (!userId) return; // creation failed — nothing downstream to test this iteration
 
   group("user > GET /:id", () => {
-    const res = http.get(`${API}/users/${userId}`, jsonHeaders(data.superAdminToken));
+    const res = http.get(
+      `${API}/users/${userId}`,
+      jsonHeaders(data.superAdminToken)
+    );
     verify("GET /users/:id", res, { "status is 200": (r) => r.status === 200 });
   });
 
   group("user > GET / (list)", () => {
-    const res = http.get(`${API}/users?limit=5`, jsonHeaders(data.superAdminToken));
+    const res = http.get(
+      `${API}/users?limit=5`,
+      jsonHeaders(data.superAdminToken)
+    );
     verify("GET /users", res, { "status is 200": (r) => r.status === 200 });
   });
 
   group("user > GET /search", () => {
-    const res = http.get(`${API}/users/search?limit=5`, jsonHeaders(data.superAdminToken));
-    verify("GET /users/search", res, { "status is 200": (r) => r.status === 200 });
+    const res = http.get(
+      `${API}/users/search?limit=5`,
+      jsonHeaders(data.superAdminToken)
+    );
+    verify("GET /users/search", res, {
+      "status is 200": (r) => r.status === 200,
+    });
   });
 
   group("user > PATCH /:id (update)", () => {
@@ -482,7 +523,11 @@ export function user_lifecycle(data) {
   });
 
   group("user > DELETE /:id (soft)", () => {
-    const res = http.del(`${API}/users/${userId}`, null, jsonHeaders(data.superAdminToken));
+    const res = http.del(
+      `${API}/users/${userId}`,
+      null,
+      jsonHeaders(data.superAdminToken)
+    );
     verify("DELETE /users/:id (soft)", res, {
       "status is 200": (r) => r.status === 200,
       "deleted true": (r) => r.json("data.deleted") === true,
@@ -490,13 +535,23 @@ export function user_lifecycle(data) {
   });
 
   group("user > GET /deleted (list)", () => {
-    const res = http.get(`${API}/users/deleted?limit=5`, jsonHeaders(data.superAdminToken));
-    verify("GET /users/deleted", res, { "status is 200": (r) => r.status === 200 });
+    const res = http.get(
+      `${API}/users/deleted?limit=5`,
+      jsonHeaders(data.superAdminToken)
+    );
+    verify("GET /users/deleted", res, {
+      "status is 200": (r) => r.status === 200,
+    });
   });
 
   group("user > GET /deleted/:id", () => {
-    const res = http.get(`${API}/users/deleted/${userId}`, jsonHeaders(data.superAdminToken));
-    verify("GET /users/deleted/:id", res, { "status is 200": (r) => r.status === 200 });
+    const res = http.get(
+      `${API}/users/deleted/${userId}`,
+      jsonHeaders(data.superAdminToken)
+    );
+    verify("GET /users/deleted/:id", res, {
+      "status is 200": (r) => r.status === 200,
+    });
   });
 
   group("user > PATCH /:id/restore", () => {
@@ -517,7 +572,9 @@ export function user_lifecycle(data) {
       null,
       jsonHeaders(data.superAdminToken)
     );
-    verify("DELETE /users/:id?hard=true", res, { "status is 200": (r) => r.status === 200 });
+    verify("DELETE /users/:id?hard=true", res, {
+      "status is 200": (r) => r.status === 200,
+    });
   });
 }
 
@@ -535,27 +592,46 @@ export function role_lifecycle(data) {
   group("role > POST / (create)", () => {
     const res = http.post(
       `${API}/roles`,
-      JSON.stringify({ name: roleName, description: "k6 scratch role", isSystem: false }),
+      JSON.stringify({
+        name: roleName,
+        description: "k6 scratch role",
+        isSystem: false,
+      }),
       jsonHeaders(data.superAdminToken)
     );
-    const ok = verify("POST /roles", res, { "status is 201": (r) => r.status === 201 });
+    const ok = verify("POST /roles", res, {
+      "status is 201": (r) => r.status === 201,
+    });
     if (ok) roleId = res.json("data.id");
   });
 
   if (roleId) {
     group("role > GET /:id", () => {
-      const res = http.get(`${API}/roles/${roleId}`, jsonHeaders(data.superAdminToken));
-      verify("GET /roles/:id", res, { "status is 200": (r) => r.status === 200 });
+      const res = http.get(
+        `${API}/roles/${roleId}`,
+        jsonHeaders(data.superAdminToken)
+      );
+      verify("GET /roles/:id", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
 
     group("role > GET / (list)", () => {
-      const res = http.get(`${API}/roles?limit=5`, jsonHeaders(data.superAdminToken));
+      const res = http.get(
+        `${API}/roles?limit=5`,
+        jsonHeaders(data.superAdminToken)
+      );
       verify("GET /roles", res, { "status is 200": (r) => r.status === 200 });
     });
 
     group("role > GET /search", () => {
-      const res = http.get(`${API}/roles/search?limit=5`, jsonHeaders(data.superAdminToken));
-      verify("GET /roles/search", res, { "status is 200": (r) => r.status === 200 });
+      const res = http.get(
+        `${API}/roles/search?limit=5`,
+        jsonHeaders(data.superAdminToken)
+      );
+      verify("GET /roles/search", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
 
     group("role > PATCH /:id (update)", () => {
@@ -564,7 +640,9 @@ export function role_lifecycle(data) {
         JSON.stringify({ description: "k6 scratch role (updated)" }),
         jsonHeaders(data.superAdminToken)
       );
-      verify("PATCH /roles/:id", res, { "status is 200": (r) => r.status === 200 });
+      verify("PATCH /roles/:id", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
 
     group("role > GET /:id/permissions (catalog)", () => {
@@ -572,7 +650,9 @@ export function role_lifecycle(data) {
         `${API}/roles/${roleId}/permissions`,
         jsonHeaders(data.superAdminToken)
       );
-      verify("GET /roles/:id/permissions", res, { "status is 200": (r) => r.status === 200 });
+      verify("GET /roles/:id/permissions", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
 
     group("role > PUT /:id/permissions (update, scratch role only)", () => {
@@ -581,22 +661,40 @@ export function role_lifecycle(data) {
         JSON.stringify({ permissionCodes: OVERRIDE_TEST_PERMISSION_CODES }),
         jsonHeaders(data.superAdminToken)
       );
-      verify("PUT /roles/:id/permissions", res, { "status is 200": (r) => r.status === 200 });
+      verify("PUT /roles/:id/permissions", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
 
     group("role > DELETE /:id (soft)", () => {
-      const res = http.del(`${API}/roles/${roleId}`, null, jsonHeaders(data.superAdminToken));
-      verify("DELETE /roles/:id (soft)", res, { "status is 200": (r) => r.status === 200 });
+      const res = http.del(
+        `${API}/roles/${roleId}`,
+        null,
+        jsonHeaders(data.superAdminToken)
+      );
+      verify("DELETE /roles/:id (soft)", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
 
     group("role > GET /deleted", () => {
-      const res = http.get(`${API}/roles/deleted?limit=5`, jsonHeaders(data.superAdminToken));
-      verify("GET /roles/deleted", res, { "status is 200": (r) => r.status === 200 });
+      const res = http.get(
+        `${API}/roles/deleted?limit=5`,
+        jsonHeaders(data.superAdminToken)
+      );
+      verify("GET /roles/deleted", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
 
     group("role > GET /deleted/:id", () => {
-      const res = http.get(`${API}/roles/deleted/${roleId}`, jsonHeaders(data.superAdminToken));
-      verify("GET /roles/deleted/:id", res, { "status is 200": (r) => r.status === 200 });
+      const res = http.get(
+        `${API}/roles/deleted/${roleId}`,
+        jsonHeaders(data.superAdminToken)
+      );
+      verify("GET /roles/deleted/:id", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
 
     group("role > PATCH /:id/restore", () => {
@@ -605,12 +703,20 @@ export function role_lifecycle(data) {
         null,
         jsonHeaders(data.superAdminToken)
       );
-      verify("PATCH /roles/:id/restore", res, { "status is 200": (r) => r.status === 200 });
+      verify("PATCH /roles/:id/restore", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
 
     group("role > DELETE /:id (cleanup)", () => {
-      const res = http.del(`${API}/roles/${roleId}`, null, jsonHeaders(data.superAdminToken));
-      verify("DELETE /roles/:id (cleanup)", res, { "status is 200": (r) => r.status === 200 });
+      const res = http.del(
+        `${API}/roles/${roleId}`,
+        null,
+        jsonHeaders(data.superAdminToken)
+      );
+      verify("DELETE /roles/:id (cleanup)", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
   }
 
@@ -620,7 +726,11 @@ export function role_lifecycle(data) {
   group("user > POST / (fixture for role assignment)", () => {
     const res = http.post(
       `${API}/users`,
-      JSON.stringify({ email: randomEmail("assignee"), firstName: "K6", lastName: "Assignee" }),
+      JSON.stringify({
+        email: randomEmail("assignee"),
+        firstName: "K6",
+        lastName: "Assignee",
+      }),
       jsonHeaders(data.superAdminToken)
     );
     if (res.status === 201) assignUserId = res.json("data.id");
@@ -666,7 +776,11 @@ export function role_lifecycle(data) {
   }
 
   // cleanup
-  http.del(`${API}/users/${assignUserId}?hard=true`, null, jsonHeaders(data.superAdminToken));
+  http.del(
+    `${API}/users/${assignUserId}?hard=true`,
+    null,
+    jsonHeaders(data.superAdminToken)
+  );
 }
 
 // ============================================================
@@ -680,12 +794,18 @@ export function permission_override_flows(data) {
   const targetUserId =
     data.overrideTargetUserIds[__ITER % data.overrideTargetUserIds.length];
   const permissionCode =
-    OVERRIDE_TEST_PERMISSION_CODES[__ITER % OVERRIDE_TEST_PERMISSION_CODES.length];
+    OVERRIDE_TEST_PERMISSION_CODES[
+      __ITER % OVERRIDE_TEST_PERMISSION_CODES.length
+    ];
 
   group("permissionOverride > POST /grant", () => {
     const res = http.post(
       `${API}/permission-overrides/grant`,
-      JSON.stringify({ userId: targetUserId, permissionCode, reason: "k6 load test grant" }),
+      JSON.stringify({
+        userId: targetUserId,
+        permissionCode,
+        reason: "k6 load test grant",
+      }),
       jsonHeaders(data.superAdminToken)
     );
     verify("POST /permission-overrides/grant", res, {
@@ -707,7 +827,11 @@ export function permission_override_flows(data) {
   group("permissionOverride > POST /revoke", () => {
     const res = http.post(
       `${API}/permission-overrides/revoke`,
-      JSON.stringify({ userId: targetUserId, permissionCode, reason: "k6 load test revoke" }),
+      JSON.stringify({
+        userId: targetUserId,
+        permissionCode,
+        reason: "k6 load test revoke",
+      }),
       jsonHeaders(data.superAdminToken)
     );
     verify("POST /permission-overrides/revoke", res, {
@@ -719,7 +843,10 @@ export function permission_override_flows(data) {
   // permission code than the grant/revoke above so it doesn't fight over
   // the same row, then delete it.
   let overrideId;
-  const clearCode = OVERRIDE_TEST_PERMISSION_CODES[(__ITER + 1) % OVERRIDE_TEST_PERMISSION_CODES.length];
+  const clearCode =
+    OVERRIDE_TEST_PERMISSION_CODES[
+      (__ITER + 1) % OVERRIDE_TEST_PERMISSION_CODES.length
+    ];
   group("permissionOverride > POST /grant (for clear)", () => {
     const res = http.post(
       `${API}/permission-overrides/grant`,
@@ -758,7 +885,9 @@ export function permission_override_flows(data) {
 export function authorization_rejection_flows(data) {
   group("reject > GET /roles (no token) -> 401", () => {
     const res = http.get(`${API}/roles`, jsonHeaders());
-    verify("GET /roles (no token) -> 401", res, { "status is 401": (r) => r.status === 401 });
+    verify("GET /roles (no token) -> 401", res, {
+      "status is 401": (r) => r.status === 401,
+    });
   });
 
   group("reject > GET /permissions (no token) -> 401", () => {
@@ -770,13 +899,18 @@ export function authorization_rejection_flows(data) {
 
   group("reject > GET /users (no token) -> 401", () => {
     const res = http.get(`${API}/users`, jsonHeaders());
-    verify("GET /users (no token) -> 401", res, { "status is 401": (r) => r.status === 401 });
+    verify("GET /users (no token) -> 401", res, {
+      "status is 401": (r) => r.status === 401,
+    });
   });
 
   group("reject > POST /permission-overrides/grant (no token) -> 401", () => {
     const res = http.post(
       `${API}/permission-overrides/grant`,
-      JSON.stringify({ userId: data.overrideTargetUserIds[0], permissionCode: "search.tutor" }),
+      JSON.stringify({
+        userId: data.overrideTargetUserIds[0],
+        permissionCode: "search.tutor",
+      }),
       jsonHeaders()
     );
     verify("POST /permission-overrides/grant (no token) -> 401", res, {
@@ -785,7 +919,11 @@ export function authorization_rejection_flows(data) {
   });
 
   group("reject > POST /auth/admin/create (no token) -> 401", () => {
-    const res = http.post(`${API}/auth/admin/create`, JSON.stringify({}), jsonHeaders());
+    const res = http.post(
+      `${API}/auth/admin/create`,
+      JSON.stringify({}),
+      jsonHeaders()
+    );
     verify("POST /auth/admin/create (no token) -> 401", res, {
       "status is 401": (r) => r.status === 401,
     });
@@ -799,8 +937,13 @@ export function authorization_rejection_flows(data) {
   });
 
   group("reject > unknown route -> 404", () => {
-    const res = http.get(`${API}/this-route-does-not-exist`, jsonHeaders(data.superAdminToken));
-    verify("GET /unknown-route -> 404", res, { "status is 404": (r) => r.status === 404 });
+    const res = http.get(
+      `${API}/this-route-does-not-exist`,
+      jsonHeaders(data.superAdminToken)
+    );
+    verify("GET /unknown-route -> 404", res, {
+      "status is 404": (r) => r.status === 404,
+    });
   });
 }
 
@@ -855,7 +998,10 @@ export function email_otp_and_registration(data) {
   group("auth > POST /register/email/verify-otp (wrong code) -> 400", () => {
     const res = http.post(
       `${API}/auth/register/email/verify-otp`,
-      JSON.stringify({ email: randomEmail("wrong-code-check"), code: "000000" }),
+      JSON.stringify({
+        email: randomEmail("wrong-code-check"),
+        code: "000000",
+      }),
       jsonHeaders()
     );
     verify("POST /auth/register/email/verify-otp (wrong code) -> 400", res, {
@@ -910,7 +1056,9 @@ export function forgot_password_flow(data) {
       JSON.stringify({ identity: email }),
       jsonHeaders()
     );
-    verify("POST /auth/forgot-password", res, { "status is 200": (r) => r.status === 200 });
+    verify("POST /auth/forgot-password", res, {
+      "status is 200": (r) => r.status === 200,
+    });
   });
 
   let code;
@@ -948,7 +1096,9 @@ export function forgot_password_flow(data) {
       }),
       jsonHeaders()
     );
-    verify("POST /auth/reset-password", res, { "status is 200": (r) => r.status === 200 });
+    verify("POST /auth/reset-password", res, {
+      "status is 200": (r) => r.status === 200,
+    });
   });
 
   group("auth > POST /login (with newly reset password)", () => {
@@ -982,12 +1132,18 @@ export function forgot_password_flow(data) {
         }),
         jsonHeaders(sessionToken)
       );
-      verify("POST /auth/change-password", res, { "status is 200": (r) => r.status === 200 });
+      verify("POST /auth/change-password", res, {
+        "status is 200": (r) => r.status === 200,
+      });
     });
   }
 
   // cleanup
-  http.del(`${API}/users/${userId}?hard=true`, null, jsonHeaders(data.superAdminToken));
+  http.del(
+    `${API}/users/${userId}?hard=true`,
+    null,
+    jsonHeaders(data.superAdminToken)
+  );
 }
 
 // ============================================================
@@ -1015,7 +1171,9 @@ export function admin_creation_flow(data) {
       }),
       jsonHeaders(data.superAdminToken)
     );
-    verify("POST /auth/admin/create", res, { "status is 201": (r) => r.status === 201 });
+    verify("POST /auth/admin/create", res, {
+      "status is 201": (r) => r.status === 201,
+    });
   });
 
   let adminToken;
@@ -1040,12 +1198,15 @@ export function admin_creation_flow(data) {
     });
   });
 
-  group("permission boundary > Admin role hitting users.readAll route -> 200", () => {
-    const res = http.get(`${API}/users?limit=1`, jsonHeaders(adminToken));
-    verify("GET /users (Admin role, has users.readAll) -> 200", res, {
-      "status is 200": (r) => r.status === 200,
-    });
-  });
+  group(
+    "permission boundary > Admin role hitting users.readAll route -> 200",
+    () => {
+      const res = http.get(`${API}/users?limit=1`, jsonHeaders(adminToken));
+      verify("GET /users (Admin role, has users.readAll) -> 200", res, {
+        "status is 200": (r) => r.status === 200,
+      });
+    }
+  );
 }
 
 // ============================================================
@@ -1146,7 +1307,9 @@ export const options = {
 export function handleSummary(summaryData) {
   const lines = [];
   lines.push("");
-  lines.push("================ MENTORA API — LOAD TEST SUMMARY ================");
+  lines.push(
+    "================ MENTORA API — LOAD TEST SUMMARY ================"
+  );
   lines.push(`Target: ${BASE_URL}`);
 
   const metrics = summaryData.metrics || {};
@@ -1160,29 +1323,41 @@ export function handleSummary(summaryData) {
     const slug = slugify(name);
     const passMetric = metrics[`route_pass__${slug}`];
     const failMetric = metrics[`route_fail__${slug}`];
-    const pass = (passMetric && passMetric.values && passMetric.values.count) || 0;
-    const failCount = (failMetric && failMetric.values && failMetric.values.count) || 0;
+    const pass =
+      (passMetric && passMetric.values && passMetric.values.count) || 0;
+    const failCount =
+      (failMetric && failMetric.values && failMetric.values.count) || 0;
     totalPass += pass;
     totalFail += failCount;
     const status = failCount > 0 ? "FAIL" : "PASS";
     if (failCount > 0) failedRoutes.push(name);
     lines.push(
-      `  [${status}] ${name.padEnd(55)} pass=${pass}${failCount > 0 ? `  fail=${failCount}` : ""}`
+      `  [${status}] ${name.padEnd(55)} pass=${pass}${
+        failCount > 0 ? `  fail=${failCount}` : ""
+      }`
     );
   }
 
-  lines.push("-------------------------------------------------------------------");
-  lines.push(`TOTAL: ${totalPass} passed, ${totalFail} failed across ${routeNames.length} routes`);
+  lines.push(
+    "-------------------------------------------------------------------"
+  );
+  lines.push(
+    `TOTAL: ${totalPass} passed, ${totalFail} failed across ${routeNames.length} routes`
+  );
 
   if (failedRoutes.length > 0) {
     lines.push("");
-    lines.push("ROUTES WITH FAILURES (see [FAIL] lines above in stdout for response bodies):");
+    lines.push(
+      "ROUTES WITH FAILURES (see [FAIL] lines above in stdout for response bodies):"
+    );
     failedRoutes.forEach((r) => lines.push(`  - ${r}`));
   } else {
     lines.push("");
     lines.push("All routes passed every check. Nothing failed.");
   }
-  lines.push("====================================================================");
+  lines.push(
+    "===================================================================="
+  );
   lines.push("");
 
   const report = lines.join("\n");

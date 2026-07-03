@@ -7,6 +7,7 @@ import basicAuth from "express-basic-auth";
 import path from "path";
 
 import { requestId } from "./middlewares/requestId.middleware";
+import { resolveLocale } from "./shared/i18n/resolveLocale";
 import { globalErrorController } from "./utils/error.controller";
 import { AppError } from "./utils/AppError.util";
 import { CORS_ORIGINS } from "./utils/enviromentVariablesCheck.util";
@@ -57,6 +58,7 @@ app.use(
 );
 
 app.use(requestId);
+app.use(resolveLocale());
 
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));

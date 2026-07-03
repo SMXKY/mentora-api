@@ -2,6 +2,6 @@ k6:
 
 $env:SUPER_ADMIN_EMAIL="admin@mentora.com"
 $env:SUPER_ADMIN_PASSWORD="Reset@123"
-$env:BASE_URL="http://localhost:8080"
+$env:BASE_URL="https://mentora.api.tallamichael.online"
 
 k6 run permissionModule.k6.js

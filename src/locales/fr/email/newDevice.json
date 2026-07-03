@@ -1,0 +1,15 @@
+{
+  "subject": "Nouvelle connexion détectée — Mentora",
+  "title": "Nouvelle connexion depuis un appareil détectée",
+  "intro": "Bonjour{{namePart}}, nous avons remarqué une connexion à votre compte Mentora depuis un nouvel appareil. Si c'était vous, aucune action n'est nécessaire. Sinon, changez votre mot de passe immédiatement.",
+  "loginDetailsLabel": "Détails de connexion",
+  "deviceLabel": "Appareil",
+  "browserLabel": "Navigateur",
+  "osLabel": "Système",
+  "ipAddressLabel": "Adresse IP",
+  "timeLabel": "Heure",
+  "unknown": "Inconnu",
+  "warning": "Si vous ne vous êtes pas connecté, changez votre mot de passe immédiatement et contactez le support.",
+  "footerNote": "Si c'était vous, vous pouvez ignorer cet e-mail en toute sécurité.",
+  "plainTextBody": "Un nouvel appareil s'est connecté à votre compte Mentora depuis {{ipAddress}}."
+}

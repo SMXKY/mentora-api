@@ -1,30 +1,42 @@
 {
+  "setup_data": {
+    "overrideTargetUserIds": [
+      "89ec9b50-f828-4e29-8561-6e1322ca04d3",
+      "3bc4b21d-ebcc-40f5-a1eb-90c6cacce65a",
+      "febff717-867b-4512-9739-1f36e1f0f229",
+      "1031051e-078a-4621-87ff-51747cc882a6",
+      "c10fa963-68f7-4388-a309-6624e8475f29"
+    ],
+    "samplePermissionId": "149bc294-4ebc-4e78-b83a-393ba990a382",
+    "superAdminToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjllYzk4YzkwLTJhZjktNGU2OC04N2ZiLWJhZDc2MzBmMDdlYSIsImlhdCI6MTc4Mjk4NzkyMCwiZXhwIjoxNzgzNTkyNzIwfQ.F7XwpTqPlnaJYkgn-Sa0sEaWXW1zgo7rGNMWcBSIYd0",
+    "moderatorRoleId": "f9e35e0c-774c-4aca-96a4-93df2649beba"
+  },
   "root_group": {
     "name": "",
     "path": "",
     "id": "d41d8cd98f00b204e9800998ecf8427e",
     "groups": [
       {
+        "name": "auth > POST /login (valid Super Admin credentials)",
+        "path": "::auth > POST /login (valid Super Admin credentials)",
+        "id": "1baef261d0fa02ca1ed2c3177108f5ab",
         "groups": [],
         "checks": [
             {
+              "path": "::auth > POST /login (valid Super Admin credentials)::status is 200",
               "id": "ca99e2a9f06fc53520f6d5fb518a331a",
-              "passes": 80,
-              "fails": 0,
-              "name": "status is 200",
-              "path": "::auth > POST /login (valid Super Admin credentials)::status is 200"
+              "passes": 70,
+              "fails": 10,
+              "name": "status is 200"
             },
             {
-              "name": "has token",
               "path": "::auth > POST /login (valid Super Admin credentials)::has token",
               "id": "9b27ba39a962246da794a7817ec4c58a",
-              "passes": 80,
-              "fails": 0
+              "passes": 70,
+              "fails": 10,
+              "name": "has token"
             }
-          ],
-        "name": "auth > POST /login (valid Super Admin credentials)",
-        "path": "::auth > POST /login (valid Super Admin credentials)",
-        "id": "1baef261d0fa02ca1ed2c3177108f5ab"
+          ]
       },
       {
         "name": "auth > POST /login (invalid credentials)",
@@ -33,37 +45,38 @@
         "groups": [],
         "checks": [
             {
-              "name": "status is 401",
               "path": "::auth > POST /login (invalid credentials)::status is 401",
               "id": "23ee06ef07a05e853a1298ba473e3ec9",
-              "passes": 80,
+              "passes": 70,
+              "fails": 0,
+              "name": "status is 401"
+            }
+          ]
+      },
+      {
+        "name": "auth > GET /me (valid token)",
+        "path": "::auth > GET /me (valid token)",
+        "id": "b16ad03fda3d4e815352a577f8c73f51",
+        "groups": [],
+        "checks": [
+            {
+              "fails": 0,
+              "name": "status is 200",
+              "path": "::auth > GET /me (valid token)::status is 200",
+              "id": "b397ca42711025ad5c5e6de5c33ea4aa",
+              "passes": 70
+            },
+            {
+              "name": "status is ready",
+              "path": "::auth > GET /me (valid token)::status is ready",
+              "id": "431bd91f93dbff5d573c28592980228c",
+              "passes": 70,
               "fails": 0
             }
           ]
       },
       {
-        "groups": [],
-        "checks": [
-            {
-              "id": "b397ca42711025ad5c5e6de5c33ea4aa",
-              "passes": 80,
-              "fails": 0,
-              "name": "status is 200",
-              "path": "::auth > GET /me (valid token)::status is 200"
-            },
-            {
-              "path": "::auth > GET /me (valid token)::status is ready",
-              "id": "431bd91f93dbff5d573c28592980228c",
-              "passes": 80,
-              "fails": 0,
-              "name": "status is ready"
-            }
-          ],
-        "name": "auth > GET /me (valid token)",
-        "path": "::auth > GET /me (valid token)",
-        "id": "b16ad03fda3d4e815352a577f8c73f51"
-      },
-      {
+        "path": "::auth > GET /me (no token) -> 401",
         "id": "b42230f5326af6ce0f5c53f78d3a4e37",
         "groups": [],
         "checks": [
@@ -71,12 +84,11 @@
               "name": "status is 401",
               "path": "::auth > GET /me (no token) -> 401::status is 401",
               "id": "335b2c7543e429199be58278f869b818",
-              "passes": 80,
+              "passes": 70,
               "fails": 0
             }
           ],
-        "name": "auth > GET /me (no token) -> 401",
-        "path": "::auth > GET /me (no token) -> 401"
+        "name": "auth > GET /me (no token) -> 401"
       },
       {
         "name": "permission > GET / (list)",
@@ -92,65 +104,65 @@
               "fails": 0
             },
             {
+              "fails": 0,
               "name": "data is array",
               "path": "::permission > GET / (list)::data is array",
               "id": "c393d7ca4e3c90ce9ce97787fae69dde",
-              "passes": 80,
-              "fails": 0
-            }
-          ]
-      },
-      {
-        "groups": [],
-        "checks": [
-            {
-              "path": "::permission > GET /search::status is 200",
-              "id": "5070a986d3b90d6096b3e5383c308a00",
-              "passes": 80,
-              "fails": 0,
-              "name": "status is 200"
-            }
-          ],
-        "name": "permission > GET /search",
-        "path": "::permission > GET /search",
-        "id": "e1c4a2f77e3a52c2b38a9d113a799bd6"
-      },
-      {
-        "name": "permission > GET /:id",
-        "path": "::permission > GET /:id",
-        "id": "bf14a45a8767d0f789500c50a7b55c10",
-        "groups": [],
-        "checks": [
-            {
-              "path": "::permission > GET /:id::status is 200",
-              "id": "10cefc19225761751b89c31f5b9533b3",
-              "passes": 80,
-              "fails": 0,
-              "name": "status is 200"
-            },
-            {
-              "path": "::permission > GET /:id::id matches",
-              "id": "f4a545bfe5c670a2e03034d09d3bda1f",
-              "passes": 80,
-              "fails": 0,
-              "name": "id matches"
+              "passes": 80
             }
           ]
       },
       {
         "checks": [
           {
-            "name": "status is 404",
-            "path": "::permission > GET /:id (unknown id) -> 404::status is 404",
-            "id": "e91c726ed41a0dc36136656e770e59b8",
             "passes": 80,
-            "fails": 0
+            "fails": 0,
+            "name": "status is 200",
+            "path": "::permission > GET /search::status is 200",
+            "id": "5070a986d3b90d6096b3e5383c308a00"
           }
         ],
-        "name": "permission > GET /:id (unknown id) -> 404",
-        "path": "::permission > GET /:id (unknown id) -> 404",
-        "id": "9dc221dd82910ee075eab36904385d4f",
+        "name": "permission > GET /search",
+        "path": "::permission > GET /search",
+        "id": "e1c4a2f77e3a52c2b38a9d113a799bd6",
         "groups": []
+      },
+      {
+        "checks": [
+          {
+            "passes": 80,
+            "fails": 0,
+            "name": "status is 200",
+            "path": "::permission > GET /:id::status is 200",
+            "id": "10cefc19225761751b89c31f5b9533b3"
+          },
+          {
+            "path": "::permission > GET /:id::id matches",
+            "id": "f4a545bfe5c670a2e03034d09d3bda1f",
+            "passes": 80,
+            "fails": 0,
+            "name": "id matches"
+          }
+        ],
+        "name": "permission > GET /:id",
+        "path": "::permission > GET /:id",
+        "id": "bf14a45a8767d0f789500c50a7b55c10",
+        "groups": []
+      },
+      {
+        "id": "9dc221dd82910ee075eab36904385d4f",
+        "groups": [],
+        "checks": [
+            {
+              "passes": 80,
+              "fails": 0,
+              "name": "status is 404",
+              "path": "::permission > GET /:id (unknown id) -> 404::status is 404",
+              "id": "e91c726ed41a0dc36136656e770e59b8"
+            }
+          ],
+        "name": "permission > GET /:id (unknown id) -> 404",
+        "path": "::permission > GET /:id (unknown id) -> 404"
       },
       {
         "name": "user > POST / (create)",
@@ -162,99 +174,99 @@
               "name": "status is 201",
               "path": "::user > POST / (create)::status is 201",
               "id": "66052d1d81c0d88865b48172207e6774",
-              "passes": 50,
-              "fails": 0
+              "passes": 49,
+              "fails": 1
             },
             {
-              "id": "154c280b4fb4791df1609c047a962138",
-              "passes": 50,
-              "fails": 0,
+              "fails": 1,
               "name": "no password field leaked",
-              "path": "::user > POST / (create)::no password field leaked"
+              "path": "::user > POST / (create)::no password field leaked",
+              "id": "154c280b4fb4791df1609c047a962138",
+              "passes": 49
             }
           ]
       },
       {
-        "name": "user > GET /:id",
-        "path": "::user > GET /:id",
-        "id": "72dfe4985f19de102f518d38b38ace6c",
         "groups": [],
         "checks": [
             {
+              "name": "status is 200",
               "path": "::user > GET /:id::status is 200",
               "id": "a086e7ef6433c4f8133c8ffe02e05b26",
-              "passes": 50,
+              "passes": 49,
+              "fails": 0
+            }
+          ],
+        "name": "user > GET /:id",
+        "path": "::user > GET /:id",
+        "id": "72dfe4985f19de102f518d38b38ace6c"
+      },
+      {
+        "name": "user > GET / (list)",
+        "path": "::user > GET / (list)",
+        "id": "06babf858d8bad4a30e464f278f969d2",
+        "groups": [],
+        "checks": [
+            {
+              "path": "::user > GET / (list)::status is 200",
+              "id": "c5e6f5333ee8a6eed05944cde75ef8fb",
+              "passes": 49,
               "fails": 0,
               "name": "status is 200"
             }
           ]
       },
       {
-        "id": "06babf858d8bad4a30e464f278f969d2",
-        "groups": [],
-        "checks": [
-            {
-              "id": "c5e6f5333ee8a6eed05944cde75ef8fb",
-              "passes": 50,
-              "fails": 0,
-              "name": "status is 200",
-              "path": "::user > GET / (list)::status is 200"
-            }
-          ],
-        "name": "user > GET / (list)",
-        "path": "::user > GET / (list)"
-      },
-      {
-        "name": "user > GET /search",
-        "path": "::user > GET /search",
         "id": "20d0e5a98a2cb17eb96de2e08e1fa254",
         "groups": [],
         "checks": [
             {
-              "name": "status is 200",
-              "path": "::user > GET /search::status is 200",
-              "id": "7b4469e7143dcf1fb498cb0c5c218857",
-              "passes": 50,
-              "fails": 0
-            }
-          ]
-      },
-      {
-        "id": "068b7bf1a2769b728b70e5ddaabdb6fa",
-        "groups": [],
-        "checks": [
-            {
-              "passes": 50,
+              "passes": 49,
               "fails": 0,
               "name": "status is 200",
-              "path": "::user > PATCH /:id (update)::status is 200",
-              "id": "7f555aae04271a2a6cfd2c4516e1511b"
-            },
-            {
-              "name": "field updated",
-              "path": "::user > PATCH /:id (update)::field updated",
-              "id": "4ee648b1d37ce6db88018b83fd170908",
-              "passes": 50,
-              "fails": 0
+              "path": "::user > GET /search::status is 200",
+              "id": "7b4469e7143dcf1fb498cb0c5c218857"
             }
           ],
-        "name": "user > PATCH /:id (update)",
-        "path": "::user > PATCH /:id (update)"
+        "name": "user > GET /search",
+        "path": "::user > GET /search"
       },
       {
         "checks": [
           {
+            "name": "status is 200",
+            "path": "::user > PATCH /:id (update)::status is 200",
+            "id": "7f555aae04271a2a6cfd2c4516e1511b",
+            "passes": 49,
+            "fails": 0
+          },
+          {
+            "name": "field updated",
+            "path": "::user > PATCH /:id (update)::field updated",
+            "id": "4ee648b1d37ce6db88018b83fd170908",
+            "passes": 49,
+            "fails": 0
+          }
+        ],
+        "name": "user > PATCH /:id (update)",
+        "path": "::user > PATCH /:id (update)",
+        "id": "068b7bf1a2769b728b70e5ddaabdb6fa",
+        "groups": []
+      },
+      {
+        "checks": [
+          {
+            "name": "status is 200",
             "path": "::user > DELETE /:id (soft)::status is 200",
             "id": "79d340d4165f60143fe714854eff678d",
-            "passes": 50,
-            "fails": 0,
-            "name": "status is 200"
+            "passes": 49,
+            "fails": 0
           },
           {
             "name": "deleted true",
             "path": "::user > DELETE /:id (soft)::deleted true",
             "id": "7465b0eefb4c0bc28de921062adcef92",
-            "passes": 50,
+            "passes": 49,
             "fails": 0
           }
         ],
@@ -274,40 +286,40 @@
               "name": "status is 200",
               "path": "::user > GET /deleted (list)::status is 200",
               "id": "022b2c8f4ebc5fd6c45a3ab9f85c2362",
-              "passes": 50
+              "passes": 49
             }
           ]
       },
       {
+        "name": "user > GET /deleted/:id",
+        "path": "::user > GET /deleted/:id",
         "id": "181c0c5e86bd2c2b79c9b059b8cca919",
         "groups": [],
         "checks": [
             {
-              "fails": 0,
               "name": "status is 200",
               "path": "::user > GET /deleted/:id::status is 200",
               "id": "f7854bd03472357f2e13dcffef6a6b8f",
-              "passes": 50
+              "passes": 49,
+              "fails": 0
             }
-          ],
-        "name": "user > GET /deleted/:id",
-        "path": "::user > GET /deleted/:id"
+          ]
       },
       {
         "groups": [],
         "checks": [
             {
-              "name": "status is 200",
               "path": "::user > PATCH /:id/restore::status is 200",
               "id": "3ba03c3b4af4a0f0f2425078c6ed198c",
-              "passes": 50,
-              "fails": 0
+              "passes": 49,
+              "fails": 0,
+              "name": "status is 200"
             },
             {
               "name": "deletedAt cleared",
               "path": "::user > PATCH /:id/restore::deletedAt cleared",
               "id": "3b2def9d0630109a33440ae31adfaf6d",
-              "passes": 50,
+              "passes": 49,
               "fails": 0
             }
           ],
@@ -316,34 +328,34 @@
         "id": "2e66f41c3fc691b6044594303935194c"
       },
       {
-        "name": "user > DELETE /:id?hard=true (cleanup)",
-        "path": "::user > DELETE /:id?hard=true (cleanup)",
-        "id": "91a2e0e371465f646f64a1242655d611",
         "groups": [],
         "checks": [
             {
+              "fails": 0,
               "name": "status is 200",
               "path": "::user > DELETE /:id?hard=true (cleanup)::status is 200",
               "id": "2ea6d31beb5f3e33e2a00a4106174efb",
-              "passes": 50,
-              "fails": 0
+              "passes": 49
             }
-          ]
+          ],
+        "name": "user > DELETE /:id?hard=true (cleanup)",
+        "path": "::user > DELETE /:id?hard=true (cleanup)",
+        "id": "91a2e0e371465f646f64a1242655d611"
       },
       {
+        "name": "role > POST / (create)",
         "path": "::role > POST / (create)",
         "id": "39528ee1c9d69292d4f9422252728344",
         "groups": [],
         "checks": [
             {
+              "passes": 50,
+              "fails": 0,
               "name": "status is 201",
               "path": "::role > POST / (create)::status is 201",
-              "id": "befb9a316046dd07fe80ab0b759e9f82",
-              "passes": 50,
-              "fails": 0
+              "id": "befb9a316046dd07fe80ab0b759e9f82"
             }
-          ],
-        "name": "role > POST / (create)"
+          ]
       },
       {
         "name": "role > GET /:id",
@@ -352,31 +364,30 @@
         "groups": [],
         "checks": [
             {
-              "name": "status is 200",
               "path": "::role > GET /:id::status is 200",
               "id": "623943c13288b78844b7dfbb194c3e98",
               "passes": 50,
-              "fails": 0
+              "fails": 0,
+              "name": "status is 200"
             }
           ]
       },
       {
+        "name": "role > GET / (list)",
         "path": "::role > GET / (list)",
         "id": "90c2cb061a8d3d067d707bab3abd6443",
         "groups": [],
         "checks": [
             {
+              "fails": 0,
               "name": "status is 200",
               "path": "::role > GET / (list)::status is 200",
               "id": "84f062efd261fa426acd39e6f2238c34",
-              "passes": 50,
-              "fails": 0
+              "passes": 50
             }
-          ],
-        "name": "role > GET / (list)"
+          ]
       },
       {
-        "id": "618aa8580952eeb2d9cc8b183701cd2d",
         "groups": [],
         "checks": [
             {
@@ -388,24 +399,28 @@
             }
           ],
         "name": "role > GET /search",
-        "path": "::role > GET /search"
+        "path": "::role > GET /search",
+        "id": "618aa8580952eeb2d9cc8b183701cd2d"
       },
       {
+        "name": "role > PATCH /:id (update)",
+        "path": "::role > PATCH /:id (update)",
+        "id": "1a6a1d42bb5fc39b4732a29a966a025c",
         "groups": [],
         "checks": [
             {
+              "passes": 50,
               "fails": 0,
               "name": "status is 200",
               "path": "::role > PATCH /:id (update)::status is 200",
-              "id": "ad175bacfc1edbbb5cc9451a1ca64f67",
-              "passes": 50
+              "id": "ad175bacfc1edbbb5cc9451a1ca64f67"
             }
-          ],
-        "name": "role > PATCH /:id (update)",
-        "path": "::role > PATCH /:id (update)",
-        "id": "1a6a1d42bb5fc39b4732a29a966a025c"
+          ]
       },
       {
+        "name": "role > GET /:id/permissions (catalog)",
+        "path": "::role > GET /:id/permissions (catalog)",
+        "id": "d18c8b57909df0a174f8a6eede8accb8",
         "groups": [],
         "checks": [
             {
@@ -415,25 +430,37 @@
               "path": "::role > GET /:id/permissions (catalog)::status is 200",
               "id": "362ec2da99fd42eea0b9151c3fcd1e0a"
             }
-          ],
-        "name": "role > GET /:id/permissions (catalog)",
-        "path": "::role > GET /:id/permissions (catalog)",
-        "id": "d18c8b57909df0a174f8a6eede8accb8"
+          ]
       },
       {
+        "name": "role > PUT /:id/permissions (update, scratch role only)",
         "path": "::role > PUT /:id/permissions (update, scratch role only)",
         "id": "cae4f5cb54324dc843c12fed6e5a3dce",
         "groups": [],
         "checks": [
             {
-              "path": "::role > PUT /:id/permissions (update, scratch role only)::status is 200",
               "id": "717d5db5e1b3f8bf512754bb41b04b16",
               "passes": 50,
               "fails": 0,
-              "name": "status is 200"
+              "name": "status is 200",
+              "path": "::role > PUT /:id/permissions (update, scratch role only)::status is 200"
             }
-          ],
-        "name": "role > PUT /:id/permissions (update, scratch role only)"
+          ]
+      },
+      {
+        "name": "role > DELETE /:id (soft)",
+        "path": "::role > DELETE /:id (soft)",
+        "id": "d561351a4262728262d4ac4df88b3a51",
+        "groups": [],
+        "checks": [
+            {
+              "fails": 0,
+              "name": "status is 200",
+              "path": "::role > DELETE /:id (soft)::status is 200",
+              "id": "9c8d1cdce4e983feedf755af38634eb3",
+              "passes": 50
+            }
+          ]
       },
       {
         "checks": [
@@ -441,44 +468,29 @@
             "passes": 50,
             "fails": 0,
             "name": "status is 200",
-            "path": "::role > DELETE /:id (soft)::status is 200",
-            "id": "9c8d1cdce4e983feedf755af38634eb3"
+            "path": "::role > GET /deleted::status is 200",
+            "id": "6beda6dc5570cfb592df04a84cfb05fe"
           }
         ],
-        "name": "role > DELETE /:id (soft)",
-        "path": "::role > DELETE /:id (soft)",
-        "id": "d561351a4262728262d4ac4df88b3a51",
+        "name": "role > GET /deleted",
+        "path": "::role > GET /deleted",
+        "id": "62c03c055f23f0cfad424cf38b23826d",
         "groups": []
       },
       {
-        "path": "::role > GET /deleted",
-        "id": "62c03c055f23f0cfad424cf38b23826d",
-        "groups": [],
         "checks": [
-            {
-              "name": "status is 200",
-              "path": "::role > GET /deleted::status is 200",
-              "id": "6beda6dc5570cfb592df04a84cfb05fe",
-              "passes": 50,
-              "fails": 0
-            }
-          ],
-        "name": "role > GET /deleted"
-      },
-      {
+          {
+            "id": "a8e7f381a0f1720c0dd9e0a2f3fbf563",
+            "passes": 50,
+            "fails": 0,
+            "name": "status is 200",
+            "path": "::role > GET /deleted/:id::status is 200"
+          }
+        ],
         "name": "role > GET /deleted/:id",
         "path": "::role > GET /deleted/:id",
         "id": "c4d9f2d4826c5d14d0ee15455e43ae10",
-        "groups": [],
-        "checks": [
-            {
-              "name": "status is 200",
-              "path": "::role > GET /deleted/:id::status is 200",
-              "id": "a8e7f381a0f1720c0dd9e0a2f3fbf563",
-              "passes": 50,
-              "fails": 0
-            }
-          ]
+        "groups": []
       },
       {
         "name": "role > PATCH /:id/restore",
@@ -487,76 +499,74 @@
         "groups": [],
         "checks": [
             {
-              "name": "status is 200",
-              "path": "::role > PATCH /:id/restore::status is 200",
               "id": "2a33494698caf3c67cafbe474d7e3b4c",
+              "passes": 50,
+              "fails": 0,
+              "name": "status is 200",
+              "path": "::role > PATCH /:id/restore::status is 200"
+            }
+          ]
+      },
+      {
+        "name": "role > DELETE /:id (cleanup)",
+        "path": "::role > DELETE /:id (cleanup)",
+        "id": "a4cdafd3782382a024a96a781a8adc62",
+        "groups": [],
+        "checks": [
+            {
+              "name": "status is 200",
+              "path": "::role > DELETE /:id (cleanup)::status is 200",
+              "id": "60b1055d8fea13841520ea82767a086a",
               "passes": 50,
               "fails": 0
             }
           ]
       },
       {
-        "id": "a4cdafd3782382a024a96a781a8adc62",
         "groups": [],
-        "checks": [
-            {
-              "id": "60b1055d8fea13841520ea82767a086a",
-              "passes": 50,
-              "fails": 0,
-              "name": "status is 200",
-              "path": "::role > DELETE /:id (cleanup)::status is 200"
-            }
-          ],
-        "name": "role > DELETE /:id (cleanup)",
-        "path": "::role > DELETE /:id (cleanup)"
-      },
-      {
+        "checks": [],
         "name": "user > POST / (fixture for role assignment)",
         "path": "::user > POST / (fixture for role assignment)",
-        "id": "148359b0c6f3bedea5e633abe8e8ea88",
-        "groups": [],
-        "checks": []
+        "id": "148359b0c6f3bedea5e633abe8e8ea88"
       },
       {
-        "name": "role > POST /assign/:userId",
-        "path": "::role > POST /assign/:userId",
         "id": "51ca039f8cc81931be5d8873c100009a",
         "groups": [],
         "checks": [
             {
+              "name": "status is 201",
               "path": "::role > POST /assign/:userId::status is 201",
               "id": "71659547828b5fb0b973b44374814f63",
               "passes": 50,
+              "fails": 0
+            }
+          ],
+        "name": "role > POST /assign/:userId",
+        "path": "::role > POST /assign/:userId"
+      },
+      {
+        "name": "role > GET /history/:userId",
+        "path": "::role > GET /history/:userId",
+        "id": "3bd6005f5888e2beac51c5ed51854a14",
+        "groups": [],
+        "checks": [
+            {
+              "passes": 50,
               "fails": 0,
-              "name": "status is 201"
+              "name": "status is 200",
+              "path": "::role > GET /history/:userId::status is 200",
+              "id": "badbeb46b22484623719e7dcda20e261"
+            },
+            {
+              "name": "history is array",
+              "path": "::role > GET /history/:userId::history is array",
+              "id": "572c619b947e8133939d19c0aafee589",
+              "passes": 50,
+              "fails": 0
             }
           ]
       },
       {
-        "checks": [
-          {
-            "name": "status is 200",
-            "path": "::role > GET /history/:userId::status is 200",
-            "id": "badbeb46b22484623719e7dcda20e261",
-            "passes": 50,
-            "fails": 0
-          },
-          {
-            "passes": 50,
-            "fails": 0,
-            "name": "history is array",
-            "path": "::role > GET /history/:userId::history is array",
-            "id": "572c619b947e8133939d19c0aafee589"
-          }
-        ],
-        "name": "role > GET /history/:userId",
-        "path": "::role > GET /history/:userId",
-        "id": "3bd6005f5888e2beac51c5ed51854a14",
-        "groups": []
-      },
-      {
-        "name": "role > PATCH /unassign/:userId/:userRoleId",
-        "path": "::role > PATCH /unassign/:userId/:userRoleId",
         "id": "c0b873b6db61aef682dc4bc658d8f112",
         "groups": [],
         "checks": [
@@ -567,17 +577,19 @@
               "passes": 50,
               "fails": 0
             }
-          ]
+          ],
+        "name": "role > PATCH /unassign/:userId/:userRoleId",
+        "path": "::role > PATCH /unassign/:userId/:userRoleId"
       },
       {
         "groups": [],
         "checks": [
             {
-              "fails": 0,
-              "name": "status is 201",
               "path": "::permissionOverride > POST /grant::status is 201",
               "id": "63739561a8d085f421d8476c042f44ee",
-              "passes": 80
+              "passes": 80,
+              "fails": 0,
+              "name": "status is 201"
             }
           ],
         "name": "permissionOverride > POST /grant",
@@ -591,11 +603,11 @@
         "groups": [],
         "checks": [
             {
+              "name": "status is 200",
               "path": "::permissionOverride > GET /user/:userId::status is 200",
               "id": "f4545c347bff905911af06152f603ca6",
               "passes": 80,
-              "fails": 0,
-              "name": "status is 200"
+              "fails": 0
             },
             {
               "id": "001720b77ae718ce19f5b991cab6b619",
@@ -607,7 +619,6 @@
           ]
       },
       {
-        "id": "389f0b01109fbb8bd139f0eb5f9ff515",
         "groups": [],
         "checks": [
             {
@@ -619,14 +630,15 @@
             }
           ],
         "name": "permissionOverride > POST /revoke",
-        "path": "::permissionOverride > POST /revoke"
+        "path": "::permissionOverride > POST /revoke",
+        "id": "389f0b01109fbb8bd139f0eb5f9ff515"
       },
       {
-        "groups": [],
-        "checks": [],
         "name": "permissionOverride > POST /grant (for clear)",
         "path": "::permissionOverride > POST /grant (for clear)",
-        "id": "5dbc1a426bba9cfce8bde965b93035e1"
+        "id": "5dbc1a426bba9cfce8bde965b93035e1",
+        "groups": [],
+        "checks": []
       },
       {
         "name": "permissionOverride > DELETE /:id (clear)",
@@ -635,37 +647,38 @@
         "groups": [],
         "checks": [
             {
+              "name": "status is 200",
               "path": "::permissionOverride > DELETE /:id (clear)::status is 200",
               "id": "d30223a8a1722215bed41fef99ce9ada",
-              "passes": 27,
-              "fails": 53,
-              "name": "status is 200"
+              "passes": 30,
+              "fails": 50
             },
             {
-              "passes": 27,
-              "fails": 53,
               "name": "cleared true",
               "path": "::permissionOverride > DELETE /:id (clear)::cleared true",
-              "id": "b38a0d34b92a45697c31b6b72a56efcb"
+              "id": "b38a0d34b92a45697c31b6b72a56efcb",
+              "passes": 30,
+              "fails": 50
             }
           ]
       },
       {
+        "name": "reject > GET /roles (no token) -> 401",
+        "path": "::reject > GET /roles (no token) -> 401",
         "id": "d5cf387bbcb3ca56442e48e28ed09b04",
         "groups": [],
         "checks": [
             {
-              "fails": 0,
-              "name": "status is 401",
               "path": "::reject > GET /roles (no token) -> 401::status is 401",
               "id": "1cb705227b6ab9a7fce94fd29c11fa48",
-              "passes": 80
+              "passes": 80,
+              "fails": 0,
+              "name": "status is 401"
             }
-          ],
-        "name": "reject > GET /roles (no token) -> 401",
-        "path": "::reject > GET /roles (no token) -> 401"
+          ]
       },
       {
+        "name": "reject > GET /permissions (no token) -> 401",
         "path": "::reject > GET /permissions (no token) -> 401",
         "id": "355b9ddf5e12dcd7efd253acc6e68a6c",
         "groups": [],
@@ -677,23 +690,22 @@
               "passes": 80,
               "fails": 0
             }
-          ],
-        "name": "reject > GET /permissions (no token) -> 401"
+          ]
       },
       {
-        "checks": [
-          {
-            "path": "::reject > GET /users (no token) -> 401::status is 401",
-            "id": "69d245938e2552f3d5b35d966b58efdd",
-            "passes": 80,
-            "fails": 0,
-            "name": "status is 401"
-          }
-        ],
         "name": "reject > GET /users (no token) -> 401",
         "path": "::reject > GET /users (no token) -> 401",
         "id": "3bacbae64da47c68f47d027a1bad1771",
-        "groups": []
+        "groups": [],
+        "checks": [
+            {
+              "passes": 80,
+              "fails": 0,
+              "name": "status is 401",
+              "path": "::reject > GET /users (no token) -> 401::status is 401",
+              "id": "69d245938e2552f3d5b35d966b58efdd"
+            }
+          ]
       },
       {
         "name": "reject > POST /permission-overrides/grant (no token) -> 401",
@@ -702,11 +714,11 @@
         "groups": [],
         "checks": [
             {
+              "passes": 80,
               "fails": 0,
               "name": "status is 401",
               "path": "::reject > POST /permission-overrides/grant (no token) -> 401::status is 401",
-              "id": "e7f906af4b6516b1bd2b0f860c24c5f2",
-              "passes": 80
+              "id": "e7f906af4b6516b1bd2b0f860c24c5f2"
             }
           ]
       },
@@ -717,28 +729,28 @@
         "groups": [],
         "checks": [
             {
+              "name": "status is 401",
+              "path": "::reject > POST /auth/admin/create (no token) -> 401::status is 401",
               "id": "75e7acc53ec89b9d124d44f02a8bb613",
-              "passes": 80,
-              "fails": 0,
-              "name": "status is 401",
-              "path": "::reject > POST /auth/admin/create (no token) -> 401::status is 401"
-            }
-          ]
-      },
-      {
-        "name": "reject > malformed token -> 401",
-        "path": "::reject > malformed token -> 401",
-        "id": "97b28bc0daa28036d472f93d5d96ad6f",
-        "groups": [],
-        "checks": [
-            {
-              "name": "status is 401",
-              "path": "::reject > malformed token -> 401::status is 401",
-              "id": "78dfaa1aa67f6a7d1ef6a977b36f0620",
               "passes": 80,
               "fails": 0
             }
           ]
+      },
+      {
+        "checks": [
+          {
+            "path": "::reject > malformed token -> 401::status is 401",
+            "id": "78dfaa1aa67f6a7d1ef6a977b36f0620",
+            "passes": 80,
+            "fails": 0,
+            "name": "status is 401"
+          }
+        ],
+        "name": "reject > malformed token -> 401",
+        "path": "::reject > malformed token -> 401",
+        "id": "97b28bc0daa28036d472f93d5d96ad6f",
+        "groups": []
       },
       {
         "name": "reject > unknown route -> 404",
@@ -756,19 +768,19 @@
           ]
       },
       {
+        "name": "auth > POST /register/email/request-otp",
+        "path": "::auth > POST /register/email/request-otp",
         "id": "be1d2ef0e162daa25adb7b523b28943f",
         "groups": [],
         "checks": [
             {
-              "id": "38ded73837fd0f12a83be17ab2b4d6c3",
-              "passes": 5,
-              "fails": 45,
               "name": "status is 200",
-              "path": "::auth > POST /register/email/request-otp::status is 200"
+              "path": "::auth > POST /register/email/request-otp::status is 200",
+              "id": "38ded73837fd0f12a83be17ab2b4d6c3",
+              "passes": 50,
+              "fails": 0
             }
-          ],
-        "name": "auth > POST /register/email/request-otp",
-        "path": "::auth > POST /register/email/request-otp"
+          ]
       },
       {
         "name": "auth > GET /dev/otp (test helper)",
@@ -777,101 +789,42 @@
         "groups": [],
         "checks": [
             {
-              "passes": 50,
-              "fails": 0,
               "name": "status is 200",
               "path": "::auth > GET /dev/otp (test helper)::status is 200",
-              "id": "3302136f41ae856cf603daa3f1e72844"
+              "id": "3302136f41ae856cf603daa3f1e72844",
+              "passes": 0,
+              "fails": 50
             },
             {
               "name": "code present",
               "path": "::auth > GET /dev/otp (test helper)::code present",
               "id": "e95be6c6d264023ecf3e6587386b8972",
-              "passes": 50,
-              "fails": 0
+              "passes": 0,
+              "fails": 50
             }
           ]
       },
       {
-        "name": "auth > POST /register/email/verify-otp",
-        "path": "::auth > POST /register/email/verify-otp",
-        "id": "b8be2ee7ee3f84659e431d6710676575",
-        "groups": [],
-        "checks": [
-            {
-              "fails": 0,
-              "name": "status is 200",
-              "path": "::auth > POST /register/email/verify-otp::status is 200",
-              "id": "ce7d0bb60bb473ed65cc38027ef0f465",
-              "passes": 50
-            },
-            {
-              "id": "fd1155c0bef03745cc94a59e6b0862d8",
-              "passes": 50,
-              "fails": 0,
-              "name": "registrationToken present",
-              "path": "::auth > POST /register/email/verify-otp::registrationToken present"
-            }
-          ]
-      },
-      {
-        "name": "auth > POST /register/email/verify-otp (wrong code) -> 400",
-        "path": "::auth > POST /register/email/verify-otp (wrong code) -> 400",
-        "id": "41861de8e867ecdf728f1d6b09c9ea60",
-        "groups": [],
-        "checks": [
-            {
-              "id": "0fa19a76b7077775f003f9408e11517a",
-              "passes": 50,
-              "fails": 0,
-              "name": "status is 400",
-              "path": "::auth > POST /register/email/verify-otp (wrong code) -> 400::status is 400"
-            }
-          ]
-      },
-      {
-        "path": "::auth > POST /register/complete",
-        "id": "2673bf2d38692e0f2ecf57243f5617bd",
-        "groups": [],
-        "checks": [
-            {
-              "name": "status is 201",
-              "path": "::auth > POST /register/complete::status is 201",
-              "id": "fe3d9a8652fbe86b0abd1f2633e2ba88",
-              "passes": 50,
-              "fails": 0
-            },
-            {
-              "name": "token present",
-              "path": "::auth > POST /register/complete::token present",
-              "id": "d45fdbf10dfc50742ebe138ba03232d5",
-              "passes": 50,
-              "fails": 0
-            }
-          ],
-        "name": "auth > POST /register/complete"
-      },
-      {
+        "id": "323076a0c39a6ee5829522ce7ba62aaf",
         "groups": [],
         "checks": [],
         "name": "user > POST / (fixture for forgot-password)",
-        "path": "::user > POST / (fixture for forgot-password)",
-        "id": "323076a0c39a6ee5829522ce7ba62aaf"
+        "path": "::user > POST / (fixture for forgot-password)"
       },
       {
+        "name": "auth > POST /forgot-password",
+        "path": "::auth > POST /forgot-password",
+        "id": "3143d5f0c110fd6935791bce9f9bcbc1",
         "groups": [],
         "checks": [
             {
-              "fails": 49,
+              "fails": 0,
               "name": "status is 200",
               "path": "::auth > POST /forgot-password::status is 200",
               "id": "ec9d8726d422a10297993d914effb85e",
-              "passes": 1
+              "passes": 50
             }
-          ],
-        "name": "auth > POST /forgot-password",
-        "path": "::auth > POST /forgot-password",
-        "id": "3143d5f0c110fd6935791bce9f9bcbc1"
+          ]
       },
       {
         "checks": [],
@@ -881,73 +834,7 @@
         "groups": []
       },
       {
-        "name": "auth > POST /forgot-password/verify-otp",
-        "path": "::auth > POST /forgot-password/verify-otp",
-        "id": "868707f1f623f0f8bce055fcf8ff5d94",
-        "groups": [],
-        "checks": [
-            {
-              "path": "::auth > POST /forgot-password/verify-otp::status is 200",
-              "id": "4b60c2faca2795ae6c80d473ee9f3f75",
-              "passes": 50,
-              "fails": 0,
-              "name": "status is 200"
-            },
-            {
-              "name": "resetToken present",
-              "path": "::auth > POST /forgot-password/verify-otp::resetToken present",
-              "id": "58a241ae774ff825de22ee6b02bdcef1",
-              "passes": 50,
-              "fails": 0
-            }
-          ]
-      },
-      {
-        "id": "e2bee27fc60e5271174dc1697a6371f1",
-        "groups": [],
-        "checks": [
-            {
-              "passes": 50,
-              "fails": 0,
-              "name": "status is 200",
-              "path": "::auth > POST /reset-password::status is 200",
-              "id": "f057849f349f1fe056129db2596af2b2"
-            }
-          ],
-        "name": "auth > POST /reset-password",
-        "path": "::auth > POST /reset-password"
-      },
-      {
-        "name": "auth > POST /login (with newly reset password)",
-        "path": "::auth > POST /login (with newly reset password)",
-        "id": "a64ee1bcfdf44d0c6f1322bb769a6def",
-        "groups": [],
-        "checks": [
-            {
-              "name": "status is 200",
-              "path": "::auth > POST /login (with newly reset password)::status is 200",
-              "id": "e46ed4bd9c345775c9ee2ed3a5bd1cfc",
-              "passes": 50,
-              "fails": 0
-            }
-          ]
-      },
-      {
-        "name": "auth > POST /change-password",
-        "path": "::auth > POST /change-password",
-        "id": "6c31eb0cd2e147ea44d60b2910000d60",
-        "groups": [],
-        "checks": [
-            {
-              "passes": 50,
-              "fails": 0,
-              "name": "status is 200",
-              "path": "::auth > POST /change-password::status is 200",
-              "id": "ef3eed2b5bce63b376cbbbaf8444475c"
-            }
-          ]
-      },
-      {
+        "path": "::auth > POST /admin/create",
         "id": "77aaaf8de38460e89a91efd8d11a7251",
         "groups": [],
         "checks": [
@@ -959,8 +846,7 @@
               "fails": 0
             }
           ],
-        "name": "auth > POST /admin/create",
-        "path": "::auth > POST /admin/create"
+        "name": "auth > POST /admin/create"
       },
       {
         "name": "auth > POST /login (as newly created admin)",
@@ -969,15 +855,18 @@
         "groups": [],
         "checks": [
             {
-              "id": "e3f5682eeb8124e5f126528680518e17",
               "passes": 50,
               "fails": 0,
               "name": "status is 200",
-              "path": "::auth > POST /login (as newly created admin)::status is 200"
+              "path": "::auth > POST /login (as newly created admin)::status is 200",
+              "id": "e3f5682eeb8124e5f126528680518e17"
             }
           ]
       },
       {
+        "name": "reject > Admin role hitting RBAC route -> 403",
+        "path": "::reject > Admin role hitting RBAC route -> 403",
+        "id": "3003c2385e6758ac6b9067dac227361f",
         "groups": [],
         "checks": [
             {
@@ -987,10 +876,7 @@
               "passes": 50,
               "fails": 0
             }
-          ],
-        "name": "reject > Admin role hitting RBAC route -> 403",
-        "path": "::reject > Admin role hitting RBAC route -> 403",
-        "id": "3003c2385e6758ac6b9067dac227361f"
+          ]
       },
       {
         "name": "permission boundary > Admin role hitting users.readAll route -> 200",
@@ -999,11 +885,11 @@
         "groups": [],
         "checks": [
             {
-              "fails": 0,
               "name": "status is 200",
               "path": "::permission boundary > Admin role hitting users.readAll route -> 200::status is 200",
               "id": "924dd6f4f771b8537ff017aa773a9a53",
-              "passes": 50
+              "passes": 50,
+              "fails": 0
             }
           ]
       }
@@ -1025,343 +911,31 @@
   "state": {
     "isStdOutTTY": true,
     "isStdErrTTY": true,
-    "testRunDurationMs": 616869.1758
+    "testRunDurationMs": 667635.7721
   },
   "metrics": {
-    "route_fail__DELETE_permission_overrides_id": {
-      "type": "counter",
-      "contains": "default",
+    "route_pass__DELETE_permission_overrides_id": {
       "values": {
-        "count": 53,
-        "rate": 0.08591773114820629
-      }
-    },
-    "route_pass__GET_roles_Admin_role_no_rbac_perms_403": {
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      },
-      "type": "counter"
-    },
-    "http_req_duration{expected_response:true}": {
-      "type": "trend",
-      "contains": "time",
-      "values": {
-        "p(90)": 588.9533,
-        "p(95)": 1101.32865,
-        "avg": 298.12288981925576,
-        "min": 0.5679,
-        "med": 141.4805,
-        "max": 3678.0719
-      }
-    },
-    "route_pass__POST_permission_overrides_grant_no_token_401": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 80,
-        "rate": 0.12968714135578308
-      }
-    },
-    "route_fail__POST_auth_register_email_request_otp": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 45,
-        "rate": 0.07294901701262799
-      }
-    },
-    "route_pass__GET_users": {
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
+        "count": 30,
+        "rate": 0.044934680335712344
       },
       "type": "counter",
       "contains": "default"
-    },
-    "http_req_waiting": {
-      "type": "trend",
-      "contains": "time",
-      "values": {
-        "avg": 342.1899471747016,
-        "min": 0.5061,
-        "med": 116.46289999999999,
-        "max": 3677.055,
-        "p(90)": 700.03278,
-        "p(95)": 2319.1428999999994
-      }
-    },
-    "route_pass__GET_users_deleted_id": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "rate": 0.08105446334736442,
-        "count": 50
-      }
-    },
-    "route_pass__POST_roles": {
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      },
-      "type": "counter",
-      "contains": "default"
-    },
-    "vus": {
-      "type": "gauge",
-      "contains": "default",
-      "values": {
-        "max": 25,
-        "value": 3,
-        "min": 0
-      }
-    },
-    "route_pass__DELETE_users_id_soft": {
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      },
-      "type": "counter"
-    },
-    "route_pass__DELETE_users_id_hard_true": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "route_pass__DELETE_roles_id_soft": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "group_duration": {
-      "type": "trend",
-      "contains": "time",
-      "values": {
-        "p(90)": 719.5635899999999,
-        "p(95)": 2342.654924999999,
-        "avg": 349.75744400000093,
-        "min": 1.3488,
-        "med": 116.7199,
-        "max": 3679.8088
-      }
-    },
-    "route_pass__POST_auth_login_invalid_401": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "rate": 0.12968714135578308,
-        "count": 80
-      }
-    },
-    "route_pass__GET_roles_deleted_id": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "rate": 0.08105446334736442,
-        "count": 50
-      }
-    },
-    "route_pass__POST_auth_forgot_password_verify_otp": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
     },
     "route_pass__POST_permission_overrides_grant": {
+      "type": "counter",
       "contains": "default",
       "values": {
         "count": 80,
-        "rate": 0.12968714135578308
-      },
-      "type": "counter"
-    },
-    "data_received": {
-      "type": "counter",
-      "contains": "data",
-      "values": {
-        "count": 14341090,
-        "rate": 23248.187075325088
+        "rate": 0.11982581422856625
       }
-    },
-    "route_pass__GET_users_Admin_role_has_users_readAll_200": {
-      "contains": "default",
-      "values": {
-        "rate": 0.08105446334736442,
-        "count": 50
-      },
-      "type": "counter"
-    },
-    "route_pass__PUT_roles_id_permissions": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "http_req_sending": {
-      "type": "trend",
-      "contains": "time",
-      "values": {
-        "p(95)": 0.5459449999999999,
-        "avg": 0.06720471747019183,
-        "min": 0,
-        "med": 0,
-        "max": 11.7914,
-        "p(90)": 0
-      }
-    },
-    "route_pass__PATCH_roles_id": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "http_req_failed": {
-      "contains": "default",
-      "values": {
-        "rate": 0.2973043027475376,
-        "passes": 1147,
-        "fails": 2711
-      },
-      "type": "rate"
     },
     "route_pass__GET_permissions_id": {
       "type": "counter",
       "contains": "default",
       "values": {
         "count": 80,
-        "rate": 0.12968714135578308
-      }
-    },
-    "route_pass__GET_roles_no_token_401": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 80,
-        "rate": 0.12968714135578308
-      }
-    },
-    "checks": {
-      "type": "rate",
-      "contains": "default",
-      "values": {
-        "rate": 0.9545454545454546,
-        "passes": 4200,
-        "fails": 200
-      },
-      "thresholds": {
-        "rate==1.0": {
-          "ok": false
-        }
-      }
-    },
-    "route_pass__POST_auth_register_email_verify_otp": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "route_pass__GET_roles": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "route_pass__GET_users_no_token_401": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 80,
-        "rate": 0.12968714135578308
-      }
-    },
-    "route_pass__PATCH_users_id": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "route_pass__POST_auth_register_complete": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "route_pass__PATCH_users_id_restore": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "route_pass__GET_roles_id_permissions": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "route_pass__GET_permission_overrides_user_userId": {
-      "values": {
-        "count": 80,
-        "rate": 0.12968714135578308
-      },
-      "type": "counter",
-      "contains": "default"
-    },
-    "route_pass__GET_users_id": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "data_sent": {
-      "values": {
-        "rate": 2101.2429391029395,
-        "count": 1296192
-      },
-      "type": "counter",
-      "contains": "data"
-    },
-    "route_pass__POST_auth_login_new_admin": {
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      },
-      "type": "counter",
-      "contains": "default"
-    },
-    "route_pass__GET_auth_me_valid_token": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 80,
-        "rate": 0.12968714135578308
+        "rate": 0.11982581422856625
       }
     },
     "route_pass__POST_auth_admin_create_no_token_401": {
@@ -1369,268 +943,127 @@
       "contains": "default",
       "values": {
         "count": 80,
-        "rate": 0.12968714135578308
+        "rate": 0.11982581422856625
       }
+    },
+    "route_pass__GET_users_deleted_id": {
+      "contains": "default",
+      "values": {
+        "count": 49,
+        "rate": 0.07339331121499683
+      },
+      "type": "counter"
     },
     "route_pass__GET_permissions_search": {
       "type": "counter",
       "contains": "default",
       "values": {
         "count": 80,
-        "rate": 0.12968714135578308
+        "rate": 0.11982581422856625
       }
     },
-    "route_pass__POST_auth_reset_password": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "rate": 0.08105446334736442,
-        "count": 50
-      }
-    },
-    "route_pass__PATCH_roles_id_restore": {
+    "route_pass__PUT_roles_id_permissions": {
       "type": "counter",
       "contains": "default",
       "values": {
         "count": 50,
-        "rate": 0.08105446334736442
+        "rate": 0.0748911338928539
       }
     },
-    "route_pass__GET_users_search": {
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      },
-      "type": "counter"
-    },
-    "route_pass__POST_auth_change_password": {
+    "route_pass__DELETE_roles_id_soft": {
       "type": "counter",
       "contains": "default",
       "values": {
         "count": 50,
-        "rate": 0.08105446334736442
+        "rate": 0.0748911338928539
       }
     },
-    "route_pass__GET_roles_deleted": {
-      "type": "counter",
-      "contains": "default",
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
       "values": {
-        "rate": 0.08105446334736442,
-        "count": 50
+        "avg": 1108.2303523625449,
+        "min": 221.1209,
+        "med": 532.2562,
+        "max": 18737.6214,
+        "p(90)": 1901.2207500000018,
+        "p(95)": 3909.6966250000014
       }
-    },
-    "route_pass__POST_auth_register_email_verify_otp_wrong_code_400": {
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      },
-      "type": "counter"
-    },
-    "route_pass__DELETE_permission_overrides_id": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 27,
-        "rate": 0.04376941020757679
-      }
-    },
-    "route_pass__GET_permissions": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 80,
-        "rate": 0.12968714135578308
-      }
-    },
-    "route_pass__POST_auth_admin_create": {
-      "contains": "default",
-      "values": {
-        "rate": 0.08105446334736442,
-        "count": 50
-      },
-      "type": "counter"
     },
     "route_pass__POST_auth_forgot_password": {
       "type": "counter",
       "contains": "default",
       "values": {
-        "count": 1,
-        "rate": 0.0016210892669472885
+        "count": 50,
+        "rate": 0.0748911338928539
       }
     },
-    "route_pass__GET_auth_me_no_token_401": {
+    "route_pass__GET_users_id": {
+      "values": {
+        "rate": 0.07339331121499683,
+        "count": 49
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "route_pass__GET_permission_overrides_user_userId": {
       "type": "counter",
       "contains": "default",
       "values": {
         "count": 80,
-        "rate": 0.12968714135578308
+        "rate": 0.11982581422856625
       }
     },
-    "route_pass__POST_users": {
-      "type": "counter",
-      "contains": "default",
+    "route_pass__POST_auth_admin_create": {
       "values": {
         "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "iterations": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "rate": 0.9240208821599544,
-        "count": 570
-      }
-    },
-    "route_pass__GET_roles_history_userId": {
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
+        "rate": 0.0748911338928539
       },
-      "type": "counter"
+      "type": "counter",
+      "contains": "default"
     },
-    "route_pass__GET_roles_id": {
+    "route_pass__PATCH_users_id": {
       "type": "counter",
       "contains": "default",
       "values": {
-        "rate": 0.08105446334736442,
-        "count": 50
+        "count": 49,
+        "rate": 0.07339331121499683
       }
-    },
-    "route_pass__GET_unknown_route_404": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "rate": 0.12968714135578308,
-        "count": 80
-      }
-    },
-    "route_pass__PATCH_roles_unassign_userId_userRoleId": {
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      },
-      "type": "counter"
     },
     "route_pass__GET_roles_malformed_token_401": {
       "type": "counter",
       "contains": "default",
       "values": {
         "count": 80,
-        "rate": 0.12968714135578308
+        "rate": 0.11982581422856625
       }
     },
-    "http_req_tls_handshaking": {
-      "type": "trend",
-      "contains": "time",
+    "http_req_sending": {
       "values": {
-        "avg": 0,
+        "p(95)": 0.50676,
+        "avg": 0.036257376075986905,
         "min": 0,
         "med": 0,
-        "max": 0,
-        "p(90)": 0,
-        "p(95)": 0
-      }
-    },
-    "route_pass__GET_auth_dev_otp": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "vus_max": {
-      "type": "gauge",
-      "contains": "default",
-      "values": {
-        "value": 50,
-        "min": 50,
-        "max": 50
-      }
-    },
-    "http_req_connecting": {
-      "type": "trend",
-      "contains": "time",
-      "values": {
-        "p(95)": 0,
-        "avg": 0.24919390876101605,
-        "min": 0,
-        "med": 0,
-        "max": 113.1962,
+        "max": 13.7259,
         "p(90)": 0
-      }
-    },
-    "http_req_blocked": {
+      },
       "type": "trend",
-      "contains": "time",
-      "values": {
-        "p(95)": 0,
-        "avg": 0.3257897096941425,
-        "min": 0,
-        "med": 0,
-        "max": 114.2003,
-        "p(90)": 0
-      }
+      "contains": "time"
     },
-    "route_pass__DELETE_roles_id_cleanup": {
+    "route_fail__GET_auth_dev_otp": {
       "type": "counter",
       "contains": "default",
       "values": {
         "count": 50,
-        "rate": 0.08105446334736442
+        "rate": 0.0748911338928539
       }
     },
-    "http_reqs": {
+    "route_pass__GET_users_search": {
       "type": "counter",
       "contains": "default",
       "values": {
-        "count": 3858,
-        "rate": 6.254162391882639
-      }
-    },
-    "route_pass__GET_permissions_id_unknown_404": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "rate": 0.12968714135578308,
-        "count": 80
-      }
-    },
-    "http_req_receiving": {
-      "type": "trend",
-      "contains": "time",
-      "values": {
-        "max": 235.2245,
-        "p(90)": 0.9984,
-        "p(95)": 1.0046,
-        "avg": 0.4579119751166399,
-        "min": 0,
-        "med": 0
-      }
-    },
-    "route_pass__POST_roles_assign_userId": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
-      }
-    },
-    "http_req_duration": {
-      "type": "trend",
-      "contains": "time",
-      "values": {
-        "min": 0.5669,
-        "med": 116.85335,
-        "max": 3678.0719,
-        "p(90)": 700.7000600000002,
-        "p(95)": 2319.1428999999994,
-        "avg": 342.7150638672885
+        "count": 49,
+        "rate": 0.07339331121499683
       }
     },
     "route_pass__GET_roles_search": {
@@ -1638,88 +1071,457 @@
       "contains": "default",
       "values": {
         "count": 50,
-        "rate": 0.08105446334736442
+        "rate": 0.0748911338928539
       }
     },
-    "route_fail__POST_auth_forgot_password": {
+    "data_received": {
       "type": "counter",
-      "contains": "default",
+      "contains": "data",
       "values": {
-        "count": 49,
-        "rate": 0.07943337408041713
+        "rate": 19887.72854132092,
+        "count": 13277759
       }
     },
-    "route_pass__GET_users_deleted": {
-      "type": "counter",
-      "contains": "default",
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
       "values": {
-        "count": 50,
-        "rate": 0.08105446334736442
+        "p(95)": 0,
+        "avg": 8.9043070940932,
+        "min": 0,
+        "med": 0,
+        "max": 293.8571,
+        "p(90)": 0
       }
     },
-    "route_pass__POST_permission_overrides_revoke": {
+    "route_pass__POST_permission_overrides_grant_no_token_401": {
       "values": {
         "count": 80,
-        "rate": 0.12968714135578308
+        "rate": 0.11982581422856625
       },
       "type": "counter",
       "contains": "default"
     },
-    "route_pass__GET_permissions_no_token_401": {
+    "route_pass__GET_unknown_route_404": {
       "type": "counter",
       "contains": "default",
       "values": {
         "count": 80,
-        "rate": 0.12968714135578308
+        "rate": 0.11982581422856625
+      }
+    },
+    "route_pass__GET_users": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 0.07339331121499683,
+        "count": 49
+      }
+    },
+    "route_pass__GET_auth_me_no_token_401": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 70,
+        "rate": 0.10484758744999546
+      }
+    },
+    "route_pass__GET_roles": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      }
+    },
+    "route_pass__POST_roles": {
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      },
+      "type": "counter"
+    },
+    "iterations": {
+      "contains": "default",
+      "values": {
+        "count": 570,
+        "rate": 0.8537589263785346
+      },
+      "type": "counter"
+    },
+    "route_pass__PATCH_users_id_restore": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 49,
+        "rate": 0.07339331121499683
+      }
+    },
+    "route_pass__DELETE_users_id_hard_true": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 49,
+        "rate": 0.07339331121499683
+      }
+    },
+    "http_req_receiving": {
+      "values": {
+        "min": 0,
+        "med": 0,
+        "max": 1468.3417,
+        "p(90)": 0.93376,
+        "p(95)": 1.00216,
+        "avg": 13.654635975066782
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "route_pass__GET_permissions": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 80,
+        "rate": 0.11982581422856625
+      }
+    },
+    "route_pass__GET_users_no_token_401": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 80,
+        "rate": 0.11982581422856625
+      }
+    },
+    "route_pass__POST_auth_login_new_admin": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      }
+    },
+    "vus": {
+      "values": {
+        "value": 2,
+        "min": 0,
+        "max": 42
+      },
+      "type": "gauge",
+      "contains": "default"
+    },
+    "route_pass__GET_roles_deleted": {
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      },
+      "type": "counter"
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 3369,
+        "rate": 5.046164601700496
+      }
+    },
+    "route_pass__GET_auth_me_valid_token": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 70,
+        "rate": 0.10484758744999546
       }
     },
     "route_pass__POST_auth_register_email_request_otp": {
       "type": "counter",
       "contains": "default",
       "values": {
-        "count": 5,
-        "rate": 0.008105446334736442
+        "rate": 0.0748911338928539,
+        "count": 50
+      }
+    },
+    "route_pass__GET_permissions_no_token_401": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 80,
+        "rate": 0.11982581422856625
+      }
+    },
+    "route_pass__POST_roles_assign_userId": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 0.0748911338928539,
+        "count": 50
+      }
+    },
+    "route_pass__GET_roles_id": {
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      },
+      "type": "counter"
+    },
+    "route_pass__GET_users_deleted": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 0.07339331121499683,
+        "count": 49
+      }
+    },
+    "route_pass__GET_roles_id_permissions": {
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      },
+      "type": "counter"
+    },
+    "route_fail__DELETE_permission_overrides_id": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      }
+    },
+    "checks": {
+      "thresholds": {
+        "rate==1.0": {
+          "ok": false
+        }
+      },
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0.9423076923076923,
+        "passes": 3626,
+        "fails": 222
+      }
+    },
+    "route_pass__GET_permissions_id_unknown_404": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 80,
+        "rate": 0.11982581422856625
+      }
+    },
+    "route_pass__PATCH_roles_id_restore": {
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "group_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 2268.0954,
+        "p(95)": 5149.28325,
+        "avg": 1138.2426853518525,
+        "min": 26.1546,
+        "med": 464.7933,
+        "max": 20009.0898
+      }
+    },
+    "route_pass__POST_auth_login_invalid_401": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 70,
+        "rate": 0.10484758744999546
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 1459964,
+        "rate": 2186.767188054931
+      }
+    },
+    "route_pass__PATCH_roles_unassign_userId_userRoleId": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      }
+    },
+    "route_pass__PATCH_roles_id": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
       }
     },
     "iteration_duration": {
       "type": "trend",
       "contains": "time",
       "values": {
-        "p(90)": 4749.813510000001,
-        "p(95)": 5049.925325,
-        "avg": 2324.7221978947377,
-        "min": 221.8041,
-        "med": 2181.3988,
-        "max": 5910.8595
+        "avg": 6669.377584736844,
+        "min": 26.1546,
+        "med": 3221.27695,
+        "max": 32770.9228,
+        "p(90)": 20325.03638,
+        "p(95)": 26916.66560999999
       }
     },
-    "route_pass__POST_auth_login_valid": {
-      "type": "counter",
-      "contains": "default",
-      "values": {
-        "count": 80,
-        "rate": 0.12968714135578308
-      }
-    },
-    "route_pass__POST_auth_login_post_password_reset": {
+    "route_pass__GET_roles_Admin_role_no_rbac_perms_403": {
       "type": "counter",
       "contains": "default",
       "values": {
         "count": 50,
-        "rate": 0.08105446334736442
+        "rate": 0.0748911338928539
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 12.454375126150197,
+        "min": 0,
+        "med": 0,
+        "max": 567.0231,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "route_pass__GET_roles_no_token_401": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 80,
+        "rate": 0.11982581422856625
+      }
+    },
+    "route_pass__POST_auth_login_valid": {
+      "contains": "default",
+      "values": {
+        "count": 70,
+        "rate": 0.10484758744999546
+      },
+      "type": "counter"
+    },
+    "route_pass__POST_permission_overrides_revoke": {
+      "contains": "default",
+      "values": {
+        "count": 80,
+        "rate": 0.11982581422856625
+      },
+      "type": "counter"
+    },
+    "route_pass__GET_users_Admin_role_has_users_readAll_200": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      }
+    },
+    "route_pass__GET_roles_history_userId": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      }
+    },
+    "route_pass__POST_users": {
+      "values": {
+        "count": 49,
+        "rate": 0.07339331121499683
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "route_pass__DELETE_users_id_soft": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 0.07339331121499683,
+        "count": 49
+      }
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 1094.2468243098833,
+        "min": 24.4104,
+        "med": 459.9269,
+        "max": 19503.0621,
+        "p(90)": 1957.2580200000173,
+        "p(95)": 5007.144859999987
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 2116.362080000009,
+        "p(95)": 5007.817719999986,
+        "avg": 1107.9377176610242,
+        "min": 24.4104,
+        "med": 460.5664,
+        "max": 19503.0621
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 0,
+        "p(95)": 0,
+        "avg": 21.400433541110125,
+        "min": 0,
+        "med": 0,
+        "max": 855.7589
+      }
+    },
+    "route_pass__DELETE_roles_id_cleanup": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      }
+    },
+    "http_req_failed": {
+      "values": {
+        "rate": 0.3089937666963491,
+        "passes": 1041,
+        "fails": 2328
+      },
+      "type": "rate",
+      "contains": "default"
+    },
+    "route_pass__GET_roles_deleted_id": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 50,
+        "rate": 0.0748911338928539
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "min": 50,
+        "max": 50,
+        "value": 50
       }
     }
-  },
-  "setup_data": {
-    "moderatorRoleId": "b0535a91-143d-411b-b385-2c563d8bb680",
-    "overrideTargetUserIds": [
-      "7278c779-a914-4395-9ec0-1aff55be589c",
-      "001e1576-81e0-447c-a7ec-62cab3cfdec4",
-      "60481173-e93a-48b9-bfd5-55e3eede4f7e",
-      "bbc23174-d154-4518-b9e9-a64af84324b2",
-      "8340a6ff-092a-4240-a0c8-86913dc51e43"
-    ],
-    "samplePermissionId": "d504a0c4-d129-4f5a-bdee-8f610600efd4",
-    "superAdminToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjdkNWMyOGEzLTQwZDMtNDBhYi04N2RmLTAyYjA4ZmYzZWJhYyIsImlhdCI6MTc4Mjk4MjczOCwiZXhwIjoxNzgzNTg3NTM4fQ.bDITWThYSC8cFd7TO3ObIPV53BcLF817e19r8ERYfD0"
   }
 }

@@ -1,0 +1,12 @@
+{
+  "subject": "Bienvenue sur Mentora — Votre compte administrateur est prêt",
+  "title": "Bienvenue, {{firstName}} !",
+  "intro": "Votre compte administrateur Mentora a été créé. Voici vos identifiants de connexion. Veuillez vous connecter et <strong style=\"color:#c62828;\">changer votre mot de passe immédiatement.</strong>",
+  "credentialsLabel": "Vos identifiants",
+  "emailLabel": "E-mail",
+  "passwordLabel": "Mot de passe",
+  "rolesLabel": "Rôles",
+  "warning": "Ce mot de passe est temporaire. Pour votre sécurité, veuillez le modifier dès votre connexion. Ne partagez ces identifiants avec personne.",
+  "footerNote": "Si vous ne vous attendiez pas à cet e-mail, veuillez contacter immédiatement votre administrateur système.",
+  "plainTextBody": "Bienvenue {{firstName}} ! E-mail : {{email}} Mot de passe : {{password}} Veuillez changer votre mot de passe immédiatement."
+}

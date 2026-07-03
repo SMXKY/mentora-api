@@ -31,18 +31,25 @@ export function parseAcceptLanguage(
   return null;
 }
 
+/**
+ * Resolves the language for this request from the Accept-Language header
+ * (or the X-Lang override header, e.g. for clients that can't set
+ * Accept-Language directly), falling back to FALLBACK_LANGUAGE.
+ *
+ * Runs as global middleware, before `protect`, so it never has access to
+ * an authenticated user — this is deliberate: server-generated content
+ * (API error messages, emails, SMS) is localized from what the client
+ * told us it wants for *this request*, not a stored profile preference.
+ */
 export function resolveLocale() {
   return (req: Request, res: Response, next: NextFunction) => {
-    const userPreference = (
-      req as Request & { user?: { preferredLanguage?: unknown } }
-    ).user?.preferredLanguage;
+    const xLangHeader = req.headers["x-lang"];
+    const xLang = Array.isArray(xLangHeader) ? xLangHeader[0] : xLangHeader;
 
-    if (isSupportedLanguage(userPreference)) {
-      res.locals.lang = userPreference;
-      return next();
-    }
+    const headerLanguage =
+      (isSupportedLanguage(xLang) ? xLang : null) ??
+      parseAcceptLanguage(req.headers["accept-language"]);
 
-    const headerLanguage = parseAcceptLanguage(req.headers["accept-language"]);
     res.locals.lang = headerLanguage ?? FALLBACK_LANGUAGE;
 
     next();

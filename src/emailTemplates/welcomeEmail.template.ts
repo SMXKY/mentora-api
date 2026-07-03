@@ -1,15 +1,27 @@
+import { t } from "../shared/i18n/t";
+import type { SupportedLanguage } from "../shared/i18n/init";
+
 export const buildAdminWelcomeEmailTemplate = (params: {
   firstName: string;
   email: string;
   password: string;
   roles: string[];
-}): string => `
+  lng: SupportedLanguage;
+}): string => {
+  const { lng } = params;
+  const tt = (
+    key: string,
+    fallback: string,
+    opts: Record<string, unknown> = {}
+  ) => t(`email/welcome:${key}`, fallback, { lng, ...opts });
+
+  return `
   <!DOCTYPE html>
-  <html lang="en">
+  <html lang="${lng}">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Welcome to Mentora</title>
+      <title>${tt("subject", "Welcome to Mentora")}</title>
     </head>
     <body style="margin:0;padding:0;background-color:#f0f2f7;font-family:'Segoe UI',Arial,sans-serif;">
       <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f2f7;padding:48px 0;">
@@ -126,3 +138,4 @@ export const buildAdminWelcomeEmailTemplate = (params: {
     </body>
   </html>
   `;
+};

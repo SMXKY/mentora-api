@@ -27,6 +27,26 @@ export function formatDate(
   }).format(d);
 }
 
+/**
+ * Date + time, locale-formatted (e.g. transactional email timestamps).
+ * en -> "July 2, 2026, 9:56 AM" / fr -> "2 juillet 2026, 09:56"
+ */
+export function formatDateTime(
+  date: Date | string | number,
+  lng: SupportedLanguage
+): string {
+  const d = date instanceof Date ? date : new Date(date);
+
+  if (Number.isNaN(d.getTime())) {
+    throw new Error(`formatDateTime: invalid date input: ${String(date)}`);
+  }
+
+  return new Intl.DateTimeFormat(DATE_LOCALE_MAP[lng], {
+    dateStyle: "long",
+    timeStyle: "short",
+  }).format(d);
+}
+
 export function formatCurrencyXAF(
   amount: number,
   lng: SupportedLanguage
