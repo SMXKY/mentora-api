@@ -14,7 +14,7 @@ import {
   CreateNotificationInput,
   NOTIFICATION_ERROR_KEYS,
 } from "./notification.types";
-import { queueChannelDelivery } from "./notification.queue";
+import { queueChannelDeliveryBulk } from "./notification.queue";
 
 const MAX_BATCH_SIZE = Number(process.env.NOTIFICATION_MAX_BATCH_SIZE) || 5000;
 const DEFAULT_PAGE_SIZE = 20;
@@ -127,37 +127,38 @@ async function send(input: CreateNotificationInput): Promise<Notification[]> {
     );
   }
 
-  const recipientIds = (await resolveRecipients(input.target)).slice(
-    0,
-    MAX_BATCH_SIZE
-  );
+  const allRecipientIds = await resolveRecipients(input.target);
+  if (allRecipientIds.length > MAX_BATCH_SIZE) {
+    // Never silently drop recipients — cap but say so loudly.
+    console.error({
+      event: "notification_batch_truncated",
+      type: input.type,
+      resolved: allRecipientIds.length,
+      cap: MAX_BATCH_SIZE,
+    });
+  }
+  const recipientIds = allRecipientIds.slice(0, MAX_BATCH_SIZE);
   if (recipientIds.length === 0) return [];
 
-  // 1. Write in-app record synchronously — this write is guaranteed regardless
-  //    of what happens to email/push/whatsapp/sms afterward.
-  const notifications = await prisma.$transaction(
-    recipientIds.map((recipientId) =>
-      prisma.notification.create({
-        data: {
-          type: input.type,
-          recipientId,
-          titleCode: definition.titleCode,
-          bodyCode: definition.bodyCode,
-          data: input.data
-            ? (input.data as Prisma.InputJsonValue)
-            : Prisma.JsonNull,
-          isTransactional: definition.isTransactional,
-          resourceType: input.resourceType,
-          resourceId: String(input.resourceId),
-        },
-      })
-    )
-  );
+  // 1. Write in-app records synchronously — this write is guaranteed
+  //    regardless of what happens to email/push/whatsapp/sms afterward.
+  const notifications = await prisma.notification.createManyAndReturn({
+    data: recipientIds.map((recipientId) => ({
+      type: input.type,
+      recipientId,
+      titleCode: definition.titleCode,
+      bodyCode: definition.bodyCode,
+      data: input.data
+        ? (input.data as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
+      isTransactional: definition.isTransactional,
+      resourceType: input.resourceType,
+      resourceId: input.resourceId,
+    })),
+  });
 
-  // 2. Queue external channel delivery — never blocks the caller.
-  for (const notification of notifications) {
-    await queueChannelDelivery(notification.id);
-  }
+  // 2. Queue external channel delivery in one bulk call — never blocks the caller.
+  await queueChannelDeliveryBulk(notifications.map((n) => n.id));
 
   return notifications;
 }
@@ -169,13 +170,15 @@ async function getForUser(
 ) {
   const limit = Math.min(options.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
+  // Cursor must follow the sort order — ids are random UUIDs, so the
+  // cursor is the notification row itself with a stable tiebreaker.
   const notifications = await prisma.notification.findMany({
-    where: {
-      recipientId: userId,
-      deletedAt: null,
-      ...(options.cursor && { id: { lt: options.cursor } }),
-    },
-    orderBy: { createdAt: "desc" },
+    where: { recipientId: userId, deletedAt: null },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    ...(options.cursor && {
+      cursor: { id: options.cursor },
+      skip: 1,
+    }),
     take: limit + 1,
   });
 

@@ -21,6 +21,13 @@ async function callGraphApi(
     },
     body: JSON.stringify(payload),
   });
+  if (!res.ok) {
+    console.error({
+      event: "whatsapp_graph_api_error",
+      status: res.status,
+      body: await res.text().catch(() => ""),
+    });
+  }
   return res.ok;
 }
 
@@ -70,7 +77,12 @@ export async function sendWhatsappChannel(
         ],
       },
     });
-  } catch {
+  } catch (err) {
+    console.error({
+      event: "whatsapp_channel_send_failed",
+      notificationId: notification.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return false;
   }
 }
@@ -112,17 +124,19 @@ export function verifyWebhookChallenge(
 
 /** Validates the X-Hub-Signature-256 header Meta sends on every webhook POST. */
 export function verifyWebhookSignature(
-  rawBody: string,
+  rawBody: Buffer | string,
   signatureHeader: string | undefined
 ): boolean {
   if (!signatureHeader || !APP_SECRET) return false;
   const expected =
     "sha256=" +
     crypto.createHmac("sha256", APP_SECRET).update(rawBody).digest("hex");
-  return crypto.timingSafeEqual(
-    Buffer.from(expected),
-    Buffer.from(signatureHeader)
-  );
+  const expectedBuf = Buffer.from(expected);
+  const receivedBuf = Buffer.from(signatureHeader);
+  // timingSafeEqual throws on length mismatch — a crafted header must be
+  // a clean `false`, never an exception.
+  if (expectedBuf.length !== receivedBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, receivedBuf);
 }
 
 /**
@@ -140,10 +154,21 @@ export async function handleInboundWebhook(body: any): Promise<void> {
     if (!fromNumber || !text) continue;
 
     if (text.trim().toUpperCase() === "STOP") {
-      await prisma.user.updateMany({
-        where: { whatsappNumber: fromNumber },
+      // Meta sends `from` without a leading "+" — we store numbers as
+      // "+237…". Match both shapes so STOP always lands.
+      const candidates = fromNumber.startsWith("+")
+        ? [fromNumber, fromNumber.slice(1)]
+        : [fromNumber, `+${fromNumber}`];
+      const result = await prisma.user.updateMany({
+        where: { whatsappNumber: { in: candidates } },
         data: { whatsappOptIn: false },
       });
+      if (result.count === 0) {
+        console.warn({
+          event: "whatsapp_stop_unmatched",
+          fromNumber,
+        });
+      }
     }
   }
 }

@@ -1059,6 +1059,7 @@ model File {
   scanCompletedAt DateTime? @map("scan_completed_at")
   isDisputeLocked Boolean   @default(false) @map("is_dispute_locked")
   deletedAt       DateTime? @map("deleted_at")
+  purgedAt        DateTime? @map("purged_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
@@ -1924,7 +1925,7 @@ model Notification {
   createdAt   DateTime         @default(now()) @map("created_at")
   deletedAt   DateTime?        @map("deleted_at")
   resourceType NotificationResourceType? @map("resource_type")
-  resourceId   String
+  resourceId   String?
 
   recipient  User                     @relation(fields: [recipientId], references: [id])
   deliveries NotificationDelivery[]

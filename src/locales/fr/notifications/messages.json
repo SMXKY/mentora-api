@@ -1,0 +1,246 @@
+{
+  "account_created": {
+    "title": "Bienvenue sur Mentora",
+    "body": "Votre compte a été créé avec succès. Complétez votre profil pour commencer."
+  },
+  "email_verification": {
+    "title": "Vérifiez votre adresse e-mail",
+    "body": "Veuillez vérifier votre adresse e-mail pour activer votre compte."
+  },
+  "password_reset": {
+    "title": "Réinitialisation de mot de passe demandée",
+    "body": "Une réinitialisation de mot de passe a été demandée pour votre compte. Si ce n'était pas vous, sécurisez votre compte immédiatement."
+  },
+  "new_device_login": {
+    "title": "Connexion depuis un nouvel appareil",
+    "body": "Votre compte vient d'être utilisé depuis un nouvel appareil. Si ce n'était pas vous, changez votre mot de passe immédiatement."
+  },
+  "account_suspended": {
+    "title": "Compte suspendu",
+    "body": "Votre compte a été suspendu. Contactez le support pour plus d'informations."
+  },
+  "account_unsuspended": {
+    "title": "Compte rétabli",
+    "body": "Votre compte a été rétabli. Bon retour parmi nous."
+  },
+  "two_factor_locked": {
+    "title": "Compte temporairement verrouillé",
+    "body": "Trop de tentatives de vérification échouées. Votre compte est temporairement verrouillé."
+  },
+  "kyc_submitted": {
+    "title": "Documents de vérification reçus",
+    "body": "Nous avons reçu vos documents d'identité. Nous vous informerons une fois l'examen terminé."
+  },
+  "kyc_identity_approved": {
+    "title": "Identité vérifiée",
+    "body": "Votre identité a été vérifiée. Il reste quelques étapes pour finaliser votre vérification."
+  },
+  "kyc_approved": {
+    "title": "Vérification approuvée",
+    "body": "Félicitations — votre vérification est terminée. Vous avez désormais un accès complet."
+  },
+  "kyc_rejected": {
+    "title": "Vérification non approuvée",
+    "body": "Votre vérification n'a pas pu être approuvée. Consultez les remarques et soumettez à nouveau."
+  },
+  "kyc_sla_breach": {
+    "title": "La vérification prend plus de temps que prévu",
+    "body": "L'examen de votre vérification prend plus de temps que prévu. Merci de votre patience."
+  },
+  "kyc_banned": {
+    "title": "Vérification définitivement refusée",
+    "body": "Votre vérification a été définitivement refusée. Contactez le support si vous pensez qu'il s'agit d'une erreur."
+  },
+  "kyc_reverification_required": {
+    "title": "Nouvelle vérification requise",
+    "body": "Vous devez vérifier à nouveau votre identité pour garder votre compte actif."
+  },
+  "booking_requested": {
+    "title": "Nouvelle demande de réservation",
+    "body": "Vous avez une nouvelle demande de réservation en attente de réponse."
+  },
+  "booking_accepted": {
+    "title": "Réservation acceptée",
+    "body": "Votre demande de réservation a été acceptée."
+  },
+  "booking_rejected": {
+    "title": "Réservation refusée",
+    "body": "Votre demande de réservation a été refusée."
+  },
+  "booking_cancelled_by_tutor": {
+    "title": "Réservation annulée par le tuteur",
+    "body": "Votre tuteur a annulé la réservation. Vous ne serez pas facturé."
+  },
+  "booking_cancelled_by_parent": {
+    "title": "Réservation annulée",
+    "body": "La réservation a été annulée par le parent."
+  },
+  "booking_cancelled_unpaid": {
+    "title": "Réservation annulée — paiement non reçu",
+    "body": "La réservation a été annulée car le paiement n'a pas été effectué à temps."
+  },
+  "payment_window_reminder": {
+    "title": "Rappel de paiement",
+    "body": "Votre réservation est en attente de paiement. Finalisez le paiement pour la confirmer."
+  },
+  "reschedule_requested": {
+    "title": "Report demandé",
+    "body": "Un report a été demandé pour votre séance."
+  },
+  "reschedule_accepted": {
+    "title": "Report accepté",
+    "body": "Votre demande de report a été acceptée."
+  },
+  "reschedule_rejected": {
+    "title": "Report refusé",
+    "body": "Votre demande de report a été refusée. L'horaire initial est maintenu."
+  },
+  "session_reminder_24hr": {
+    "title": "Séance demain",
+    "body": "Vous avez une séance prévue dans 24 heures."
+  },
+  "session_reminder_1hr": {
+    "title": "Séance dans 1 heure",
+    "body": "Votre séance commence dans 1 heure. Préparez-vous !"
+  },
+  "session_checkin_reminder": {
+    "title": "C'est l'heure de pointer",
+    "body": "Votre séance commence — veuillez pointer maintenant."
+  },
+  "session_checkin_overdue": {
+    "title": "Pointage en retard",
+    "body": "Votre séance a commencé mais vous n'avez pas encore pointé."
+  },
+  "session_tutor_disconnected": {
+    "title": "Tuteur déconnecté",
+    "body": "Votre tuteur a perdu la connexion pendant la séance. Il devrait revenir sous peu."
+  },
+  "session_no_show": {
+    "title": "Séance marquée comme absence",
+    "body": "Un participant ne s'est pas présenté à la séance prévue."
+  },
+  "payment_confirmed": {
+    "title": "Paiement confirmé",
+    "body": "Votre paiement a été reçu et confirmé. Merci."
+  },
+  "wallet_topped_up": {
+    "title": "Portefeuille rechargé",
+    "body": "Le rechargement de votre portefeuille a réussi."
+  },
+  "wallet_withdrawal_initiated": {
+    "title": "Retrait initié",
+    "body": "Votre demande de retrait a été initiée et est en cours de traitement."
+  },
+  "withdrawal_failed": {
+    "title": "Échec du retrait",
+    "body": "Votre retrait n'a pas pu être effectué. Les fonds restent dans votre portefeuille."
+  },
+  "escrow_released": {
+    "title": "Fonds libérés",
+    "body": "Les fonds de votre séance terminée ont été libérés."
+  },
+  "refund_issued": {
+    "title": "Remboursement effectué",
+    "body": "Un remboursement vous a été accordé."
+  },
+  "payout_account_added": {
+    "title": "Compte de paiement ajouté",
+    "body": "Un nouveau compte de paiement a été ajouté à votre profil. Si ce n'était pas vous, contactez le support."
+  },
+  "monthly_fee_deducted": {
+    "title": "Frais mensuels prélevés",
+    "body": "Vos frais mensuels de plateforme ont été prélevés."
+  },
+  "monthly_fee_failed": {
+    "title": "Échec du prélèvement des frais mensuels",
+    "body": "Nous n'avons pas pu prélever vos frais mensuels. Veuillez recharger votre portefeuille."
+  },
+  "payment_reconciliation_pending": {
+    "title": "Paiement en cours de vérification",
+    "body": "Votre paiement est en cours de rapprochement. Nous le confirmerons sous peu."
+  },
+  "lesson_awaiting_confirmation": {
+    "title": "Confirmez votre leçon",
+    "body": "Une leçon terminée attend votre confirmation."
+  },
+  "lesson_confirmed": {
+    "title": "Leçon confirmée",
+    "body": "La leçon a été confirmée."
+  },
+  "lesson_auto_confirmed": {
+    "title": "Leçon confirmée automatiquement",
+    "body": "La leçon a été confirmée automatiquement après la fermeture de la fenêtre de validation."
+  },
+  "dispute_opened": {
+    "title": "Litige ouvert",
+    "body": "Un litige a été ouvert sur l'une de vos séances."
+  },
+  "dispute_tutor_response_reminder": {
+    "title": "Réponse au litige attendue",
+    "body": "Un litige attend votre réponse. Veuillez répondre avant l'échéance."
+  },
+  "dispute_resolved": {
+    "title": "Litige résolu",
+    "body": "Le litige a été résolu. Consultez le résultat dans l'application."
+  },
+  "dispute_escalated": {
+    "title": "Litige transmis",
+    "body": "Le litige a été transmis à l'équipe Mentora pour examen."
+  },
+  "review_window_opened": {
+    "title": "Laissez un avis",
+    "body": "Votre séance est terminée — partagez votre expérience en laissant un avis."
+  },
+  "review_received": {
+    "title": "Nouvel avis reçu",
+    "body": "Vous avez reçu un nouvel avis."
+  },
+  "review_response_submitted": {
+    "title": "Réponse à votre avis",
+    "body": "Une réponse a été publiée à votre avis."
+  },
+  "account_flagged": {
+    "title": "Compte signalé",
+    "body": "Votre compte a été signalé pour examen. Certaines fonctionnalités peuvent être limitées."
+  },
+  "reauth_required": {
+    "title": "Veuillez vous reconnecter",
+    "body": "Pour votre sécurité, vous devez vous reconnecter."
+  },
+  "support_ticket_opened": {
+    "title": "Ticket de support créé",
+    "body": "Votre ticket de support a été créé. Nous vous répondrons bientôt."
+  },
+  "support_ticket_response": {
+    "title": "Réponse du support",
+    "body": "Il y a une nouvelle réponse sur votre ticket de support."
+  },
+  "support_ticket_resolved": {
+    "title": "Ticket de support résolu",
+    "body": "Votre ticket de support a été marqué comme résolu."
+  },
+  "material_removed": {
+    "title": "Contenu retiré",
+    "body": "L'un de vos supports pédagogiques a été retiré à la suite d'un examen."
+  },
+  "material_access_granted": {
+    "title": "Nouveau contenu disponible",
+    "body": "Vous avez reçu l'accès à un nouveau support pédagogique."
+  },
+  "platform_outage_refund": {
+    "title": "Remboursement pour interruption de service",
+    "body": "Une séance affectée par une panne de la plateforme a été remboursée."
+  },
+  "scheduled_maintenance": {
+    "title": "Maintenance planifiée",
+    "body": "Mentora sera brièvement indisponible pour une maintenance planifiée."
+  },
+  "new_message_received": {
+    "title": "Nouveau message",
+    "body": "Vous avez un nouveau message."
+  },
+  "other": {
+    "title": "Notification",
+    "body": "Vous avez une nouvelle notification."
+  }
+}

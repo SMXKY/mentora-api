@@ -15,7 +15,7 @@ export const CreateNotificationSchema = z
     isTransactional: z.boolean(),
     readAt: z.string().datetime().optional(),
     resourceType: z.string().optional(),
-    resourceId: z.string(),
+    resourceId: z.string().optional(),
   })
   .openapi("CreateNotification");
 
@@ -41,7 +41,7 @@ export const NotificationResponseSchema = z
     isTransactional: z.boolean(),
     readAt: z.string().datetime().optional(),
     resourceType: z.string().optional(),
-    resourceId: z.string(),
+    resourceId: z.string().nullable().optional(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
   })

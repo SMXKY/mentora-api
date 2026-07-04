@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import multer from "multer";
 import { AppError } from "./AppError.util";
 import { t } from "../shared/i18n/t";
 import { StatusCodes } from "http-status-codes";
@@ -45,6 +46,20 @@ export const globalErrorController = (
 ) => {
   if (res.headersSent) {
     return next(err);
+  }
+
+  // Multer throws its own error type for multipart problems — map the
+  // hard size cap to 413 and everything else it raises to 400.
+  if (err instanceof multer.MulterError) {
+    err = new AppError(
+      err.code === "LIMIT_FILE_SIZE"
+        ? "media/errors:fileTooLarge"
+        : "common/errors:validation.invalidFormat",
+      err.code === "LIMIT_FILE_SIZE"
+        ? StatusCodes.REQUEST_TOO_LONG
+        : StatusCodes.BAD_REQUEST,
+      { multerCode: err.code }
+    );
   }
 
   const error = AppError.from(err);

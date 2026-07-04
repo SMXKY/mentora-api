@@ -23,3 +23,23 @@ export interface StorageAdapter {
   /** Fetch a file from permanent storage down to a local temp path for processing. */
   fetchToTemp(relativePath: string, destTempPath: string): Promise<void>;
 }
+
+/**
+ * Shared guard for every adapter: a relativePath is only ever
+ * `<category-folder>/<file-name>` built by MediaService. Anything with
+ * traversal segments, absolute roots, or null bytes is refused outright.
+ */
+export function assertSafeRelativePath(relativePath: string): void {
+  const hasTraversal = relativePath
+    .split(/[\\/]/)
+    .some((segment) => segment === ".." || segment === "");
+  if (
+    hasTraversal ||
+    relativePath.startsWith("/") ||
+    relativePath.startsWith("\\") ||
+    /^[a-zA-Z]:/.test(relativePath) ||
+    relativePath.includes("\0")
+  ) {
+    throw new Error(`Unsafe storage path: ${relativePath}`);
+  }
+}

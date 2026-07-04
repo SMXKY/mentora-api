@@ -19,6 +19,8 @@ import permissionOverideRouter from "./modules/permissionOverride";
 import userRouter from "./modules/user";
 import auditLogRouter from "./modules/auditLog";
 import notificationRouter from "./modules/notification";
+import notificationWebhookRouter from "./services/notification/notification.webhook.route";
+import mediaRouter from "./modules/media";
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -61,6 +63,11 @@ app.use(
 
 app.use(requestId);
 app.use(resolveLocale());
+
+// Mounted before express.json — the WhatsApp webhook verifies an HMAC over
+// the raw request bytes, so its body must never be parsed by the global
+// JSON middleware first.
+app.use("/api/v1", notificationWebhookRouter);
 
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
@@ -130,6 +137,7 @@ app.use("/api/v1/permission-overrides", permissionOverideRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/audit-logs", auditLogRouter);
 app.use("/api/v1/notifications", notificationRouter);
+app.use("/api/v1/media", mediaRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(

@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import express, { Router, Request, Response } from "express";
 import {
   verifyWebhookChallenge,
   verifyWebhookSignature,
@@ -22,21 +22,37 @@ router.get("/webhooks/whatsapp", (req: Request, res: Response) => {
 });
 
 // Inbound events — message delivery status, and user replies (e.g. STOP).
-// IMPORTANT: this route must receive the raw body for signature verification.
-// Register with express.raw({ type: "application/json" }) ahead of express.json()
-// for this specific path, or capture rawBody via a verify callback on express.json().
-router.post("/webhooks/whatsapp", async (req: Request, res: Response) => {
-  const signature = req.headers["x-hub-signature-256"] as string | undefined;
-  const rawBody = (req as any).rawBody ?? JSON.stringify(req.body);
+// This router is mounted in app.ts BEFORE the global express.json(), and
+// uses express.raw here so the HMAC is computed over the exact bytes Meta
+// sent — a re-serialized JSON body would never match the signature.
+router.post(
+  "/webhooks/whatsapp",
+  express.raw({ type: "application/json", limit: "1mb" }),
+  async (req: Request, res: Response) => {
+    try {
+      const signature = req.headers["x-hub-signature-256"] as
+        | string
+        | undefined;
+      const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
 
-  if (!verifyWebhookSignature(rawBody, signature)) {
-    return res.sendStatus(401);
+      if (!verifyWebhookSignature(rawBody, signature)) {
+        res.sendStatus(401);
+        return;
+      }
+
+      // Respond fast — Meta expects 200 within 5 seconds; STOP-processing
+      // is a single lightweight DB write so it stays inline.
+      const body = JSON.parse(rawBody.toString("utf8"));
+      await handleInboundWebhook(body);
+      res.sendStatus(200);
+    } catch (err) {
+      console.error({
+        event: "whatsapp_webhook_error",
+        error: err instanceof Error ? err.message : String(err),
+      });
+      res.sendStatus(400);
+    }
   }
-
-  // Respond fast — Meta expects 200 within 5 seconds, heavy work is inline
-  // here only because STOP-processing is a single lightweight DB write.
-  await handleInboundWebhook(req.body);
-  res.sendStatus(200);
-});
+);
 
 export default router;

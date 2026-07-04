@@ -30,47 +30,55 @@ async function resolveQuotaLimitBytes(userId: string): Promise<bigint> {
   return BigInt(500 * 1024 * 1024); // 500MB
 }
 
+async function ensureUsageRow(userId: string): Promise<void> {
+  await prisma.storageUsage.upsert({
+    where: { userId },
+    create: { userId, usedBytes: BigInt(0) },
+    update: {},
+  });
+}
+
 /**
- * Checks the pessimistic (pre-processing) size against remaining quota.
- * Throws before any upload work begins if it would exceed the limit.
+ * Atomically reserves `incomingSizeBytes` against the user's quota.
+ * The check and the increment happen in one conditional UPDATE, so two
+ * concurrent uploads can never both slip under the limit.
+ * Throws quotaExceeded (and reserves nothing) if it would go over.
  */
-export async function assertWithinQuota(
+export async function reserveQuota(
   userId: string,
   incomingSizeBytes: number
 ): Promise<void> {
-  const [usage, limitBytes] = await Promise.all([
-    prisma.storageUsage.findUnique({ where: { userId } }),
-    resolveQuotaLimitBytes(userId),
-  ]);
+  const limitBytes = await resolveQuotaLimitBytes(userId);
+  await ensureUsageRow(userId);
 
-  const currentUsed = usage?.usedBytes ?? BigInt(0);
+  const delta = BigInt(incomingSizeBytes);
+  const updated = await prisma.$executeRaw`
+    UPDATE storage_usage
+    SET used_bytes = used_bytes + ${delta}, last_updated_at = NOW()
+    WHERE user_id = ${userId}::uuid
+      AND used_bytes + ${delta} <= ${limitBytes}`;
 
-  if (currentUsed + BigInt(incomingSizeBytes) > limitBytes) {
-    throw new AppError(
-      MEDIA_ERROR_KEYS.quotaExceeded,
-      StatusCodes.BAD_REQUEST,
-      {
-        limitBytes: limitBytes.toString(),
-        currentUsed: currentUsed.toString(),
-      }
-    );
+  if (updated === 0) {
+    const usage = await prisma.storageUsage.findUnique({ where: { userId } });
+    throw new AppError(MEDIA_ERROR_KEYS.quotaExceeded, StatusCodes.BAD_REQUEST, {
+      limitBytes: limitBytes.toString(),
+      currentUsed: (usage?.usedBytes ?? BigInt(0)).toString(),
+    });
   }
 }
 
 /**
- * Called twice per upload: once optimistically with the raw incoming size,
- * once again after processing completes with the true final size (delta-adjusted).
+ * Unconditionally adjusts usage by `deltaBytes` (positive or negative),
+ * atomically and floored at zero. Used to release a failed reservation,
+ * reconcile to the true post-processing size, and free bytes on delete.
  */
 export async function adjustUsage(
   userId: string,
   deltaBytes: bigint
 ): Promise<void> {
-  await prisma.storageUsage.upsert({
-    where: { userId },
-    create: {
-      userId,
-      usedBytes: deltaBytes < BigInt(0) ? BigInt(0) : deltaBytes,
-    },
-    update: { usedBytes: { increment: deltaBytes }, lastUpdatedAt: new Date() },
-  });
+  await ensureUsageRow(userId);
+  await prisma.$executeRaw`
+    UPDATE storage_usage
+    SET used_bytes = GREATEST(used_bytes + ${deltaBytes}, 0), last_updated_at = NOW()
+    WHERE user_id = ${userId}::uuid`;
 }

@@ -1,0 +1,13 @@
+{
+  "noFileProvided": "Aucun fichier n'a été fourni dans la requête",
+  "invalidFileName": "Le nom de fichier fourni n'est pas autorisé",
+  "invalidExtension": "Ce type de fichier n'est pas autorisé ici. Autorisés : {{allowed}}",
+  "invalidMimeType": "Le contenu du fichier ne correspond pas à un type autorisé (détecté : {{detected}})",
+  "fileTooLarge": "Le fichier est trop volumineux. Taille maximale : {{maxSizeMB}} Mo",
+  "virusDetected": "Le fichier a été rejeté par l'analyse antivirus",
+  "scanUnavailable": "L'analyse des fichiers est temporairement indisponible. Veuillez réessayer plus tard",
+  "quotaExceeded": "Vous avez atteint votre limite de stockage",
+  "fileNotFound": "Le fichier demandé est introuvable",
+  "disputeLocked": "Ce fichier est verrouillé en raison d'un litige en cours et ne peut pas être modifié",
+  "processingFailed": "Le fichier n'a pas pu être traité. Veuillez réessayer de le téléverser"
+}

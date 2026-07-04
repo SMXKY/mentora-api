@@ -44,7 +44,12 @@ export async function sendEmailChannel(
       buildNotificationEmailTemplate(subject, bodyText)
     );
     return true;
-  } catch {
+  } catch (err) {
+    console.error({
+      event: "email_channel_send_failed",
+      notificationId: notification.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return false;
   }
 }

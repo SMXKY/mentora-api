@@ -36,12 +36,20 @@ async function resolveActiveChannels(
 
   if (definition.defaultChannels.IN_APP) active.push("IN_APP");
 
+  const user = await prisma.user.findUnique({
+    where: { id: notification.recipientId },
+    select: { notificationsMuted: true, whatsappOptIn: true },
+  });
+
   if (definition.isTransactional) {
     // Transactional notifications always go out on every default channel —
-    // preferences cannot disable them.
+    // preferences cannot disable them. WhatsApp opt-in is NOT a preference:
+    // Meta policy forbids messaging numbers that never opted in, so it
+    // gates even transactional sends.
     if (definition.defaultChannels.EMAIL) active.push("EMAIL");
     if (definition.defaultChannels.PUSH) active.push("PUSH");
-    if (definition.defaultChannels.WHATSAPP) active.push("WHATSAPP");
+    if (definition.defaultChannels.WHATSAPP && user?.whatsappOptIn)
+      active.push("WHATSAPP");
     if (definition.defaultChannels.SMS) active.push("SMS");
   } else {
     const prefs = await prisma.notificationPreference.findMany({
@@ -52,10 +60,6 @@ async function resolveActiveChannels(
       select: { channel: true, isEnabled: true },
     });
     const prefMap = new Map(prefs.map((p) => [p.channel, p.isEnabled]));
-    const user = await prisma.user.findUnique({
-      where: { id: notification.recipientId },
-      select: { notificationsMuted: true, whatsappOptIn: true },
-    });
 
     const channelDefaults: [keyof ChannelProfile, NotificationChannel][] = [
       ["EMAIL", "EMAIL"],
@@ -127,6 +131,10 @@ async function dispatchInApp(notification: Notification): Promise<void> {
  * Fires every applicable channel for a single notification, in parallel.
  * Each channel's success/failure is recorded independently — a failed
  * email never affects whether the push or WhatsApp attempt happens.
+ *
+ * Idempotent across BullMQ retries: channels that already have a
+ * DELIVERED record are skipped, so a retry triggered by one failed
+ * channel can never double-send the ones that succeeded.
  */
 export async function dispatchAllChannels(
   notificationId: string,
@@ -137,9 +145,20 @@ export async function dispatchAllChannels(
   });
   if (!notification) return;
 
-  const channels = await resolveActiveChannels(notification);
+  const alreadyDelivered = new Set(
+    (
+      await prisma.notificationDelivery.findMany({
+        where: { notificationId, status: "DELIVERED" },
+        select: { channel: true },
+      })
+    ).map((d) => d.channel)
+  );
 
-  await Promise.all(
+  const channels = (await resolveActiveChannels(notification)).filter(
+    (channel) => !alreadyDelivered.has(channel)
+  );
+
+  const results = await Promise.allSettled(
     channels.map(async (channel) => {
       if (channel === "IN_APP") {
         return dispatchInApp(notification);
@@ -165,8 +184,17 @@ export async function dispatchAllChannels(
           attemptNumber,
           err instanceof Error ? err.message : String(err)
         );
-        throw err; // surfaces to the queue worker so BullMQ can retry this job
+        throw err;
       }
     })
   );
+
+  // Surface failures to the queue worker so BullMQ retries — the
+  // DELIVERED-skip above guarantees the retry only re-attempts failures.
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    throw new Error(
+      `${failures.length}/${channels.length} channel(s) failed for notification ${notificationId}`
+    );
+  }
 }

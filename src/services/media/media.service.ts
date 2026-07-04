@@ -1,14 +1,14 @@
 import fs from "fs";
 import path from "path";
 import * as FileType from "file-type";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import prisma from "../../config/database.config";
 import { AppError } from "../../utils/AppError.util";
 import { StatusCodes } from "http-status-codes";
 import { FileProcessingStatus, FileUploadType } from "../../generated/prisma";
 import { getStorageAdapter } from ".";
 import { scanFileOrThrow } from "./media.virusScan";
-import { assertWithinQuota, adjustUsage } from "./media.quota";
+import { reserveQuota, adjustUsage } from "./media.quota";
 import { queueFileProcessing } from "./media.processor";
 import {
   MEDIA_ERROR_KEYS,
@@ -17,8 +17,28 @@ import {
   UploadResult,
   ReplaceOptions,
   categoryFolderMap,
-  FileTypeSpec,
 } from "./media.types";
+
+/**
+ * A caller-supplied file name must be a bare name — no directory
+ * separators, no traversal, no null bytes. The storage path is always
+ * `<category-folder>/<name>` and nothing an uploader controls may
+ * change which folder the bytes land in.
+ */
+function assertSafeFileName(fileName: string): void {
+  if (
+    fileName !== path.basename(fileName) ||
+    fileName.includes("..") ||
+    fileName.includes("/") ||
+    fileName.includes("\\") ||
+    fileName.includes("\0")
+  ) {
+    throw new AppError(
+      MEDIA_ERROR_KEYS.invalidFileName,
+      StatusCodes.BAD_REQUEST
+    );
+  }
+}
 
 class MediaServiceClass {
   /**
@@ -34,9 +54,8 @@ class MediaServiceClass {
     for (let i = 0; i < files.length; i++) {
       const input = files[i];
       const resolvedId = input.id ?? String(i);
-      const fileId = await this.uploadSingle(input, options);
-      results.push(fileId);
-      results[results.length - 1] = { ...fileId, id: resolvedId };
+      const uploaded = await this.uploadSingle(input, options);
+      results.push({ ...uploaded, id: resolvedId });
     }
 
     return results;
@@ -92,55 +111,66 @@ class MediaServiceClass {
     // 4. Virus scan — throws immediately, nothing else happens on infection
     await scanFileOrThrow(tempFilePath);
 
-    // 5. Quota check (pessimistic — pre-processing size)
-    await assertWithinQuota(options.uploadedById, stats.size);
+    // 5. Reserve quota atomically (pessimistic — pre-processing size).
+    //    Everything after this must release the reservation on failure.
+    await reserveQuota(options.uploadedById, stats.size);
 
-    // 6. Build storage path — category folder, never caller-decided
-    const folder = categoryFolderMap[options.fileCategory];
-    const fileName = input.fileName ?? `${uuidv4()}${ext}`;
-    const relativePath = `${folder}/${fileName}`;
+    try {
+      // 6. Build storage path — category folder, never caller-decided
+      const folder = categoryFolderMap[options.fileCategory];
+      if (input.fileName) assertSafeFileName(input.fileName);
+      const fileName = input.fileName ?? `${randomUUID()}${ext}`;
+      const relativePath = `${folder}/${fileName}`;
 
-    // 7. Move bytes to permanent storage
-    const storage = getStorageAdapter();
-    await storage.put(tempFilePath, relativePath);
+      // 7. Move bytes to permanent storage
+      const storage = getStorageAdapter();
+      await storage.put(tempFilePath, relativePath);
 
-    // 8. Create the DB record — pending until processing pipeline finishes
-    const record = await prisma.file.create({
-      data: {
-        uploadedById: options.uploadedById,
-        originalFileName,
-        storagePath: relativePath,
-        fileCategory: options.fileCategory,
-        fileType: options.fileType,
-        mimeType: matchedType.mime,
-        fileSizeBytes: BigInt(stats.size),
-        uploadType: FileUploadType.SERVER_SIDE,
-        status: FileProcessingStatus.PENDING,
-        refTable: options.refTable,
-        refRecordId: options.refRecordId,
-      },
-      select: { id: true },
-    });
+      // 8. Create the DB record — pending until processing pipeline finishes
+      const record = await prisma.file.create({
+        data: {
+          uploadedById: options.uploadedById,
+          originalFileName,
+          storagePath: relativePath,
+          fileCategory: options.fileCategory,
+          fileType: options.fileType,
+          mimeType: matchedType.mime,
+          fileSizeBytes: BigInt(stats.size),
+          uploadType: FileUploadType.SERVER_SIDE,
+          status: FileProcessingStatus.PENDING,
+          refTable: options.refTable,
+          refRecordId: options.refRecordId,
+        },
+        select: { id: true },
+      });
 
-    // 9. Reserve quota now; reconciled to true size after processing
-    await adjustUsage(options.uploadedById, BigInt(stats.size));
+      // 9. Hand off to background pipeline
+      await queueFileProcessing(record.id);
 
-    // 10. Hand off to background pipeline
-    await queueFileProcessing(record.id);
-
-    return { id: "", fileId: record.id, storagePath: relativePath };
+      return { id: "", fileId: record.id, storagePath: relativePath };
+    } catch (err) {
+      // Release the reservation — the bytes never became a live file.
+      await adjustUsage(options.uploadedById, -BigInt(stats.size));
+      throw err;
+    }
   }
 
   /**
-   * Replaces an existing file's bytes. Old file is soft-deleted only
-   * after the new file has been confirmed ready by the pipeline.
+   * Replaces an existing file's bytes. The file must belong to
+   * options.uploadedById — replacing someone else's file is a 404,
+   * indistinguishable from the file not existing. Old file is
+   * soft-deleted only after the new file has been confirmed in the DB.
    */
   async replace(
     input: UploadInput,
     options: ReplaceOptions
   ): Promise<UploadResult> {
-    const existing = await prisma.file.findUnique({
-      where: { id: options.fileId },
+    const existing = await prisma.file.findFirst({
+      where: {
+        id: options.fileId,
+        uploadedById: options.uploadedById,
+        deletedAt: null,
+      },
       select: { id: true, isDisputeLocked: true, storagePath: true },
     });
 
@@ -162,23 +192,34 @@ class MediaServiceClass {
   }
 
   /**
-   * Soft-deletes one or many files by id. Bytes are removed from
-   * permanent storage only after the DB record is marked deleted.
+   * Soft-deletes one or many files by id. When `ownerId` is given, only
+   * files uploaded by that user are touched — ids belonging to anyone
+   * else are treated as not found. Bytes are removed from permanent
+   * storage by the scheduled purge job after the 30-day retention window.
    */
   async delete(
     fileIds: string[],
-    opts: { skipDisputeCheck?: boolean } = {}
+    opts: { skipDisputeCheck?: boolean; ownerId?: string } = {}
   ): Promise<void> {
     const files = await prisma.file.findMany({
-      where: { id: { in: fileIds } },
+      where: {
+        id: { in: fileIds },
+        deletedAt: null,
+        ...(opts.ownerId && { uploadedById: opts.ownerId }),
+      },
       select: {
         id: true,
         storagePath: true,
         isDisputeLocked: true,
         fileSizeBytes: true,
         uploadedById: true,
+        variants: { select: { fileSizeBytes: true } },
       },
     });
+
+    if (opts.ownerId && files.length !== fileIds.length) {
+      throw new AppError(MEDIA_ERROR_KEYS.fileNotFound, StatusCodes.NOT_FOUND);
+    }
 
     for (const file of files) {
       if (file.isDisputeLocked && !opts.skipDisputeCheck) {
@@ -192,16 +233,19 @@ class MediaServiceClass {
       }
     }
 
-    const storage = getStorageAdapter();
-
     for (const file of files) {
       await prisma.file.update({
         where: { id: file.id },
         data: { deletedAt: new Date() },
       });
-      await adjustUsage(file.uploadedById, BigInt(-Number(file.fileSizeBytes)));
-      // Bytes retained 30 days per policy — actual removal is a scheduled
-      // hard-delete job, not done inline here.
+      // Free the main file plus every processed variant from the quota.
+      const totalBytes = file.variants.reduce(
+        (sum, v) => sum + v.fileSizeBytes,
+        file.fileSizeBytes
+      );
+      await adjustUsage(file.uploadedById, -totalBytes);
+      // Bytes retained 30 days per policy — removal happens in the
+      // scheduled purge job in media.processor.ts, not inline here.
     }
   }
 

@@ -38,6 +38,8 @@ import {
   clearBruteForceCounters,
 } from "../../utils/bruteforce.util";
 import { buildAccountLockedEmailTemplate } from "../../emailTemplates/accountLocked.template";
+import NotificationService from "../../services/notification/notification.service";
+import { NotificationType } from "../../generated/prisma";
 
 const CAMEROON_PHONE_REGEX = /^\+237[6-9][0-9]{8}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -393,6 +395,19 @@ export class AuthService {
       newState: { identityType, role },
       changedFields: [],
       eventType: "user.registered",
+    });
+
+    // Welcome notification (in-app + email). Fire-and-forget — a
+    // notification failure must never fail the registration itself.
+    NotificationService.send({
+      type: NotificationType.ACCOUNT_CREATED,
+      target: { kind: "user", userId: user.id },
+    }).catch((err) => {
+      console.error({
+        event: "account_created_notification_failed",
+        userId: user.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
 
     return { token: signToken(user.id) };

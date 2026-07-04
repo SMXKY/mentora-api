@@ -4,7 +4,7 @@ import { ServiceContext } from "../../base/base.types";
 import { CreateNotificationInput, UpdateNotificationInput } from "./notification.types";
 
 
-export class NotificationService extends BaseService
+export class NotificationService extends BaseService<
   any,
   CreateNotificationInput,
   UpdateNotificationInput

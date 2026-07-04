@@ -1,0 +1,246 @@
+{
+  "account_created": {
+    "title": "Welcome to Mentora",
+    "body": "Your account has been created successfully. Complete your profile to get started."
+  },
+  "email_verification": {
+    "title": "Verify your email",
+    "body": "Please verify your email address to activate your account."
+  },
+  "password_reset": {
+    "title": "Password reset requested",
+    "body": "A password reset was requested for your account. If this wasn't you, secure your account now."
+  },
+  "new_device_login": {
+    "title": "New device sign-in",
+    "body": "Your account was just accessed from a new device. If this wasn't you, change your password immediately."
+  },
+  "account_suspended": {
+    "title": "Account suspended",
+    "body": "Your account has been suspended. Contact support for more information."
+  },
+  "account_unsuspended": {
+    "title": "Account reinstated",
+    "body": "Your account has been reinstated. Welcome back."
+  },
+  "two_factor_locked": {
+    "title": "Account temporarily locked",
+    "body": "Too many failed verification attempts. Your account is temporarily locked."
+  },
+  "kyc_submitted": {
+    "title": "Verification documents received",
+    "body": "We received your identity documents. We'll notify you once the review is complete."
+  },
+  "kyc_identity_approved": {
+    "title": "Identity verified",
+    "body": "Your identity has been verified. A few more steps remain to complete your verification."
+  },
+  "kyc_approved": {
+    "title": "Verification approved",
+    "body": "Congratulations — your verification is complete. You now have full access."
+  },
+  "kyc_rejected": {
+    "title": "Verification not approved",
+    "body": "Your verification could not be approved. Check the feedback and submit again."
+  },
+  "kyc_sla_breach": {
+    "title": "Verification is taking longer than usual",
+    "body": "Your verification review is taking longer than expected. Thank you for your patience."
+  },
+  "kyc_banned": {
+    "title": "Verification permanently declined",
+    "body": "Your verification has been permanently declined. Contact support if you believe this is an error."
+  },
+  "kyc_reverification_required": {
+    "title": "Re-verification required",
+    "body": "We need you to verify your identity again to keep your account active."
+  },
+  "booking_requested": {
+    "title": "New booking request",
+    "body": "You have a new booking request awaiting your response."
+  },
+  "booking_accepted": {
+    "title": "Booking accepted",
+    "body": "Your booking request was accepted."
+  },
+  "booking_rejected": {
+    "title": "Booking declined",
+    "body": "Your booking request was declined."
+  },
+  "booking_cancelled_by_tutor": {
+    "title": "Booking cancelled by tutor",
+    "body": "Your tutor cancelled the booking. You will not be charged."
+  },
+  "booking_cancelled_by_parent": {
+    "title": "Booking cancelled",
+    "body": "The booking was cancelled by the parent."
+  },
+  "booking_cancelled_unpaid": {
+    "title": "Booking cancelled — payment not received",
+    "body": "The booking was cancelled because payment was not completed in time."
+  },
+  "payment_window_reminder": {
+    "title": "Payment reminder",
+    "body": "Your booking is reserved but unpaid. Complete payment to confirm it."
+  },
+  "reschedule_requested": {
+    "title": "Reschedule requested",
+    "body": "A reschedule has been requested for your session."
+  },
+  "reschedule_accepted": {
+    "title": "Reschedule accepted",
+    "body": "Your reschedule request was accepted."
+  },
+  "reschedule_rejected": {
+    "title": "Reschedule declined",
+    "body": "Your reschedule request was declined. The original time still stands."
+  },
+  "session_reminder_24hr": {
+    "title": "Session tomorrow",
+    "body": "You have a session scheduled in 24 hours."
+  },
+  "session_reminder_1hr": {
+    "title": "Session in 1 hour",
+    "body": "Your session starts in 1 hour. Get ready!"
+  },
+  "session_checkin_reminder": {
+    "title": "Time to check in",
+    "body": "Your session is starting — please check in now."
+  },
+  "session_checkin_overdue": {
+    "title": "Check-in overdue",
+    "body": "Your session has started but you haven't checked in yet."
+  },
+  "session_tutor_disconnected": {
+    "title": "Tutor disconnected",
+    "body": "Your tutor lost connection during the session. They may rejoin shortly."
+  },
+  "session_no_show": {
+    "title": "Session marked as no-show",
+    "body": "A participant did not show up for the scheduled session."
+  },
+  "payment_confirmed": {
+    "title": "Payment confirmed",
+    "body": "Your payment was received and confirmed. Thank you."
+  },
+  "wallet_topped_up": {
+    "title": "Wallet topped up",
+    "body": "Your wallet top-up was successful."
+  },
+  "wallet_withdrawal_initiated": {
+    "title": "Withdrawal initiated",
+    "body": "Your withdrawal request has been initiated and is being processed."
+  },
+  "withdrawal_failed": {
+    "title": "Withdrawal failed",
+    "body": "Your withdrawal could not be completed. The funds remain in your wallet."
+  },
+  "escrow_released": {
+    "title": "Funds released",
+    "body": "Funds for your completed session have been released."
+  },
+  "refund_issued": {
+    "title": "Refund issued",
+    "body": "A refund has been issued to you."
+  },
+  "payout_account_added": {
+    "title": "Payout account added",
+    "body": "A new payout account was added to your profile. If this wasn't you, contact support."
+  },
+  "monthly_fee_deducted": {
+    "title": "Monthly fee deducted",
+    "body": "Your monthly platform fee has been deducted."
+  },
+  "monthly_fee_failed": {
+    "title": "Monthly fee payment failed",
+    "body": "We could not collect your monthly platform fee. Please top up your wallet."
+  },
+  "payment_reconciliation_pending": {
+    "title": "Payment under review",
+    "body": "Your payment is being reconciled. We'll confirm it shortly."
+  },
+  "lesson_awaiting_confirmation": {
+    "title": "Confirm your lesson",
+    "body": "A completed lesson is awaiting your confirmation."
+  },
+  "lesson_confirmed": {
+    "title": "Lesson confirmed",
+    "body": "The lesson has been confirmed."
+  },
+  "lesson_auto_confirmed": {
+    "title": "Lesson auto-confirmed",
+    "body": "The lesson was automatically confirmed after the review window closed."
+  },
+  "dispute_opened": {
+    "title": "Dispute opened",
+    "body": "A dispute has been opened on one of your sessions."
+  },
+  "dispute_tutor_response_reminder": {
+    "title": "Dispute response needed",
+    "body": "A dispute is awaiting your response. Please reply before the deadline."
+  },
+  "dispute_resolved": {
+    "title": "Dispute resolved",
+    "body": "The dispute has been resolved. Check the outcome in the app."
+  },
+  "dispute_escalated": {
+    "title": "Dispute escalated",
+    "body": "The dispute has been escalated to the Mentora team for review."
+  },
+  "review_window_opened": {
+    "title": "Leave a review",
+    "body": "Your session is complete — share your experience with a review."
+  },
+  "review_received": {
+    "title": "New review received",
+    "body": "You received a new review."
+  },
+  "review_response_submitted": {
+    "title": "Response to your review",
+    "body": "A response was posted to your review."
+  },
+  "account_flagged": {
+    "title": "Account flagged",
+    "body": "Your account has been flagged for review. Some features may be limited."
+  },
+  "reauth_required": {
+    "title": "Please sign in again",
+    "body": "For your security, you need to sign in again."
+  },
+  "support_ticket_opened": {
+    "title": "Support ticket created",
+    "body": "Your support ticket was created. We'll get back to you soon."
+  },
+  "support_ticket_response": {
+    "title": "Support replied",
+    "body": "There's a new reply on your support ticket."
+  },
+  "support_ticket_resolved": {
+    "title": "Support ticket resolved",
+    "body": "Your support ticket has been marked as resolved."
+  },
+  "material_removed": {
+    "title": "Material removed",
+    "body": "One of your learning materials was removed following a review."
+  },
+  "material_access_granted": {
+    "title": "New material available",
+    "body": "You've been granted access to new learning material."
+  },
+  "platform_outage_refund": {
+    "title": "Refund for service interruption",
+    "body": "A session affected by a platform outage has been refunded."
+  },
+  "scheduled_maintenance": {
+    "title": "Scheduled maintenance",
+    "body": "Mentora will be briefly unavailable for scheduled maintenance."
+  },
+  "new_message_received": {
+    "title": "New message",
+    "body": "You have a new message."
+  },
+  "other": {
+    "title": "Notification",
+    "body": "You have a new notification."
+  }
+}

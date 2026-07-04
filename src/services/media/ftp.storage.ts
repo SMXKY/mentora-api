@@ -1,7 +1,7 @@
 import Client from "ftp";
 import fs from "fs";
 import path from "path";
-import { StorageAdapter } from "./storage.adapter";
+import { StorageAdapter, assertSafeRelativePath } from "./storage.adapter";
 
 interface FtpConfig {
   user: string;
@@ -37,6 +37,7 @@ function loadConfig(): FtpConfig {
 }
 
 function buildRemotePath(remoteDir: string, relativePath: string): string {
+  assertSafeRelativePath(relativePath);
   if (remoteDir === "./" || remoteDir === "." || remoteDir === "") {
     return relativePath;
   }
@@ -50,24 +51,13 @@ function ensureRemoteDir(client: Client, dir: string): Promise<void> {
     .filter((p) => p !== ".");
   if (parts.length === 0) return Promise.resolve();
 
-  return parts.reduce((promise: Promise<void>, _part, idx) => {
-    const segment = parts.slice(0, idx + 1).join("/");
-    return promise.then(
-      () =>
-        new Promise<void>((resolve, reject) => {
-          client.list(segment, (err: any) => {
-            if (err) {
-              client.mkdir(segment, true, (mkErr: any) => {
-                if (mkErr) return reject(mkErr);
-                resolve();
-              });
-            } else {
-              resolve();
-            }
-          });
-        })
-    );
-  }, Promise.resolve());
+  // Always attempt a recursive mkdir. Probing with LIST is unreliable —
+  // some servers (Interserver included) return an empty listing instead
+  // of an error for a missing directory. mkdir on an existing directory
+  // errors harmlessly; the subsequent STOR is the real source of truth.
+  return new Promise<void>((resolve) => {
+    client.mkdir(parts.join("/"), true, () => resolve());
+  });
 }
 
 function withConnection<T>(
@@ -96,6 +86,8 @@ function withConnection<T>(
       user: config.user,
       password: config.password,
       port: config.port,
+      connTimeout: 15000,
+      pasvTimeout: 15000,
     });
   });
 }
@@ -132,11 +124,26 @@ export class FtpStorageAdapter implements StorageAdapter {
     try {
       await withConnection(this.config, (client) => {
         return new Promise<void>((resolve) => {
-          client.delete(remotePath, () => resolve()); // non-fatal either way
+          client.delete(remotePath, (err: any) => {
+            // Deletion failures never block app flow, but they must be
+            // visible — orphaned bytes are how storage bills explode.
+            if (err && err.code !== 550 /* file not found */) {
+              console.error({
+                event: "ftp_storage_remove_failed",
+                remotePath,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+            resolve();
+          });
         });
       });
-    } catch {
-      // Swallow — deletion failures on the remote side shouldn't block app flow.
+    } catch (err) {
+      console.error({
+        event: "ftp_storage_remove_failed",
+        remotePath,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

@@ -30,7 +30,10 @@ const conversationRoom = (conversationId: string) =>
 export function initializeSocketIO(httpServer: HttpServer): Server {
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.CORS_ORIGINS?.split(",") ?? [],
+      origin:
+        process.env.CORS_ORIGINS?.split(",")
+          .map((o) => o.trim())
+          .filter(Boolean) ?? [],
       credentials: true,
     },
   });
@@ -82,9 +85,13 @@ export function initializeSocketIO(httpServer: HttpServer): Server {
     // The client only ever sends an ID. The server decides whether that
     // ID's room is one this user is allowed into.
     socket.on("booking:join", async (payload: { bookingId: string }) => {
-      const allowed = await userCanAccessBooking(userId, payload.bookingId);
-      if (!allowed) return; // silently ignore — no error leaks whether the booking exists
-      socket.join(bookingRoom(payload.bookingId));
+      try {
+        const allowed = await userCanAccessBooking(userId, payload?.bookingId);
+        if (!allowed) return; // silently ignore — no error leaks whether the booking exists
+        socket.join(bookingRoom(payload.bookingId));
+      } catch (err) {
+        console.error({ event: "socket_join_error", room: "booking", error: err instanceof Error ? err.message : String(err) });
+      }
     });
 
     socket.on("booking:leave", (payload: { bookingId: string }) => {
@@ -94,12 +101,16 @@ export function initializeSocketIO(httpServer: HttpServer): Server {
     socket.on(
       "conversation:join",
       async (payload: { conversationId: string }) => {
-        const allowed = await userCanAccessConversation(
-          userId,
-          payload.conversationId
-        );
-        if (!allowed) return;
-        socket.join(conversationRoom(payload.conversationId));
+        try {
+          const allowed = await userCanAccessConversation(
+            userId,
+            payload?.conversationId
+          );
+          if (!allowed) return;
+          socket.join(conversationRoom(payload.conversationId));
+        } catch (err) {
+          console.error({ event: "socket_join_error", room: "conversation", error: err instanceof Error ? err.message : String(err) });
+        }
       }
     );
 

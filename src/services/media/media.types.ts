@@ -80,10 +80,13 @@ export interface ReplaceOptions extends UploadOptions {
 }
 
 export const MEDIA_ERROR_KEYS = {
+  noFileProvided: "media/errors:noFileProvided",
+  invalidFileName: "media/errors:invalidFileName",
   invalidExtension: "media/errors:invalidExtension",
   invalidMimeType: "media/errors:invalidMimeType",
   fileTooLarge: "media/errors:fileTooLarge",
   virusDetected: "media/errors:virusDetected",
+  scanUnavailable: "media/errors:scanUnavailable",
   quotaExceeded: "media/errors:quotaExceeded",
   fileNotFound: "media/errors:fileNotFound",
   disputeLocked: "media/errors:disputeLocked",
