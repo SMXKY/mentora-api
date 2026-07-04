@@ -6,14 +6,14 @@ export const buildAdminWelcomeEmailTemplate = (params: {
   email: string;
   password: string;
   roles: string[];
-  lng?: SupportedLanguage;
+  lng: SupportedLanguage;
 }): string => {
   const { lng } = params;
   const tt = (
     key: string,
     fallback: string,
     opts: Record<string, unknown> = {}
-  ) => t(`email/welcome:${key}`, fallback, { lng, ...opts });
+  ) => t(`email/welcome:${key}`, fallback, { lng: lng || "en", ...opts });
 
   return `
   <!DOCTYPE html>
