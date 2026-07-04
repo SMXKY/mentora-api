@@ -1,5 +1,6 @@
 {
   "adminCreated": "Admin account created successfully.",
   "passwordChanged": "Your password has been changed successfully.",
-  "passwordReset": "Your password has been reset successfully."
+  "passwordReset": "Your password has been reset successfully.",
+  "accountDeactivated": "Your account has been deactivated. You can reactivate it within 30 days."
 }

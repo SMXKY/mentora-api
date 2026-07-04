@@ -234,6 +234,9 @@ enum LogOperation {
   CHANGE_PASSWORD
   CHANGE_USER_CREDENTIALS
   ROLE_MODIFICATION
+  DEACTIVATE
+  REACTIVATE
+  ANONYMISE
 }
 
 enum LogCategory {
@@ -354,6 +357,17 @@ model User {
   isSystem          Boolean    @default(false) @map("is_system")
   isAccountComplete Boolean    @default(false) @map("is_account_complete")
 
+  // Self-deactivation: deletedAt doubles as the 30-day grace-period start.
+  // anonymisedAt marks PII already scrubbed by the nightly job — once set,
+  // the account is excluded from future anonymisation runs.
+  anonymisedAt DateTime? @map("anonymised_at")
+
+  // Set when an admin suspends this account while it holds pending escrow
+  // funds — surfaces the account in an admin review queue. No funds move
+  // automatically.
+  escrowReviewRequired   Boolean   @default(false) @map("escrow_review_required")
+  escrowReviewRequiredAt DateTime? @map("escrow_review_required_at")
+
   lastLoggedInAt DateTime? @map("last_logged_in_at")
 
   createdAt DateTime  @default(now()) @map("created_at")
@@ -379,6 +393,7 @@ model User {
   suspensionsLifted   AccountSuspension[] @relation("AccountSuspensionLiftedBy")
   suspensionsCreated  AccountSuspension[] @relation("AccountSuspensionCreatedBy")
   studentProfiles     StudentProfile[]
+  studentProfilesGuarded StudentProfile[] @relation("StudentProfileGuardian")
 
   tutorProfile               TutorProfile?
   relationshipWeightsSet     SubjectRelationshipWeight[]
@@ -962,6 +977,10 @@ model AvailabilitySlot {
 model StudentProfile {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
+  // The Parent account that created/manages this student profile, when the
+  // profile was added on a child's behalf rather than self-registered.
+  // Nullable: a Student who registered themselves has no guardian.
+  guardianId String? @map("guardian_id") @db.Uuid
   firstName String   @map("first_name") @db.VarChar(100)
   dob       DateTime? @db.Date
   levelId    String?     @map("level_id") @db.Uuid
@@ -969,13 +988,14 @@ model StudentProfile {
   examOrGoal String?     @map("exam_or_goal") @db.VarChar(255)
   preferredMode     PreferredSessionMode? @map("preferred_mode")
   preferredLanguage Languages?               @map("preferred_language")
-  
+
   specialNotes      String?               @map("special_notes")
   createdAt         DateTime              @default(now()) @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
   deletedAt         DateTime?             @map("deleted_at")
 
   user                User                      @relation(fields: [userId], references: [id])
+  guardian            User?                     @relation("StudentProfileGuardian", fields: [guardianId], references: [id])
   level               Level?                    @relation(fields: [levelId], references: [id])
   subjects            StudentProfileSubject[]
   bookings            Booking[]
@@ -983,6 +1003,7 @@ model StudentProfile {
   learningSnapshots   LearningAnalyticsSnapshot[]
 
   @@index([userId])
+  @@index([guardianId])
   @@index([schoolType])
   @@index([levelId])
   @@map("student_profiles")
@@ -1863,6 +1884,7 @@ enum NotificationType {
 
   ACCOUNT_FLAGGED
   REAUTH_REQUIRED
+  ADMIN_REVIEW_REQUIRED
 
   SUPPORT_TICKET_OPENED
   SUPPORT_TICKET_RESPONSE

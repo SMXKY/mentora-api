@@ -407,6 +407,12 @@ export const notificationRegistry: Record<
     isTransactional: true,
     defaultChannels: inAppEmail,
   },
+  ADMIN_REVIEW_REQUIRED: {
+    titleCode: "notifications/messages:admin_review_required.title",
+    bodyCode: "notifications/messages:admin_review_required.body",
+    isTransactional: true,
+    defaultChannels: inAppEmail,
+  },
 
   SUPPORT_TICKET_OPENED: {
     titleCode: "notifications/messages:support_ticket_opened.title",

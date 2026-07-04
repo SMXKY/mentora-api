@@ -2,6 +2,7 @@ import { registry } from "../../docs/openapi.registry";
 import {
   CreateUserSchema,
   UpdateUserSchema,
+  UpdateMeSchema,
   UserResponseSchema,
 } from "./user.schema";
 import { z } from "zod";
@@ -149,5 +150,75 @@ registry.registerPath({
   responses: {
     200: { description: "User deleted" },
     404: { description: "User not found" },
+  },
+});
+
+// ── Self-service ─────────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: "patch",
+  path: `${basePath}/me`,
+  tags,
+  summary: "Update the caller's own profile",
+  description:
+    "Self-service subset of user fields — excludes anything only an admin may " +
+    "change (email, status, isAccountComplete, username, etc). Scoped to the " +
+    "caller; there is no id in the path.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { "application/json": { schema: UpdateMeSchema } } },
+  },
+  responses: {
+    200: {
+      description: "Profile updated",
+      content: { "application/json": { schema: UserResponseSchema } },
+    },
+    400: { description: "Validation error" },
+    401: { description: "No valid session token" },
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: `${basePath}/me/profile-picture`,
+  tags,
+  summary: "Replace the caller's own profile picture",
+  description:
+    "Uploads through the same pipeline as any other media file — real MIME " +
+    "sniffing, virus scan, and quota enforcement all apply. The previous " +
+    "profile photo (if any) is soft-deleted once the new one is confirmed.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      content: {
+        "multipart/form-data": {
+          schema: z.object({
+            profilePicture: z.string().openapi({
+              type: "string",
+              format: "binary",
+              description: "JPEG, PNG, or WebP, up to 5MB",
+            }),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Profile picture updated",
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.boolean(),
+            data: z.object({ url: z.string().url() }),
+          }),
+        },
+      },
+    },
+    400: {
+      description:
+        "No file provided, invalid extension/MIME, file too large, or virus detected",
+    },
+    401: { description: "No valid session token" },
   },
 });

@@ -45,5 +45,11 @@
   "lastNameRequired": "Please enter a last name.",
   "idTokenRequired": "A Google ID token is required.",
   "notAuthenticated": "You must be signed in to access this resource.",
-  "insufficientPermissions": "You do not have permission to perform this action."
+  "insufficientPermissions": "You do not have permission to perform this action.",
+  "sessionInvalidated": "Your session was ended. Please sign in again.",
+  "accountIncomplete": "Please complete your account before continuing.",
+  "deactivateConfirmationRequired": "Please confirm your password, or verify with the code sent to you, but not both.",
+  "passwordAccountNoOtp": "This account has a password — confirm with your password instead of a code.",
+  "notDeactivated": "This account is not deactivated.",
+  "reactivationWindowExpired": "The 30-day reactivation window for this account has passed. Please contact support."
 }

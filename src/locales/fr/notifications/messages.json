@@ -242,5 +242,9 @@
   "other": {
     "title": "Notification",
     "body": "Vous avez une nouvelle notification."
+  },
+  "admin_review_required": {
+    "title": "Examen de compte requis",
+    "body": "Un compte suspendu nécessite un examen manuel avant que ses réservations ou fonds sous séquestre puissent être résolus."
   }
 }

@@ -11,6 +11,7 @@ const developmentResponse = (err: AppError, req: Request, res: Response) => {
     ok: false,
     status: err.status,
     message: t(err.messageKey, err.messageKey, { lng: lang, ...err.meta }),
+    ...(err.meta?.redirect && { redirect: err.meta.redirect }),
     error: err,
     stack: err.stack || "No stack trace available",
     path: req.originalUrl,
@@ -26,6 +27,7 @@ const productionResponse = (err: AppError, req: Request, res: Response) => {
       ok: false,
       status: err.status,
       message: t(err.messageKey, err.messageKey, { lng: lang, ...err.meta }),
+      ...(err.meta?.redirect && { redirect: err.meta.redirect }),
     });
   } else {
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({

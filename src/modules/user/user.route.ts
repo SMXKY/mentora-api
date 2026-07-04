@@ -1,16 +1,29 @@
 import { Router } from "express";
+import multer from "multer";
+import os from "os";
+import path from "path";
+import { randomUUID } from "crypto";
 import { userController } from "./user.controller";
 import {
   validate,
   ParamsId,
   PaginationQuery,
 } from "../../middlewares/validate.middleware";
-import { CreateUserSchema, UpdateUserSchema } from "./user.schema";
+import { CreateUserSchema, UpdateUserSchema, UpdateMeSchema } from "./user.schema";
 import protect from "../../middlewares/protect.middleware";
 import restrictTo from "../../middlewares/restrictTo.middleware";
 import { permissions } from "../../data/permission.data";
 
 const router = Router();
+
+const uploadProfilePicture = multer({
+  storage: multer.diskStorage({
+    destination: os.tmpdir(),
+    filename: (_req, file, cb) =>
+      cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
+  }),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+});
 
 router.post(
   "/",
@@ -50,6 +63,22 @@ router.get(
   restrictTo(permissions.users.manage),
   validate(ParamsId, "params"),
   userController.findDeletedById
+);
+
+// Self-service — must be registered before the generic "/:id" routes below,
+// otherwise Express would treat "me" as an :id value.
+router.patch(
+  "/me",
+  protect,
+  validate(UpdateMeSchema),
+  userController.updateMe
+);
+
+router.patch(
+  "/me/profile-picture",
+  protect,
+  uploadProfilePicture.single("profilePicture"),
+  userController.updateMyProfilePicture
 );
 
 router.get(

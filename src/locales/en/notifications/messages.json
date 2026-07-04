@@ -242,5 +242,9 @@
   "other": {
     "title": "Notification",
     "body": "You have a new notification."
+  },
+  "admin_review_required": {
+    "title": "Account review required",
+    "body": "A suspended account needs manual review before its bookings or escrow funds can be resolved."
   }
 }

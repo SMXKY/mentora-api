@@ -1,0 +1,12 @@
+{
+  "email_verified": "Vérifiez votre adresse e-mail",
+  "full_name": "Ajoutez votre prénom et nom",
+  "phone_number": "Ajoutez votre numéro de téléphone",
+  "student_profile": "Ajoutez au moins un profil d'élève",
+  "class_level": "Indiquez votre classe ou niveau actuel",
+  "subject_of_interest": "Ajoutez au moins une matière d'intérêt",
+  "tutor_profile": "Complétez votre profil de tuteur (bio, localisation, mode d'enseignement)",
+  "subjects": "Ajoutez au moins une matière que vous enseignez",
+  "pricing": "Définissez votre tarif horaire minimum et maximum",
+  "photo": "Ajoutez une photo de profil"
+}

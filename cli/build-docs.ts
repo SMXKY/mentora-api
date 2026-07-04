@@ -12,6 +12,7 @@ import "../src/modules/user/user.openapi";
 import "../src/modules/userRole/userRole.openapi";
 import "../src/modules/notification/notification.openapi";
 import "../src/modules/media/media.openapi";
+import "../src/modules/adminUser/adminUser.openapi";
 // testResource is a scaffold template, not a mounted module — excluded on purpose
 
 async function main() {

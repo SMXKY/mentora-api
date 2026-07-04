@@ -41,6 +41,7 @@ async function bootstrap() {
 
   await import("./services/media/media.processor");
   await import("./services/notification/notification.queue");
+  await import("./services/account/accountAnonymisation.processor");
   console.log("Background jobs initialised. ✅");
 
   httpServer.listen(port, () => {
