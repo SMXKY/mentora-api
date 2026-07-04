@@ -9,6 +9,7 @@ import { connectRedis } from "./config/redis.config";
 import { initI18n } from "./shared/i18n/init";
 import { runSeeds } from "./seeds";
 import { PORT } from "./utils/enviromentVariablesCheck.util";
+import { initializeSocketIO } from "./socket";
 
 process.on("uncaughtException", (err: Error) => {
   console.error({
@@ -35,20 +36,12 @@ async function bootstrap() {
 
   const httpServer = createServer(app);
 
-  // ============================================================
-  // SOCKET.IO
-  // Initialised after the HTTP server is created.
-  // Uncomment when socket module is implemented.
-  // ============================================================
-  // const io = initializeSocketIO(httpServer)
+  initializeSocketIO(httpServer);
+  console.log("Socket.IO initialised. ✅");
 
-  // ============================================================
-  // BACKGROUND JOBS
-  // Initialised after database connection is confirmed.
-  // Uncomment when jobs module is implemented.
-  // ============================================================
-  // await initJobQueue()
-  // console.log('Background jobs initialised. ✅')
+  await import("./services/media/media.processor");
+  await import("./services/notification/notification.queue");
+  console.log("Background jobs initialised. ✅");
 
   httpServer.listen(port, () => {
     console.log(`Server running on port ${port} ✅`);

@@ -1872,6 +1872,22 @@ enum NotificationType {
 
   PLATFORM_OUTAGE_REFUND
   SCHEDULED_MAINTENANCE
+
+  NEW_MESSAGE_RECEIVED
+
+  OTHER
+}
+
+enum NotificationResourceType {
+  BOOKING
+  DISPUTE
+  PAYMENT
+  KYC
+  REVIEW
+  MATERIAL
+  SUPPORT_TICKET
+  ACCOUNT
+  MESSAGE
 }
 
 enum NotificationChannel {
@@ -1907,6 +1923,8 @@ model Notification {
   readAt      DateTime?        @map("read_at")
   createdAt   DateTime         @default(now()) @map("created_at")
   deletedAt   DateTime?        @map("deleted_at")
+  resourceType NotificationResourceType? @map("resource_type")
+  resourceId   String
 
   recipient  User                     @relation(fields: [recipientId], references: [id])
   deliveries NotificationDelivery[]
@@ -1918,6 +1936,7 @@ model Notification {
   @@index([recipientId, readAt], map: "idx_notifications_recipient_read")
   @@index([recipientId, type], map: "idx_notifications_recipient_type")
   @@index([deletedAt])
+  @@index([resourceType, resourceId], map: "idx_notification_resource")
   @@map("notifications")
 }
 
