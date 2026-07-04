@@ -18,6 +18,7 @@ import permissionRouter from "./modules/permission";
 import permissionOverideRouter from "./modules/permissionOverride";
 import userRouter from "./modules/user";
 import auditLogRouter from "./modules/auditLog";
+import notificationRouter from "./modules/notification";
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -128,6 +129,7 @@ app.use("/api/v1/permissions", permissionRouter);
 app.use("/api/v1/permission-overrides", permissionOverideRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/audit-logs", auditLogRouter);
+app.use("/api/v1/notifications", notificationRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(
