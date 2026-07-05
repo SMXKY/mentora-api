@@ -7,6 +7,7 @@ import getUserPermissions from "../utils/getUserPermissions.util";
 import { catchAsync } from "../utils/catchAsync.util";
 import { JWT_SECRET } from "../utils/enviromentVariablesCheck.util";
 import { UserStatus } from "../generated/prisma";
+import { isSessionBlocklisted } from "../modules/auth/utils/session.util";
 
 const protect = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -42,6 +43,15 @@ const protect = catchAsync(
     if (!decoded.id || !decoded.iat) {
       return next(
         new AppError("auth/errors:invalidToken", StatusCodes.UNAUTHORIZED)
+      );
+    }
+
+    // Tokens issued with a session (jti) can be revoked before their
+    // natural expiry — suspend/deactivate/unsuspend blocklist the jti in
+    // Redis rather than waiting for the token to time out on its own.
+    if (decoded.jti && (await isSessionBlocklisted(decoded.jti))) {
+      return next(
+        new AppError("auth/errors:sessionInvalidated", StatusCodes.UNAUTHORIZED)
       );
     }
 

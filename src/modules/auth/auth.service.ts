@@ -7,7 +7,10 @@ import {
   SessionStatusResponse,
   CompleteRegistrationInput,
   CreateAdminInput,
+  DeactivateAccountInput,
+  ReactivateAccountInput,
 } from "./auth.types";
+import { CompletionResult } from "../../services/accountCompletion/accountCompletion.service";
 import { OtpService } from "../../services/otp";
 import {
   signRegistrationToken,
@@ -21,15 +24,30 @@ import { buildPasswordResetOtpEmailTemplate } from "../../emailTemplates/passwor
 import { sendEmail } from "../../utils/sendEmail.util";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
 import { GOOGLE_CLIENT_ID } from "../../utils/enviromentVariablesCheck.util";
-import signToken from "./utils/signToken.util";
 import argon2 from "argon2";
 import { getDeviceInfo } from "./utils/deviceFingerprint.util";
+import {
+  resolveOrCreateDevice,
+  issueSessionToken,
+  invalidateAllSessions,
+} from "./utils/session.util";
+import { evaluateCompletion } from "../../services/accountCompletion/accountCompletion.service";
 import { signResetToken, verifyResetToken } from "./utils/signResetToken";
 import { deliverOtp } from "../../services/otp/dilivery";
 import getUserPermissions from "../../utils/getUserPermissions.util";
 import { applyFtpUrlTransform } from "../../utils/applyFtpUrl.util";
 import { AuditService } from "../../utils/logUserActivity.util";
 import { LogCategory, LogOperation } from "../../generated/prisma";
+import {
+  isAccountLocked,
+  isIpLocked,
+  recordFailedAccountAttempt,
+  recordFailedIpAttempt,
+  clearBruteForceCounters,
+} from "../../utils/bruteforce.util";
+import { buildAccountLockedEmailTemplate } from "../../emailTemplates/accountLocked.template";
+import NotificationService from "../../services/notification/notification.service";
+import { NotificationType } from "../../generated/prisma";
 
 const CAMEROON_PHONE_REGEX = /^\+237[6-9][0-9]{8}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -233,7 +251,12 @@ export class AuthService {
         });
 
         AuditService.record(
-          { userId: existingUser.id, userEmail: email, ipAddress: ip, userAgent },
+          {
+            userId: existingUser.id,
+            userEmail: email,
+            ipAddress: ip,
+            userAgent,
+          },
           "users",
           {
             operation: LogOperation.UPDATE,
@@ -252,7 +275,7 @@ export class AuthService {
         })
         .catch(() => {});
 
-      return AuthService.buildLoginResponse(existingUser.id);
+      return AuthService.buildLoginResponse(existingUser.id, ip, userAgent);
     }
 
     return {
@@ -382,7 +405,25 @@ export class AuthService {
       eventType: "user.registered",
     });
 
-    return { token: signToken(user.id) };
+    // Welcome notification (in-app + email). Fire-and-forget — a
+    // notification failure must never fail the registration itself.
+    NotificationService.send({
+      type: NotificationType.ACCOUNT_CREATED,
+      target: { kind: "user", userId: user.id },
+    }).catch((err) => {
+      console.error({
+        event: "account_created_notification_failed",
+        userId: user.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    const deviceId = await resolveOrCreateDevice(
+      user.id,
+      ctx.ipAddress,
+      ctx.userAgent
+    );
+    return { token: await issueSessionToken(user.id, deviceId) };
   }
 
   static async createAdminUser(
@@ -472,6 +513,7 @@ export class AuthService {
       email,
       password,
       roles,
+      lng: "en",
     });
 
     // Fire-and-forget, matching login/changePassword/resetPassword —
@@ -493,6 +535,13 @@ export class AuthService {
     userAgent: string | undefined,
     ip: string | undefined
   ): Promise<{ user: any; token: string }> {
+    if (ip && (await isIpLocked(ip))) {
+      throw new AppError(
+        "auth/errors:ipBlocked",
+        StatusCodes.TOO_MANY_REQUESTS
+      );
+    }
+
     const user = await prisma.user.findFirst({
       where: {
         OR: [
@@ -513,6 +562,7 @@ export class AuthService {
     });
 
     if (!user) {
+      if (ip) await recordFailedIpAttempt(ip);
       throw new AppError(
         "auth/errors:invalidCredentials",
         StatusCodes.UNAUTHORIZED
@@ -534,13 +584,56 @@ export class AuthService {
       throw new AppError("auth/errors:accountBanned", StatusCodes.FORBIDDEN);
     }
 
+    if (await isAccountLocked(user.id)) {
+      if (ip) await recordFailedIpAttempt(ip);
+      throw new AppError(
+        "auth/errors:accountLocked",
+        StatusCodes.TOO_MANY_REQUESTS
+      );
+    }
+
     const isValid = await argon2.verify(user.password, password);
     if (!isValid) {
+      if (ip) await recordFailedIpAttempt(ip);
+      const justLocked = await recordFailedAccountAttempt(user.id);
+
+      if (justLocked && user.email) {
+        const html = buildAccountLockedEmailTemplate({
+          firstName: user.firstName,
+          ipAddress: String(ip),
+          timestamp: new Date().toLocaleString("en-GB", {
+            dateStyle: "long",
+            timeStyle: "short",
+          }),
+        });
+
+        sendEmail(
+          user.email,
+          "Your Mentora account was temporarily locked",
+          `Your account was locked for 30 minutes after repeated failed login attempts from ${ip}.`,
+          html
+        ).catch(() => {});
+
+        AuditService.record(
+          { userId: user.id, ipAddress: ip, userAgent },
+          "users",
+          {
+            operation: LogOperation.AUTH,
+            category: LogCategory.AUTH,
+            recordId: user.id,
+            changedFields: [],
+            eventType: "user.account_locked",
+          }
+        );
+      }
+
       throw new AppError(
         "auth/errors:invalidCredentials",
         StatusCodes.UNAUTHORIZED
       );
     }
+
+    if (ip) await clearBruteForceCounters(ip, user.id);
 
     const deviceInfo = getDeviceInfo(userAgent, ip);
 
@@ -552,21 +645,23 @@ export class AuthService {
       select: { id: true },
     });
 
+    let deviceId = existingDevice?.id;
+
     if (!existingDevice) {
-      prisma.userDevice
-        .create({
-          data: {
-            userId: user.id,
-            deviceFingerprintHash: deviceInfo.fingerprintHash,
-            ipAddress: deviceInfo.ipAddress,
-            os: deviceInfo.os,
-            browser: deviceInfo.browser,
-            browserVersion: deviceInfo.browserVersion,
-            deviceType: deviceInfo.deviceType,
-            lastSeenAt: new Date(),
-          },
-        })
-        .catch(() => {});
+      const newDevice = await prisma.userDevice.create({
+        data: {
+          userId: user.id,
+          deviceFingerprintHash: deviceInfo.fingerprintHash,
+          ipAddress: deviceInfo.ipAddress,
+          os: deviceInfo.os,
+          browser: deviceInfo.browser,
+          browserVersion: deviceInfo.browserVersion,
+          deviceType: deviceInfo.deviceType,
+          lastSeenAt: new Date(),
+        },
+        select: { id: true },
+      });
+      deviceId = newDevice.id;
 
       if (user.email) {
         const html = buildNewDeviceEmailTemplate({
@@ -616,7 +711,7 @@ export class AuthService {
       eventType: "user.login",
     });
 
-    return AuthService.buildLoginResponse(user.id, ip, userAgent);
+    return AuthService.buildLoginResponse(user.id, ip, userAgent, deviceId);
   }
 
   static async changePassword(
@@ -876,7 +971,8 @@ export class AuthService {
   private static async buildLoginResponse(
     userId: string,
     ip?: string,
-    userAgent?: string
+    userAgent?: string,
+    deviceId?: string
   ): Promise<{ user: any; token: string }> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -903,6 +999,8 @@ export class AuthService {
     }
 
     const permissions = await getUserPermissions(userId);
+    const resolvedDeviceId =
+      deviceId ?? (await resolveOrCreateDevice(userId, ip, userAgent));
 
     return {
       user: {
@@ -913,7 +1011,188 @@ export class AuthService {
           : null,
         permissions,
       },
-      token: signToken(userId),
+      token: await issueSessionToken(userId, resolvedDeviceId),
     };
+  }
+
+  static async getCompletion(ctx: ServiceContext): Promise<CompletionResult> {
+    return evaluateCompletion(ctx.userId!);
+  }
+
+  /**
+   * Sends a fresh OTP for passwordless (Google-auth) accounts to confirm
+   * before deactivating. Accounts with a password confirm with it instead
+   * and never need this step.
+   */
+  static async requestDeactivationOtp(ctx: ServiceContext): Promise<void> {
+    const user = await prisma.user.findUnique({
+      where: { id: ctx.userId },
+      select: { email: true, password: true },
+    });
+    if (!user) {
+      throw new AppError("auth/errors:userNotFound", StatusCodes.UNAUTHORIZED);
+    }
+    if (user.password) {
+      throw new AppError(
+        "auth/errors:passwordAccountNoOtp",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+    if (!user.email) {
+      throw new AppError(
+        "auth/errors:noPasswordAccount",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    const code = await OtpService.generateAndStoreOtp(user.email);
+    await deliverEmailOtp(user.email, code);
+  }
+
+  static async deactivateAccount(
+    ctx: ServiceContext,
+    input: DeactivateAccountInput
+  ): Promise<{ message: string }> {
+    const user = await prisma.user.findUnique({
+      where: { id: ctx.userId },
+      select: { id: true, email: true, password: true, deletedAt: true },
+    });
+    if (!user || user.deletedAt) {
+      throw new AppError("auth/errors:userNotFound", StatusCodes.UNAUTHORIZED);
+    }
+
+    if (input.password) {
+      if (!user.password) {
+        throw new AppError(
+          "auth/errors:noPasswordAccount",
+          StatusCodes.BAD_REQUEST
+        );
+      }
+      const isValid = await argon2.verify(user.password, input.password);
+      if (!isValid) {
+        throw new AppError(
+          "auth/errors:invalidCurrentPassword",
+          StatusCodes.UNAUTHORIZED
+        );
+      }
+    } else {
+      if (!user.email) {
+        throw new AppError(
+          "auth/errors:noPasswordAccount",
+          StatusCodes.BAD_REQUEST
+        );
+      }
+      await OtpService.verifyOtp(user.email, input.otpCode!);
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { deletedAt: new Date(), status: UserStatus.DEACTIVATED },
+    });
+
+    await invalidateAllSessions(user.id);
+
+    AuditService.record(ctx, "users", {
+      operation: LogOperation.DEACTIVATE,
+      category: LogCategory.AUTH,
+      recordId: user.id,
+      changedFields: ["status", "deletedAt"],
+      eventType: "user.deactivated",
+    });
+
+    return { message: "auth/success:accountDeactivated" };
+  }
+
+  /**
+   * Re-authenticates a self-deactivated account during its 30-day grace
+   * period. Deliberately NOT behind `protect` — a deactivated account's
+   * token is already invalidated and `deletedAt` would reject it anyway,
+   * so this re-verifies identity from scratch, the same way login() does.
+   */
+  static async reactivateAccount(
+    input: ReactivateAccountInput,
+    ip?: string,
+    userAgent?: string
+  ): Promise<{ user: any; token: string }> {
+    const isEmail = EMAIL_REGEX.test(input.identifier);
+    const isPhone = CAMEROON_PHONE_REGEX.test(input.identifier);
+
+    if (!isEmail && !isPhone) {
+      throw new AppError(
+        "auth/errors:invalidIdentityFormat",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          isEmail ? { email: input.identifier } : {},
+          isPhone ? { phoneNumber: input.identifier } : {},
+        ],
+      },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        status: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!user || user.status !== UserStatus.DEACTIVATED || !user.deletedAt) {
+      throw new AppError("auth/errors:notDeactivated", StatusCodes.BAD_REQUEST);
+    }
+
+    const GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+    if (Date.now() > user.deletedAt.getTime() + GRACE_PERIOD_MS) {
+      throw new AppError(
+        "auth/errors:reactivationWindowExpired",
+        StatusCodes.GONE
+      );
+    }
+
+    if (input.password) {
+      if (!user.password) {
+        throw new AppError(
+          "auth/errors:noPasswordAccount",
+          StatusCodes.BAD_REQUEST
+        );
+      }
+      const isValid = await argon2.verify(user.password, input.password);
+      if (!isValid) {
+        throw new AppError(
+          "auth/errors:invalidCredentials",
+          StatusCodes.UNAUTHORIZED
+        );
+      }
+    } else {
+      if (!user.email) {
+        throw new AppError(
+          "auth/errors:noPasswordAccount",
+          StatusCodes.BAD_REQUEST
+        );
+      }
+      await OtpService.verifyOtp(user.email, input.otpCode!);
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { deletedAt: null, status: UserStatus.ACTIVE },
+    });
+
+    AuditService.record(
+      { userId: user.id, userEmail: user.email ?? undefined, ipAddress: ip, userAgent },
+      "users",
+      {
+        operation: LogOperation.REACTIVATE,
+        category: LogCategory.AUTH,
+        recordId: user.id,
+        changedFields: ["status", "deletedAt"],
+        eventType: "user.reactivated",
+      }
+    );
+
+    return AuthService.buildLoginResponse(user.id, ip, userAgent);
   }
 }

@@ -152,3 +152,50 @@ export type RequestPhoneOtpInput = z.infer<typeof RequestPhoneOtpSchema>;
 export type VerifyPhoneOtpInput = z.infer<typeof VerifyPhoneOtpSchema>;
 
 export type SessionStatusResponse = z.infer<typeof SessionStatusResponseSchema>;
+
+// ── Account completion ──────────────────────────────────────
+export const CompletionItemSchema = z.object({
+  key: z.string(),
+  labelCode: z.string(),
+  complete: z.boolean(),
+});
+
+export const CompletionResponseSchema = z
+  .object({
+    completionStatus: z.enum(["complete", "incomplete"]),
+    isComplete: z.boolean(),
+    role: z.string().nullable(),
+    percent: z.number(),
+    items: z.array(CompletionItemSchema),
+    missing: z.array(z.string()),
+  })
+  .openapi("AccountCompletion");
+
+// ── Self-deactivation / reactivation ────────────────────────
+// Accounts with a password confirm with it; passwordless (Google) accounts
+// re-verify a fresh OTP instead — exactly one of the two must be present.
+export const DeactivateAccountSchema = z
+  .object({
+    password: z.string().optional(),
+    otpCode: z.string().length(6, "auth/errors:invalidOtpLength").optional(),
+  })
+  .refine((d) => !!d.password !== !!d.otpCode, {
+    message: "auth/errors:deactivateConfirmationRequired",
+    path: ["password"],
+  })
+  .openapi("DeactivateAccount");
+
+export const ReactivateAccountSchema = z
+  .object({
+    identifier: z.string().min(1, "auth/errors:identifierRequired"),
+    password: z.string().optional(),
+    otpCode: z.string().length(6, "auth/errors:invalidOtpLength").optional(),
+  })
+  .refine((d) => !!d.password !== !!d.otpCode, {
+    message: "auth/errors:deactivateConfirmationRequired",
+    path: ["password"],
+  })
+  .openapi("ReactivateAccount");
+
+export type DeactivateAccountInput = z.infer<typeof DeactivateAccountSchema>;
+export type ReactivateAccountInput = z.infer<typeof ReactivateAccountSchema>;

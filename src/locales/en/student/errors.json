@@ -1,0 +1,5 @@
+{
+  "firstNameRequired": "Please enter a first name.",
+  "profileNotFound": "No student profile was found. Please set up your profile first.",
+  "subjectNotFound": "This subject does not exist."
+}

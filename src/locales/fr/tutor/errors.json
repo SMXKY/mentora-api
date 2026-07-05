@@ -1,0 +1,7 @@
+{
+  "bioRequired": "Veuillez rédiger une courte biographie.",
+  "invalidRateRange": "Le tarif maximum doit être supérieur ou égal au tarif minimum.",
+  "tutorProfileNotFound": "Aucun profil de tuteur n'a été trouvé.",
+  "subjectNotClaimed": "Vous devez d'abord faire vérifier cette matière avant de lui fixer un prix.",
+  "atLeastOneRateRequired": "Veuillez fournir au moins un tarif à mettre à jour."
+}

@@ -234,6 +234,9 @@ enum LogOperation {
   CHANGE_PASSWORD
   CHANGE_USER_CREDENTIALS
   ROLE_MODIFICATION
+  DEACTIVATE
+  REACTIVATE
+  ANONYMISE
 }
 
 enum LogCategory {
@@ -354,6 +357,22 @@ model User {
   isSystem          Boolean    @default(false) @map("is_system")
   isAccountComplete Boolean    @default(false) @map("is_account_complete")
 
+  // Self-deactivation: deletedAt doubles as the 30-day grace-period start.
+  // anonymisedAt marks PII already scrubbed by the nightly job — once set,
+  // the account is excluded from future anonymisation runs.
+  anonymisedAt DateTime? @map("anonymised_at")
+
+  // Set when an admin suspends this account while it holds pending escrow
+  // funds — surfaces the account in an admin review queue. No funds move
+  // automatically.
+  escrowReviewRequired   Boolean   @default(false) @map("escrow_review_required")
+  escrowReviewRequiredAt DateTime? @map("escrow_review_required_at")
+
+  // Set once this admin has more than 3 KYC approvals marked BAD in a spot
+  // check within a trailing 30-day window — their future KYC approvals
+  // require Super Admin countersignature until this is cleared.
+  kycCountersignatureRequired Boolean @default(false) @map("kyc_countersignature_required")
+
   lastLoggedInAt DateTime? @map("last_logged_in_at")
 
   createdAt DateTime  @default(now()) @map("created_at")
@@ -379,6 +398,7 @@ model User {
   suspensionsLifted   AccountSuspension[] @relation("AccountSuspensionLiftedBy")
   suspensionsCreated  AccountSuspension[] @relation("AccountSuspensionCreatedBy")
   studentProfiles     StudentProfile[]
+  studentProfilesGuarded StudentProfile[] @relation("StudentProfileGuardian")
 
   tutorProfile               TutorProfile?
   relationshipWeightsSet     SubjectRelationshipWeight[]
@@ -399,6 +419,7 @@ model User {
   kycStatusChanges        KycStatusHistory[]
   kycChecklistSubmissions KycChecklistSubmission[]
   kycBansIssued           KycBan[]
+  kycSpotCheckReviewsGiven KycSpotCheckReview[]
   
   demandSignals DemandSignal[]
   
@@ -961,7 +982,13 @@ model AvailabilitySlot {
 
 model StudentProfile {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
+  // Nullable: a Parent-managed child has no login of their own, so there is
+  // no User row to point at. Self-registered students always set this.
+  userId    String?  @map("user_id") @db.Uuid
+  // The Parent account that created/manages this student profile, when the
+  // profile was added on a child's behalf rather than self-registered.
+  // Nullable: a Student who registered themselves has no guardian.
+  guardianId String? @map("guardian_id") @db.Uuid
   firstName String   @map("first_name") @db.VarChar(100)
   dob       DateTime? @db.Date
   levelId    String?     @map("level_id") @db.Uuid
@@ -969,13 +996,14 @@ model StudentProfile {
   examOrGoal String?     @map("exam_or_goal") @db.VarChar(255)
   preferredMode     PreferredSessionMode? @map("preferred_mode")
   preferredLanguage Languages?               @map("preferred_language")
-  
+
   specialNotes      String?               @map("special_notes")
   createdAt         DateTime              @default(now()) @map("created_at")
   updatedAt         DateTime              @updatedAt @map("updated_at")
   deletedAt         DateTime?             @map("deleted_at")
 
-  user                User                      @relation(fields: [userId], references: [id])
+  user                User?                     @relation(fields: [userId], references: [id])
+  guardian            User?                     @relation("StudentProfileGuardian", fields: [guardianId], references: [id])
   level               Level?                    @relation(fields: [levelId], references: [id])
   subjects            StudentProfileSubject[]
   bookings            Booking[]
@@ -983,6 +1011,7 @@ model StudentProfile {
   learningSnapshots   LearningAnalyticsSnapshot[]
 
   @@index([userId])
+  @@index([guardianId])
   @@index([schoolType])
   @@index([levelId])
   @@map("student_profiles")
@@ -1059,6 +1088,7 @@ model File {
   scanCompletedAt DateTime? @map("scan_completed_at")
   isDisputeLocked Boolean   @default(false) @map("is_dispute_locked")
   deletedAt       DateTime? @map("deleted_at")
+  purgedAt        DateTime? @map("purged_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
@@ -1069,6 +1099,8 @@ model File {
   kycFrontPhotos  KycApplication[] @relation("KycCniFront")
   kycBackPhotos   KycApplication[] @relation("KycCniBack")
   kycSelfiePhotos KycApplication[] @relation("KycSelfie")
+  kycNonConvictionCertificates KycApplication[] @relation("KycNonConviction")
+  kycCvUploads                 KycApplication[] @relation("KycCv")
 
   whiteboardRooms LiveRoom[] @relation("RoomWhiteboardFile")
   recordingRooms  LiveRoom[] @relation("RoomRecordingFile")
@@ -1387,6 +1419,8 @@ model KycApplication {
   cniFrontPhotoId   String?         @map("cni_front_photo_id") @db.Uuid
   cniBackPhotoId    String?         @map("cni_back_photo_id") @db.Uuid
   selfieWithCniId   String?         @map("selfie_with_cni_id") @db.Uuid
+  nonConvictionCertificateId String? @map("non_conviction_certificate_id") @db.Uuid
+  cvFileId                   String? @map("cv_file_id") @db.Uuid
 
   fullLegalName            String?     @map("full_legal_name") @db.VarChar(255)
   surname                  String?     @db.VarChar(255)
@@ -1414,6 +1448,8 @@ model KycApplication {
   cniFrontPhoto File?        @relation("KycCniFront", fields: [cniFrontPhotoId], references: [id])
   cniBackPhoto  File?        @relation("KycCniBack", fields: [cniBackPhotoId], references: [id])
   selfieWithCni File?        @relation("KycSelfie", fields: [selfieWithCniId], references: [id])
+  nonConvictionCertificate File? @relation("KycNonConviction", fields: [nonConvictionCertificateId], references: [id])
+  cvFile                   File? @relation("KycCv", fields: [cvFileId], references: [id])
   currentCity   City?        @relation(fields: [currentCityId], references: [id])
   currentRegion Region?      @relation(fields: [currentRegionId], references: [id])
 
@@ -1448,6 +1484,7 @@ model KycStatusHistory {
   changedBy            User                     @relation(fields: [changedById], references: [id])
   rejectionFlags       KycRejectionFlag[]
   checklistSubmissions KycChecklistSubmission[]
+  spotCheckReview      KycSpotCheckReview?
 
   @@index([kycApplicationId])
   @@index([tutorProfileId])
@@ -1512,6 +1549,31 @@ model KycChecklistSubmission {
   @@index([kycStatusHistoryId])
   @@index([reviewedById])
   @@map("kyc_checklist_submissions")
+}
+
+enum SpotCheckVerdict {
+  GOOD
+  BAD
+}
+
+// Super Admin's secondary review of a sample of already-approved KYC
+// decisions. One verdict per KycStatusHistory row (an approval event) —
+// this is what "bad approval" governance counts against an admin.
+model KycSpotCheckReview {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kycStatusHistoryId String           @unique @map("kyc_status_history_id") @db.Uuid
+  reviewedById       String           @map("reviewed_by") @db.Uuid
+  verdict            SpotCheckVerdict
+  note               String?
+  reviewedAt         DateTime         @default(now()) @map("reviewed_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  kycStatusHistory KycStatusHistory @relation(fields: [kycStatusHistoryId], references: [id])
+  reviewedBy       User             @relation(fields: [reviewedById], references: [id])
+
+  @@index([reviewedById])
+  @@index([verdict])
+  @@map("kyc_spot_check_reviews")
 }
 
 model KycBan {
@@ -1862,6 +1924,7 @@ enum NotificationType {
 
   ACCOUNT_FLAGGED
   REAUTH_REQUIRED
+  ADMIN_REVIEW_REQUIRED
 
   SUPPORT_TICKET_OPENED
   SUPPORT_TICKET_RESPONSE
@@ -1872,6 +1935,22 @@ enum NotificationType {
 
   PLATFORM_OUTAGE_REFUND
   SCHEDULED_MAINTENANCE
+
+  NEW_MESSAGE_RECEIVED
+
+  OTHER
+}
+
+enum NotificationResourceType {
+  BOOKING
+  DISPUTE
+  PAYMENT
+  KYC
+  REVIEW
+  MATERIAL
+  SUPPORT_TICKET
+  ACCOUNT
+  MESSAGE
 }
 
 enum NotificationChannel {
@@ -1907,6 +1986,8 @@ model Notification {
   readAt      DateTime?        @map("read_at")
   createdAt   DateTime         @default(now()) @map("created_at")
   deletedAt   DateTime?        @map("deleted_at")
+  resourceType NotificationResourceType? @map("resource_type")
+  resourceId   String?
 
   recipient  User                     @relation(fields: [recipientId], references: [id])
   deliveries NotificationDelivery[]
@@ -1918,6 +1999,7 @@ model Notification {
   @@index([recipientId, readAt], map: "idx_notifications_recipient_read")
   @@index([recipientId, type], map: "idx_notifications_recipient_type")
   @@index([deletedAt])
+  @@index([resourceType, resourceId], map: "idx_notification_resource")
   @@map("notifications")
 }
 

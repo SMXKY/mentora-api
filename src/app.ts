@@ -7,6 +7,7 @@ import basicAuth from "express-basic-auth";
 import path from "path";
 
 import { requestId } from "./middlewares/requestId.middleware";
+import { resolveLocale } from "./shared/i18n/resolveLocale";
 import { globalErrorController } from "./utils/error.controller";
 import { AppError } from "./utils/AppError.util";
 import { CORS_ORIGINS } from "./utils/enviromentVariablesCheck.util";
@@ -16,6 +17,16 @@ import authRouter from "./modules/auth";
 import permissionRouter from "./modules/permission";
 import permissionOverideRouter from "./modules/permissionOverride";
 import userRouter from "./modules/user";
+import auditLogRouter from "./modules/auditLog";
+import notificationRouter from "./modules/notification";
+import notificationWebhookRouter from "./services/notification/notification.webhook.route";
+import mediaRouter from "./modules/media";
+import adminUserRouter from "./modules/adminUser";
+import { kycRouter, kycAdminRouter } from "./modules/kyc";
+import { regionsRouter, citiesRouter, subjectsRouter, levelsRouter } from "./modules/catalog";
+import studentRouter from "./modules/student";
+import parentRouter from "./modules/parent";
+import tutorRouter from "./modules/tutor";
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -57,6 +68,12 @@ app.use(
 );
 
 app.use(requestId);
+app.use(resolveLocale());
+
+// Mounted before express.json — the WhatsApp webhook verifies an HMAC over
+// the raw request bytes, so its body must never be parsed by the global
+// JSON middleware first.
+app.use("/api/v1", notificationWebhookRouter);
 
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
@@ -124,6 +141,19 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/permissions", permissionRouter);
 app.use("/api/v1/permission-overrides", permissionOverideRouter);
 app.use("/api/v1/users", userRouter);
+app.use("/api/v1/audit-logs", auditLogRouter);
+app.use("/api/v1/notifications", notificationRouter);
+app.use("/api/v1/media", mediaRouter);
+app.use("/api/v1/admin/users", adminUserRouter);
+app.use("/api/v1/kyc", kycRouter);
+app.use("/api/v1/admin/kyc", kycAdminRouter);
+app.use("/api/v1/regions", regionsRouter);
+app.use("/api/v1/cities", citiesRouter);
+app.use("/api/v1/subjects", subjectsRouter);
+app.use("/api/v1/levels", levelsRouter);
+app.use("/api/v1/students", studentRouter);
+app.use("/api/v1/parents", parentRouter);
+app.use("/api/v1/tutors", tutorRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(

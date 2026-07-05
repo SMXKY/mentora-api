@@ -5,10 +5,7 @@ import {
   ParamsId,
   PaginationQuery,
 } from "../../middlewares/validate.middleware";
-import {
-  CreateUserRoleSchema,
-  UpdateUserRoleSchema,
-} from "./userRole.schema";
+import { CreateUserRoleSchema, UpdateUserRoleSchema } from "./userRole.schema";
 import protect from "../../middlewares/protect.middleware";
 import restrictTo from "../../middlewares/restrictTo.middleware";
 import { permissions } from "../../data/permission.data";

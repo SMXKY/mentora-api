@@ -1,0 +1,12 @@
+{
+  "subject": "Welcome to Mentora — Your admin account is ready",
+  "title": "Welcome, {{firstName}}!",
+  "intro": "Your Mentora admin account has been created. Below are your login credentials. Please log in and <strong style=\"color:#c62828;\">change your password immediately.</strong>",
+  "credentialsLabel": "Your credentials",
+  "emailLabel": "Email",
+  "passwordLabel": "Password",
+  "rolesLabel": "Roles",
+  "warning": "This password is temporary. For your security, please change it as soon as you log in. Do not share these credentials with anyone.",
+  "footerNote": "If you did not expect this email, please contact your system administrator immediately.",
+  "plainTextBody": "Welcome {{firstName}}! Email: {{email}} Password: {{password}} Please change your password immediately."
+}

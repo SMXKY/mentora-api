@@ -15,6 +15,8 @@ import {
   VerifyResetOtpSchema,
   ResetPasswordSchema,
   ChangePasswordSchema,
+  DeactivateAccountSchema,
+  ReactivateAccountSchema,
 } from "./auth.types";
 import restrictTo from "../../middlewares/restrictTo.middleware";
 import { permissions } from "../../data/permission.data";
@@ -62,6 +64,30 @@ router.post(
 );
 
 router.get("/me", protect, authController.me);
+
+router.get("/me/completion", protect, authController.getCompletion);
+
+router.post(
+  "/me/deactivate/request-otp",
+  protect,
+  authController.requestDeactivationOtp
+);
+
+router.post(
+  "/me/deactivate",
+  protect,
+  validate(DeactivateAccountSchema),
+  authController.deactivateMe
+);
+
+// Not behind `protect` — a deactivated account's own token no longer
+// works (session invalidated, deletedAt set), so reactivation re-verifies
+// identity from scratch, same as login.
+router.post(
+  "/me/reactivate",
+  validate(ReactivateAccountSchema),
+  authController.reactivateMe
+);
 
 router.post("/login", validate(LoginSchema), authController.login);
 

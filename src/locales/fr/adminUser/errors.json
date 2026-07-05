@@ -1,0 +1,7 @@
+{
+  "reasonRequired": "Un motif est requis pour suspendre un compte.",
+  "userNotFound": "Aucun compte trouvé avec cet identifiant.",
+  "alreadySuspended": "Ce compte est déjà suspendu.",
+  "cannotSuspendBanned": "Ce compte est définitivement banni et ne peut pas être suspendu.",
+  "notSuspended": "Ce compte n'est pas actuellement suspendu."
+}

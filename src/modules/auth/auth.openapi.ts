@@ -13,6 +13,9 @@ import {
   ForgotPasswordSchema,
   VerifyResetOtpSchema,
   ResetPasswordSchema,
+  CompletionResponseSchema,
+  DeactivateAccountSchema,
+  ReactivateAccountSchema,
 } from "./auth.types";
 import { z } from "zod";
 
@@ -416,5 +419,103 @@ registry.registerPath({
       },
     },
     401: { description: "No valid session token" },
+  },
+});
+
+// ── Account completion ───────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: "get",
+  path: `${basePath}/me/completion`,
+  tags,
+  summary: "Get account completion status",
+  description:
+    "Evaluates completion requirements for the caller's role (Parent: email, " +
+    "name, phone, at least one student profile. Student: email, name, phone, " +
+    "class/level, at least one subject of interest. Tutor: email, name, phone, " +
+    "and a full tutor profile broken into subjects/pricing/photo). Returns not " +
+    "just complete/incomplete but exactly which items are still missing.",
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: "Completion status and missing items",
+      content: {
+        "application/json": {
+          schema: z.object({ success: z.boolean(), data: CompletionResponseSchema }),
+        },
+      },
+    },
+    401: { description: "No valid session token" },
+  },
+});
+
+// ── Self-deactivation / reactivation ────────────────────────────────────────
+
+registry.registerPath({
+  method: "post",
+  path: `${basePath}/me/deactivate/request-otp`,
+  tags,
+  summary: "Request an OTP to confirm self-deactivation (passwordless accounts only)",
+  description:
+    "Only usable by accounts with no password (Google sign-in). Sends a 6-digit " +
+    "OTP to the account's email, to be passed as otpCode to POST /me/deactivate. " +
+    "Accounts with a password confirm with it directly and never call this.",
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: { description: "OTP sent" },
+    400: { description: "Account has a password — confirm with it instead" },
+    401: { description: "No valid session token" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: `${basePath}/me/deactivate`,
+  tags,
+  summary: "Deactivate the caller's own account",
+  description:
+    "Confirms identity with either `password` (accounts with a password) or " +
+    "`otpCode` (passwordless accounts, requested via /me/deactivate/request-otp) " +
+    "— exactly one must be provided. On success invalidates every active session " +
+    "immediately and starts a 30-day recoverable grace period; the account is " +
+    "anonymised automatically if it is never reactivated within that window.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { "application/json": { schema: DeactivateAccountSchema } } },
+  },
+  responses: {
+    200: { description: "Account deactivated" },
+    400: {
+      description:
+        "Neither or both of password/otpCode provided, or wrong confirmation type for this account",
+    },
+    401: { description: "Incorrect password/OTP, or no valid session token" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: `${basePath}/me/reactivate`,
+  tags,
+  summary: "Reactivate a self-deactivated account within its grace period",
+  description:
+    "Not behind authentication — a deactivated account's own token is already " +
+    "invalidated, so this re-verifies identity from scratch by identifier + " +
+    "password/otpCode, the same way login does. Returns a fresh session token " +
+    "on success, exactly like login.",
+  request: {
+    body: { content: { "application/json": { schema: ReactivateAccountSchema } } },
+  },
+  responses: {
+    200: {
+      description: "Account reactivated — new session issued",
+      content: { "application/json": { schema: z.object({ success: z.boolean(), data: z.object({ user: z.any(), token: z.string() }) }) } },
+    },
+    400: {
+      description:
+        "Invalid identifier format, account is not deactivated, or wrong confirmation type",
+    },
+    401: { description: "Incorrect password/OTP" },
+    410: { description: "The 30-day reactivation window has passed" },
   },
 });

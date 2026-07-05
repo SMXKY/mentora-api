@@ -76,6 +76,14 @@ export class AuthController {
     appResponder(StatusCodes.OK, result, res);
   });
 
+  getCompletion = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const result = await AuthService.getCompletion(ctx);
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
+
   login = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { identifier, password } = req.body;
     const userAgent = req.headers["user-agent"];
@@ -126,6 +134,38 @@ export class AuthController {
         newPassword,
         confirmPassword,
         ctx
+      );
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
+
+  requestDeactivationOtp = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      await AuthService.requestDeactivationOtp(ctx);
+      appResponder(StatusCodes.OK, {}, res);
+    }
+  );
+
+  deactivateMe = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const result = await AuthService.deactivateAccount(ctx, req.body);
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
+
+  reactivateMe = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const userAgent = req.headers["user-agent"];
+      const ip =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+        req.socket.remoteAddress ||
+        req.ip;
+      const result = await AuthService.reactivateAccount(
+        req.body,
+        ip,
+        userAgent
       );
       appResponder(StatusCodes.OK, result, res);
     }

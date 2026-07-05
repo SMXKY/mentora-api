@@ -1,0 +1,13 @@
+{
+  "noFileProvided": "No file was provided in the request",
+  "invalidFileName": "The provided file name is not allowed",
+  "invalidExtension": "This file type is not allowed here. Allowed: {{allowed}}",
+  "invalidMimeType": "The file content does not match an allowed type (detected: {{detected}})",
+  "fileTooLarge": "The file is too large. Maximum size is {{maxSizeMB}}MB",
+  "virusDetected": "The file was rejected by the malware scan",
+  "scanUnavailable": "File scanning is temporarily unavailable. Please try again later",
+  "quotaExceeded": "You have reached your storage limit",
+  "fileNotFound": "The requested file was not found",
+  "disputeLocked": "This file is locked because of an open dispute and cannot be modified",
+  "processingFailed": "The file could not be processed. Please try uploading it again"
+}

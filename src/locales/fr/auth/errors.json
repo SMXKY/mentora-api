@@ -45,5 +45,11 @@
   "lastNameRequired": "Veuillez entrer un nom de famille.",
   "idTokenRequired": "Un jeton Google ID est requis.",
   "notAuthenticated": "Vous devez être connecté pour accéder à cette ressource.",
-  "insufficientPermissions": "Vous n'avez pas la permission d'effectuer cette action."
+  "insufficientPermissions": "Vous n'avez pas la permission d'effectuer cette action.",
+  "sessionInvalidated": "Votre session a été terminée. Veuillez vous reconnecter.",
+  "accountIncomplete": "Veuillez compléter votre compte avant de continuer.",
+  "deactivateConfirmationRequired": "Veuillez confirmer avec votre mot de passe, ou avec le code qui vous a été envoyé, mais pas les deux.",
+  "passwordAccountNoOtp": "Ce compte a un mot de passe — confirmez avec votre mot de passe plutôt qu'avec un code.",
+  "notDeactivated": "Ce compte n'est pas désactivé.",
+  "reactivationWindowExpired": "Le délai de 30 jours pour réactiver ce compte est dépassé. Veuillez contacter le support."
 }

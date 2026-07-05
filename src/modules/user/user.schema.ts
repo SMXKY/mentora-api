@@ -40,6 +40,23 @@ export const UpdateUserSchema = CreateUserSchema.partial().openapi(
   "UpdateUser"
 );
 
+// Self-service subset — deliberately excludes fields only an admin may
+// change (email, isEmailVerified, username, status, isAccountComplete,
+// googleAuthId, facebookAuthId, whatsapp opt-in bookkeeping, profilePictureUrl
+// — that one has its own dedicated multipart endpoint).
+export const UpdateMeSchema = z
+  .object({
+    firstName: z.string().min(1).optional(),
+    lastName: z.string().min(1).optional(),
+    phoneNumber: z.string().optional(),
+    dob: z.string().datetime().optional(),
+    gender: z.enum(["MALE", "FEMALE", "PREFER_NOT_TO_SAY"]).optional(),
+    address: z.string().optional(),
+    preferredLanguage: z.enum(["EN", "FR"]).optional(),
+    notificationsMuted: z.boolean().optional(),
+  })
+  .openapi("UpdateMe");
+
 // Full response shape returned to the client — password is never
 // included here (see user.repository.ts, which strips it from every
 // record before it reaches this layer).

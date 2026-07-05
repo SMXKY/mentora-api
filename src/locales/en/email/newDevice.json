@@ -1,0 +1,15 @@
+{
+  "subject": "New device login detected — Mentora",
+  "title": "New device login detected",
+  "intro": "Hi{{namePart}}, we noticed a login to your Mentora account from a new device. If this was you, no action is needed. If not, change your password immediately.",
+  "loginDetailsLabel": "Login details",
+  "deviceLabel": "Device",
+  "browserLabel": "Browser",
+  "osLabel": "OS",
+  "ipAddressLabel": "IP Address",
+  "timeLabel": "Time",
+  "unknown": "Unknown",
+  "warning": "If you did not log in, change your password immediately and contact support.",
+  "footerNote": "If this was you, you can safely ignore this email.",
+  "plainTextBody": "A new device logged into your Mentora account from {{ipAddress}}."
+}

@@ -38,15 +38,21 @@ if (!process.env.LIVEKIT_API_KEY)
 if (!process.env.LIVEKIT_API_SECRET)
   throw new Error("LIVEKIT_API_SECRET environment variable not set");
 
-// Interserver Storage
-if (!process.env.STORAGE_ENDPOINT)
-  throw new Error("STORAGE_ENDPOINT environment variable not set");
-if (!process.env.STORAGE_ACCESS_KEY)
-  throw new Error("STORAGE_ACCESS_KEY environment variable not set");
-if (!process.env.STORAGE_SECRET_KEY)
-  throw new Error("STORAGE_SECRET_KEY environment variable not set");
-if (!process.env.STORAGE_BUCKET)
-  throw new Error("STORAGE_BUCKET environment variable not set");
+// Interserver Storage (FTP) — required only in production; development
+// uses the local-filesystem adapter and needs no FTP credentials.
+if (process.env.NODE_ENV === "production") {
+  for (const key of [
+    "FTP_HOST",
+    "FTP_USER",
+    "FTP_PASSWORD",
+    "FTP_PORT",
+    "FTP_UPLOAD_DIR",
+    "FTP_BASE_URL",
+  ]) {
+    if (!process.env[key])
+      throw new Error(`${key} environment variable not set`);
+  }
+}
 
 // Cloudflare CDN
 if (!process.env.CDN_BASE_URL)
@@ -64,13 +70,20 @@ if (!process.env.FIREBASE_CLIENT_EMAIL)
 if (!process.env.FIREBASE_PRIVATE_KEY)
   throw new Error("FIREBASE_PRIVATE_KEY environment variable not set");
 
-// WhatsApp
-if (!process.env.WHATSAPP_ACCESS_TOKEN)
-  throw new Error("WHATSAPP_ACCESS_TOKEN environment variable not set");
-if (!process.env.WHATSAPP_PHONE_NUMBER_ID)
-  throw new Error("WHATSAPP_PHONE_NUMBER_ID environment variable not set");
-if (!process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN)
-  throw new Error("WHATSAPP_WEBHOOK_VERIFY_TOKEN environment variable not set");
+// WhatsApp Cloud API — required only in production. The channel code
+// degrades gracefully (logged send failures, webhook rejects) when the
+// credentials are absent in development.
+if (process.env.NODE_ENV === "production") {
+  for (const key of [
+    "WHATSAPP_CLOUD_API_TOKEN",
+    "WHATSAPP_PHONE_NUMBER_ID",
+    "WHATSAPP_APP_SECRET",
+    "WHATSAPP_WEBHOOK_VERIFY_TOKEN",
+  ]) {
+    if (!process.env[key])
+      throw new Error(`${key} environment variable not set`);
+  }
+}
 
 // Flagsmith
 if (!process.env.FLAGSMITH_ENVIRONMENT_KEY)
@@ -167,12 +180,6 @@ export const NOTCHPAY_WEBHOOK_SECRET = process.env.NOTCHPAY_WEBHOOK_SECRET!;
 export const LIVEKIT_URL = process.env.LIVEKIT_URL!;
 export const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY!;
 export const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET!;
-
-export const STORAGE_ENDPOINT = process.env.STORAGE_ENDPOINT!;
-export const STORAGE_ACCESS_KEY = process.env.STORAGE_ACCESS_KEY!;
-export const STORAGE_SECRET_KEY = process.env.STORAGE_SECRET_KEY!;
-export const STORAGE_BUCKET = process.env.STORAGE_BUCKET!;
-export const STORAGE_REGION = process.env.STORAGE_REGION || "us-east-1";
 
 export const CDN_BASE_URL = process.env.CDN_BASE_URL!;
 export const RESEND_API_KEY = process.env.RESEND_API_KEY!;

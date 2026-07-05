@@ -1,0 +1,6 @@
+{
+  "unregisteredType": "This notification type ({{type}}) is not registered and cannot be sent",
+  "notFound": "The requested notification was not found",
+  "invalidWhatsappNumber": "Please provide a valid Cameroonian WhatsApp number (e.g. +2376XXXXXXXX)",
+  "noIdsProvided": "Provide at least one notification id"
+}

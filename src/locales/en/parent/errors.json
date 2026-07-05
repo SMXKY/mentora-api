@@ -1,0 +1,4 @@
+{
+  "firstNameRequired": "Please enter the student's first name.",
+  "studentNotFound": "No student profile was found for this account."
+}

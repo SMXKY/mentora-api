@@ -1,5 +1,6 @@
 {
   "adminCreated": "Le compte administrateur a été créé avec succès.",
   "passwordChanged": "Votre mot de passe a été modifié avec succès.",
-  "passwordReset": "Votre mot de passe a été réinitialisé avec succès."
+  "passwordReset": "Votre mot de passe a été réinitialisé avec succès.",
+  "accountDeactivated": "Votre compte a été désactivé. Vous pouvez le réactiver dans les 30 jours."
 }

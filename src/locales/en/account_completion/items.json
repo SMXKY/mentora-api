@@ -1,0 +1,12 @@
+{
+  "email_verified": "Verify your email address",
+  "full_name": "Add your first and last name",
+  "phone_number": "Add your phone number",
+  "student_profile": "Add at least one student profile",
+  "class_level": "Set your current class or level",
+  "subject_of_interest": "Add at least one subject of interest",
+  "tutor_profile": "Complete your tutor profile (bio, location, teaching mode)",
+  "subjects": "Add at least one subject you teach",
+  "pricing": "Set your minimum and maximum hourly rate",
+  "photo": "Add a profile photo"
+}
