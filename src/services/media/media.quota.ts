@@ -31,11 +31,21 @@ async function resolveQuotaLimitBytes(userId: string): Promise<bigint> {
 }
 
 async function ensureUsageRow(userId: string): Promise<void> {
-  await prisma.storageUsage.upsert({
-    where: { userId },
-    create: { userId, usedBytes: BigInt(0) },
-    update: {},
-  });
+  try {
+    await prisma.storageUsage.upsert({
+      where: { userId },
+      create: { userId, usedBytes: BigInt(0) },
+      update: {},
+    });
+  } catch (err: any) {
+    // Two concurrent first-touch uploads for the same brand-new user (e.g.
+    // KYC's Step 1 uploading four files at once) can both pass the upsert's
+    // internal existence check before either commits its CREATE — Postgres
+    // then rejects the loser with a unique violation on user_id. The row
+    // exists either way by the time we get here, so this is a race, not a
+    // real failure.
+    if (err?.code !== "P2002") throw err;
+  }
 }
 
 /**

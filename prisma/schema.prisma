@@ -368,6 +368,11 @@ model User {
   escrowReviewRequired   Boolean   @default(false) @map("escrow_review_required")
   escrowReviewRequiredAt DateTime? @map("escrow_review_required_at")
 
+  // Set once this admin has more than 3 KYC approvals marked BAD in a spot
+  // check within a trailing 30-day window — their future KYC approvals
+  // require Super Admin countersignature until this is cleared.
+  kycCountersignatureRequired Boolean @default(false) @map("kyc_countersignature_required")
+
   lastLoggedInAt DateTime? @map("last_logged_in_at")
 
   createdAt DateTime  @default(now()) @map("created_at")
@@ -414,6 +419,7 @@ model User {
   kycStatusChanges        KycStatusHistory[]
   kycChecklistSubmissions KycChecklistSubmission[]
   kycBansIssued           KycBan[]
+  kycSpotCheckReviewsGiven KycSpotCheckReview[]
   
   demandSignals DemandSignal[]
   
@@ -1091,6 +1097,8 @@ model File {
   kycFrontPhotos  KycApplication[] @relation("KycCniFront")
   kycBackPhotos   KycApplication[] @relation("KycCniBack")
   kycSelfiePhotos KycApplication[] @relation("KycSelfie")
+  kycNonConvictionCertificates KycApplication[] @relation("KycNonConviction")
+  kycCvUploads                 KycApplication[] @relation("KycCv")
 
   whiteboardRooms LiveRoom[] @relation("RoomWhiteboardFile")
   recordingRooms  LiveRoom[] @relation("RoomRecordingFile")
@@ -1409,6 +1417,8 @@ model KycApplication {
   cniFrontPhotoId   String?         @map("cni_front_photo_id") @db.Uuid
   cniBackPhotoId    String?         @map("cni_back_photo_id") @db.Uuid
   selfieWithCniId   String?         @map("selfie_with_cni_id") @db.Uuid
+  nonConvictionCertificateId String? @map("non_conviction_certificate_id") @db.Uuid
+  cvFileId                   String? @map("cv_file_id") @db.Uuid
 
   fullLegalName            String?     @map("full_legal_name") @db.VarChar(255)
   surname                  String?     @db.VarChar(255)
@@ -1436,6 +1446,8 @@ model KycApplication {
   cniFrontPhoto File?        @relation("KycCniFront", fields: [cniFrontPhotoId], references: [id])
   cniBackPhoto  File?        @relation("KycCniBack", fields: [cniBackPhotoId], references: [id])
   selfieWithCni File?        @relation("KycSelfie", fields: [selfieWithCniId], references: [id])
+  nonConvictionCertificate File? @relation("KycNonConviction", fields: [nonConvictionCertificateId], references: [id])
+  cvFile                   File? @relation("KycCv", fields: [cvFileId], references: [id])
   currentCity   City?        @relation(fields: [currentCityId], references: [id])
   currentRegion Region?      @relation(fields: [currentRegionId], references: [id])
 
@@ -1470,6 +1482,7 @@ model KycStatusHistory {
   changedBy            User                     @relation(fields: [changedById], references: [id])
   rejectionFlags       KycRejectionFlag[]
   checklistSubmissions KycChecklistSubmission[]
+  spotCheckReview      KycSpotCheckReview?
 
   @@index([kycApplicationId])
   @@index([tutorProfileId])
@@ -1534,6 +1547,31 @@ model KycChecklistSubmission {
   @@index([kycStatusHistoryId])
   @@index([reviewedById])
   @@map("kyc_checklist_submissions")
+}
+
+enum SpotCheckVerdict {
+  GOOD
+  BAD
+}
+
+// Super Admin's secondary review of a sample of already-approved KYC
+// decisions. One verdict per KycStatusHistory row (an approval event) —
+// this is what "bad approval" governance counts against an admin.
+model KycSpotCheckReview {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kycStatusHistoryId String           @unique @map("kyc_status_history_id") @db.Uuid
+  reviewedById       String           @map("reviewed_by") @db.Uuid
+  verdict            SpotCheckVerdict
+  note               String?
+  reviewedAt         DateTime         @default(now()) @map("reviewed_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  kycStatusHistory KycStatusHistory @relation(fields: [kycStatusHistoryId], references: [id])
+  reviewedBy       User             @relation(fields: [reviewedById], references: [id])
+
+  @@index([reviewedById])
+  @@index([verdict])
+  @@map("kyc_spot_check_reviews")
 }
 
 model KycBan {

@@ -22,6 +22,7 @@ import notificationRouter from "./modules/notification";
 import notificationWebhookRouter from "./services/notification/notification.webhook.route";
 import mediaRouter from "./modules/media";
 import adminUserRouter from "./modules/adminUser";
+import { kycRouter, kycAdminRouter } from "./modules/kyc";
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -140,6 +141,8 @@ app.use("/api/v1/audit-logs", auditLogRouter);
 app.use("/api/v1/notifications", notificationRouter);
 app.use("/api/v1/media", mediaRouter);
 app.use("/api/v1/admin/users", adminUserRouter);
+app.use("/api/v1/kyc", kycRouter);
+app.use("/api/v1/admin/kyc", kycAdminRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(

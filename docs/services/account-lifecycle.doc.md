@@ -37,12 +37,17 @@ self-deactivation both call.
 |---|---|
 | Parent | verified email, full name, phone, **at least one guarded student profile** |
 | Student | verified email, full name, phone, class/level, **at least one subject of interest** |
-| Tutor | verified email, full name, phone, **a TutorProfile row + at least one subject + both min/max rate + a photo** |
+| Tutor | verified email, full name, phone, **a TutorProfile row + both min/max rate + a photo** |
 
 Tutor's "bio, location, mode" are collapsed into a single `tutor_profile`
 item rather than three separate checks — those three fields are `NOT NULL`
 on `TutorProfile` itself, so a row existing at all already guarantees them.
-Only genuinely-optional pieces (subjects, pricing, photo) get their own item.
+**Subjects are deliberately excluded from Tutor completion** — subjects are
+only ever claimed by going through KYC (Module 9), and KYC is itself gated
+behind this completion check, so requiring a subject here would make it
+impossible for any tutor to ever reach 100%. (This was corrected after the
+KYC module was built and the circular dependency became visible — see
+`docs/services/kyc-onboarding.doc.md`.)
 
 Every response — `GET /api/v1/auth/me/completion` — returns the exact
 missing items, not just a boolean:
@@ -52,15 +57,14 @@ missing items, not just a boolean:
   "completionStatus": "incomplete",
   "isComplete": false,
   "role": "Tutor",
-  "percent": 40,
+  "percent": 50,
   "items": [
     { "key": "email_verified", "labelCode": "account_completion/items:email_verified", "complete": true },
     { "key": "tutor_profile", "labelCode": "account_completion/items:tutor_profile", "complete": true },
-    { "key": "subjects", "labelCode": "account_completion/items:subjects", "complete": false },
     { "key": "pricing", "labelCode": "account_completion/items:pricing", "complete": false },
     { "key": "photo", "labelCode": "account_completion/items:photo", "complete": false }
   ],
-  "missing": ["subjects", "pricing", "photo"]
+  "missing": ["pricing", "photo"]
 }
 ```
 

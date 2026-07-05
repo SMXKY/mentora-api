@@ -113,24 +113,19 @@ export async function evaluateCompletion(
   } else if (role === "Tutor") {
     const profile = await prisma.tutorProfile.findFirst({
       where: { userId, deletedAt: null },
-      select: {
-        minRateXaf: true,
-        maxRateXaf: true,
-        profilePictureUrl: true,
-        tutorSubjects: { select: { id: true }, take: 1 },
-      },
+      select: { minRateXaf: true, maxRateXaf: true, profilePictureUrl: true },
     });
     // bio, teachingMode, and cityId are NOT NULL on TutorProfile, so a row
     // existing at all already satisfies "information/bio/location/mode".
+    // Subjects are deliberately NOT a completion requirement here — a
+    // tutor only ever claims subjects by going through KYC (Module 9),
+    // and KYC itself is gated behind this completion check. Requiring
+    // subjects first would make it impossible for any tutor to ever
+    // reach 100% and unlock verification.
     items.push({
       key: "tutor_profile",
       labelCode: "account_completion/items:tutor_profile",
       complete: !!profile,
-    });
-    items.push({
-      key: "subjects",
-      labelCode: "account_completion/items:subjects",
-      complete: (profile?.tutorSubjects.length ?? 0) > 0,
     });
     items.push({
       key: "pricing",
