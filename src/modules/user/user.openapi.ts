@@ -17,27 +17,6 @@ const tags = ["User"];
 const basePath = "/api/v1/users";
 
 registry.registerPath({
-  method: "post",
-  path: basePath,
-  tags,
-  summary: "Create a new user",
-  request: {
-    body: {
-      content: { "application/json": { schema: CreateUserSchema } },
-    },
-  },
-  responses: {
-    201: {
-      description: "User created successfully",
-      content: { "application/json": { schema: UserResponseSchema } },
-    },
-    400: { description: "Validation error" },
-    401: { description: "Unauthorised" },
-    403: { description: "Forbidden" },
-  },
-});
-
-registry.registerPath({
   method: "get",
   path: basePath,
   tags,

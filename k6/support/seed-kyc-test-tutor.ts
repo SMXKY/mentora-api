@@ -144,6 +144,7 @@ async function main(): Promise<void> {
     path.join(fixturesDir, "kyc-seed.json"),
     JSON.stringify({
       email: KYC_TUTOR_EMAIL,
+      tutorProfileId: tutorProfile.id,
       subjectId: subject.id,
       cityId: city.id,
       regionId: region.id,

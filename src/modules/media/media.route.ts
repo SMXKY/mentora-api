@@ -16,7 +16,10 @@ const upload = multer({
   storage: multer.diskStorage({
     destination: os.tmpdir(),
     filename: (_req, file, cb) =>
-      cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
+      cb(
+        null,
+        `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`
+      ),
   }),
   limits: { fileSize: 500 * 1024 * 1024, files: 10 },
 });

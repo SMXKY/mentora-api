@@ -14,6 +14,10 @@ import "../src/modules/notification/notification.openapi";
 import "../src/modules/media/media.openapi";
 import "../src/modules/adminUser/adminUser.openapi";
 import "../src/modules/kyc/kyc.openapi";
+import "../src/modules/catalog/catalog.openapi";
+import "../src/modules/student/student.openapi";
+import "../src/modules/parent/parent.openapi";
+import "../src/modules/tutor/tutor.openapi";
 // testResource is a scaffold template, not a mounted module — excluded on purpose
 
 async function main() {

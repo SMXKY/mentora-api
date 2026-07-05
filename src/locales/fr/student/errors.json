@@ -1,0 +1,5 @@
+{
+  "firstNameRequired": "Veuillez saisir un prénom.",
+  "profileNotFound": "Aucun profil d'élève n'a été trouvé. Veuillez d'abord configurer votre profil.",
+  "subjectNotFound": "Cette matière n'existe pas."
+}

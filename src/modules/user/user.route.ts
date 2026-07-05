@@ -9,7 +9,11 @@ import {
   ParamsId,
   PaginationQuery,
 } from "../../middlewares/validate.middleware";
-import { CreateUserSchema, UpdateUserSchema, UpdateMeSchema } from "./user.schema";
+import {
+  CreateUserSchema,
+  UpdateUserSchema,
+  UpdateMeSchema,
+} from "./user.schema";
 import protect from "../../middlewares/protect.middleware";
 import restrictTo from "../../middlewares/restrictTo.middleware";
 import { permissions } from "../../data/permission.data";
@@ -20,18 +24,13 @@ const uploadProfilePicture = multer({
   storage: multer.diskStorage({
     destination: os.tmpdir(),
     filename: (_req, file, cb) =>
-      cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
+      cb(
+        null,
+        `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`
+      ),
   }),
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
 });
-
-router.post(
-  "/",
-  protect,
-  restrictTo(permissions.users.manage),
-  validate(CreateUserSchema),
-  userController.create
-);
 
 router.get(
   "/",
@@ -67,12 +66,7 @@ router.get(
 
 // Self-service — must be registered before the generic "/:id" routes below,
 // otherwise Express would treat "me" as an :id value.
-router.patch(
-  "/me",
-  protect,
-  validate(UpdateMeSchema),
-  userController.updateMe
-);
+router.patch("/me", protect, validate(UpdateMeSchema), userController.updateMe);
 
 router.patch(
   "/me/profile-picture",

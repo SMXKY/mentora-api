@@ -23,6 +23,10 @@ import notificationWebhookRouter from "./services/notification/notification.webh
 import mediaRouter from "./modules/media";
 import adminUserRouter from "./modules/adminUser";
 import { kycRouter, kycAdminRouter } from "./modules/kyc";
+import { regionsRouter, citiesRouter, subjectsRouter, levelsRouter } from "./modules/catalog";
+import studentRouter from "./modules/student";
+import parentRouter from "./modules/parent";
+import tutorRouter from "./modules/tutor";
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -143,6 +147,13 @@ app.use("/api/v1/media", mediaRouter);
 app.use("/api/v1/admin/users", adminUserRouter);
 app.use("/api/v1/kyc", kycRouter);
 app.use("/api/v1/admin/kyc", kycAdminRouter);
+app.use("/api/v1/regions", regionsRouter);
+app.use("/api/v1/cities", citiesRouter);
+app.use("/api/v1/subjects", subjectsRouter);
+app.use("/api/v1/levels", levelsRouter);
+app.use("/api/v1/students", studentRouter);
+app.use("/api/v1/parents", parentRouter);
+app.use("/api/v1/tutors", tutorRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(

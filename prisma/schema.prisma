@@ -982,7 +982,9 @@ model AvailabilitySlot {
 
 model StudentProfile {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
+  // Nullable: a Parent-managed child has no login of their own, so there is
+  // no User row to point at. Self-registered students always set this.
+  userId    String?  @map("user_id") @db.Uuid
   // The Parent account that created/manages this student profile, when the
   // profile was added on a child's behalf rather than self-registered.
   // Nullable: a Student who registered themselves has no guardian.
@@ -1000,7 +1002,7 @@ model StudentProfile {
   updatedAt         DateTime              @updatedAt @map("updated_at")
   deletedAt         DateTime?             @map("deleted_at")
 
-  user                User                      @relation(fields: [userId], references: [id])
+  user                User?                     @relation(fields: [userId], references: [id])
   guardian            User?                     @relation("StudentProfileGuardian", fields: [guardianId], references: [id])
   level               Level?                    @relation(fields: [levelId], references: [id])
   subjects            StudentProfileSubject[]
