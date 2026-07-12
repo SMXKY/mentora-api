@@ -37,7 +37,9 @@ export const KycRejectionFlagItemEnum = z.enum([
 export const KycStep1Schema = z
   .object({
     idDocumentType: IdDocumentTypeEnum,
-    cniNumber: z.string().regex(CNI_NUMBER_REGEX, "kyc/errors:invalidCniNumberFormat"),
+    cniNumber: z
+      .string()
+      .regex(CNI_NUMBER_REGEX, "kyc/errors:invalidCniNumberFormat"),
     cniDateIssued: z.string().datetime().optional(),
     cniExpirationDate: z.string().datetime().optional(),
   })
@@ -72,12 +74,10 @@ export const CredentialInputSchema = z
     qualificationType: QualificationTypeEnum,
     fieldOfStudy: z.string().min(1, "kyc/errors:fieldRequired"),
     gradeOrClassification: z.string().optional(),
-    yearAwarded: z
-      .number()
-      .int()
-      .min(1950)
-      .max(new Date().getFullYear()),
-    subjectIds: z.array(z.string().uuid()).min(1, "kyc/errors:credentialNeedsSubject"),
+    yearAwarded: z.number().int().min(1950).max(new Date().getFullYear()),
+    subjectIds: z
+      .array(z.string().uuid())
+      .min(1, "kyc/errors:credentialNeedsSubject"),
   })
   .openapi("CredentialInput");
 export type CredentialInput = z.infer<typeof CredentialInputSchema>;
@@ -94,7 +94,9 @@ export type KycDeclarationInput = z.infer<typeof KycDeclarationSchema>;
 
 // ── Additional-subject (post-approval lighter flow) ─────────
 export const AdditionalSubjectSchema = CredentialInputSchema.extend({
-  subjectIds: z.array(z.string().uuid()).length(1, "kyc/errors:additionalSubjectSingle"),
+  subjectIds: z
+    .array(z.string().uuid())
+    .length(1, "kyc/errors:additionalSubjectSingle"),
 }).openapi("AdditionalSubject");
 export type AdditionalSubjectInput = z.infer<typeof AdditionalSubjectSchema>;
 
@@ -177,3 +179,33 @@ export const KycSlaConfigSchema = z
   })
   .openapi("KycSlaConfig");
 export type KycSlaConfigInput = z.infer<typeof KycSlaConfigSchema>;
+
+// ── Status check (lightweight, for UI gating) ────────────────
+export const KycStepsProgressSchema = z
+  .object({
+    identity: z.boolean(),
+    biography: z.boolean(),
+    credentials: z.boolean(),
+  })
+  .openapi("KycStepsProgress");
+
+export const KycRejectionFlagSummarySchema = z
+  .object({
+    flagItem: KycRejectionFlagItemEnum,
+    reason: z.string(),
+    adminMessage: z.string().nullable(),
+  })
+  .openapi("KycRejectionFlagSummary");
+
+export const KycStatusResponseSchema = z
+  .object({
+    hasStarted: z.boolean(),
+    kycStatus: z.string().nullable(),
+    currentStep: z.string().nullable(),
+    canEdit: z.boolean(),
+    steps: KycStepsProgressSchema,
+    rejectionFlags: z.array(KycRejectionFlagSummarySchema),
+    isBanned: z.boolean(),
+  })
+  .openapi("KycStatusResponse");
+export type KycStatusResponse = z.infer<typeof KycStatusResponseSchema>;

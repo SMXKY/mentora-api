@@ -5,10 +5,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { kycController } from "./kyc.controller";
 import { validate, ParamsId } from "../../middlewares/validate.middleware";
-import {
-  KycStep1Schema,
-  KycStep2Schema,
-} from "./kyc.types";
+import { KycStep1Schema, KycStep2Schema } from "./kyc.types";
 import protect from "../../middlewares/protect.middleware";
 import { z } from "zod";
 
@@ -19,7 +16,10 @@ function makeUpload(maxSizeMB: number, maxFiles: number) {
     storage: multer.diskStorage({
       destination: os.tmpdir(),
       filename: (_req, file, cb) =>
-        cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
+        cb(
+          null,
+          `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`
+        ),
     }),
     limits: { fileSize: maxSizeMB * 1024 * 1024, files: maxFiles },
   });
@@ -58,6 +58,9 @@ router.delete(
   validate(z.object({ credentialId: z.string().uuid() }), "params"),
   kycController.removeCredential
 );
+
+router.get("/me", kycController.getMyApplication);
+router.get("/me/status", kycController.getStatus);
 
 router.post("/me/cv", cvUpload.single("cv"), kycController.uploadCv);
 

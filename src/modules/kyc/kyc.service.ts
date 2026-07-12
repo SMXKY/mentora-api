@@ -13,7 +13,10 @@ import { fileTypes, FileTypeSpec } from "../../services/media/media.types";
 import { evaluateCompletion } from "../../services/accountCompletion/accountCompletion.service";
 import { assertValidTransition } from "../../services/kyc/kycStateMachine";
 import NotificationService from "../../services/notification/notification.service";
-import { NotificationType, NotificationResourceType } from "../../generated/prisma";
+import {
+  NotificationType,
+  NotificationResourceType,
+} from "../../generated/prisma";
 import { permissions } from "../../data/permission.data";
 import {
   KycStep1Input,
@@ -35,7 +38,10 @@ async function getTutorProfileOrThrow(userId: string) {
     select: { id: true, kycStatus: true, userId: true },
   });
   if (!profile) {
-    throw new AppError("kyc/errors:tutorProfileNotFound", StatusCodes.NOT_FOUND);
+    throw new AppError(
+      "kyc/errors:tutorProfileNotFound",
+      StatusCodes.NOT_FOUND
+    );
   }
   return profile;
 }
@@ -44,11 +50,10 @@ async function getTutorProfileOrThrow(userId: string) {
 async function assertProfileComplete(userId: string): Promise<void> {
   const completion = await evaluateCompletion(userId);
   if (!completion.isComplete) {
-    throw new AppError(
-      "kyc/errors:profileIncomplete",
-      StatusCodes.FORBIDDEN,
-      { redirect: "profile_completion", missing: completion.missing }
-    );
+    throw new AppError("kyc/errors:profileIncomplete", StatusCodes.FORBIDDEN, {
+      redirect: "profile_completion",
+      missing: completion.missing,
+    });
   }
 }
 
@@ -126,7 +131,12 @@ export const KycService = {
           })
         : [];
 
-    return { application, credentials, kycStatus: profile.kycStatus, rejectionFlags };
+    return {
+      application,
+      credentials,
+      kycStatus: profile.kycStatus,
+      rejectionFlags,
+    };
   },
 
   async saveStep1(
@@ -144,24 +154,38 @@ export const KycService = {
     const application = await getOrCreateApplication(profile.id);
     await assertEditable(application.id, profile.id);
 
-    if (!files.cniFront || !files.cniBack || !files.selfie || !files.nonConvictionCertificate) {
-      throw new AppError("kyc/errors:step1FilesRequired", StatusCodes.BAD_REQUEST);
+    if (
+      !files.cniFront ||
+      !files.cniBack ||
+      !files.selfie ||
+      !files.nonConvictionCertificate
+    ) {
+      throw new AppError(
+        "kyc/errors:step1FilesRequired",
+        StatusCodes.BAD_REQUEST
+      );
     }
 
-    const [cniFrontPhotoId, cniBackPhotoId, selfieWithCniId, nonConvictionCertificateId] =
-      await Promise.all([
-        uploadKycDoc(userId, files.cniFront, IMAGE_TYPES, 5),
-        uploadKycDoc(userId, files.cniBack, IMAGE_TYPES, 5),
-        uploadKycDoc(userId, files.selfie, IMAGE_TYPES, 5),
-        uploadKycDoc(userId, files.nonConvictionCertificate, PDF_TYPES, 5),
-      ]);
+    const [
+      cniFrontPhotoId,
+      cniBackPhotoId,
+      selfieWithCniId,
+      nonConvictionCertificateId,
+    ] = await Promise.all([
+      uploadKycDoc(userId, files.cniFront, IMAGE_TYPES, 5),
+      uploadKycDoc(userId, files.cniBack, IMAGE_TYPES, 5),
+      uploadKycDoc(userId, files.selfie, IMAGE_TYPES, 5),
+      uploadKycDoc(userId, files.nonConvictionCertificate, PDF_TYPES, 5),
+    ]);
 
     return prisma.kycApplication.update({
       where: { id: application.id },
       data: {
         idDocumentType: data.idDocumentType,
         cniNumber: data.cniNumber,
-        cniDateIssued: data.cniDateIssued ? new Date(data.cniDateIssued) : undefined,
+        cniDateIssued: data.cniDateIssued
+          ? new Date(data.cniDateIssued)
+          : undefined,
         cniExpirationDate: data.cniExpirationDate
           ? new Date(data.cniExpirationDate)
           : undefined,
@@ -181,7 +205,10 @@ export const KycService = {
     await assertEditable(application.id, profile.id);
 
     if (!application.cniFrontPhotoId) {
-      throw new AppError("kyc/errors:step1NotComplete", StatusCodes.BAD_REQUEST);
+      throw new AppError(
+        "kyc/errors:step1NotComplete",
+        StatusCodes.BAD_REQUEST
+      );
     }
 
     return prisma.kycApplication.update({
@@ -205,7 +232,10 @@ export const KycService = {
     await assertEditable(application.id, profile.id);
 
     if (!file) {
-      throw new AppError("kyc/errors:credentialDocumentRequired", StatusCodes.BAD_REQUEST);
+      throw new AppError(
+        "kyc/errors:credentialDocumentRequired",
+        StatusCodes.BAD_REQUEST
+      );
     }
 
     const subjects = await prisma.subject.findMany({
@@ -221,7 +251,10 @@ export const KycService = {
       {
         uploadedById: userId,
         fileCategory: FileCategory.KYC_DOCUMENT,
-        fileType: file.mimetype === "application/pdf" ? FileType.DOCUMENT : FileType.IMAGE,
+        fileType:
+          file.mimetype === "application/pdf"
+            ? FileType.DOCUMENT
+            : FileType.IMAGE,
         allowedTypes: [...IMAGE_TYPES, ...PDF_TYPES],
         maxSizeMB: 10,
       }
@@ -271,10 +304,16 @@ export const KycService = {
       where: { id: credentialId, tutorProfileId: profile.id },
     });
     if (!credential) {
-      throw new AppError("kyc/errors:credentialNotFound", StatusCodes.NOT_FOUND);
+      throw new AppError(
+        "kyc/errors:credentialNotFound",
+        StatusCodes.NOT_FOUND
+      );
     }
     if (credential.status !== CredentialStatus.PENDING) {
-      throw new AppError("kyc/errors:credentialNotEditable", StatusCodes.CONFLICT);
+      throw new AppError(
+        "kyc/errors:credentialNotEditable",
+        StatusCodes.CONFLICT
+      );
     }
 
     await prisma.credentialSubjectLink.deleteMany({ where: { credentialId } });
@@ -308,7 +347,10 @@ export const KycService = {
       !!application.selfieWithCniId &&
       !!application.nonConvictionCertificateId;
     if (!step1Complete) {
-      throw new AppError("kyc/errors:step1NotComplete", StatusCodes.BAD_REQUEST);
+      throw new AppError(
+        "kyc/errors:step1NotComplete",
+        StatusCodes.BAD_REQUEST
+      );
     }
 
     const step2Complete =
@@ -325,7 +367,10 @@ export const KycService = {
       !!application.emergencyContactName &&
       !!application.emergencyContactPhone;
     if (!step2Complete) {
-      throw new AppError("kyc/errors:step2NotComplete", StatusCodes.BAD_REQUEST);
+      throw new AppError(
+        "kyc/errors:step2NotComplete",
+        StatusCodes.BAD_REQUEST
+      );
     }
 
     const credentialCount = await prisma.tutorCredential.count({
@@ -335,7 +380,10 @@ export const KycService = {
       },
     });
     if (credentialCount === 0) {
-      throw new AppError("kyc/errors:step3NotComplete", StatusCodes.BAD_REQUEST);
+      throw new AppError(
+        "kyc/errors:step3NotComplete",
+        StatusCodes.BAD_REQUEST
+      );
     }
 
     const fromStatus =
@@ -363,7 +411,8 @@ export const KycService = {
         data: {
           kycApplicationId: application.id,
           tutorProfileId: profile.id,
-          previousStatus: fromStatus === KycStatus.INCOMPLETE ? null : fromStatus,
+          previousStatus:
+            fromStatus === KycStatus.INCOMPLETE ? null : fromStatus,
           newStatus: KycStatus.PENDING,
           changedById: userId,
           reason: isResubmission ? "Tutor resubmission" : "Initial submission",
@@ -384,7 +433,9 @@ export const KycService = {
       resourceType: NotificationResourceType.KYC,
       resourceId: application.id,
       data: {
-        reviewReason: isResubmission ? "kyc_resubmission" : "new_kyc_application",
+        reviewReason: isResubmission
+          ? "kyc_resubmission"
+          : "new_kyc_application",
         tutorProfileId: profile.id,
       },
     }).catch(() => {});
@@ -403,10 +454,14 @@ export const KycService = {
       orderBy: { version: "desc" },
     });
     if (!latest) {
-      throw new AppError("kyc/errors:tutorProfileNotFound", StatusCodes.NOT_FOUND);
+      throw new AppError(
+        "kyc/errors:tutorProfileNotFound",
+        StatusCodes.NOT_FOUND
+      );
     }
 
-    const { id, createdAt, updatedAt, version, currentStep, ...carryForward } = latest;
+    const { id, createdAt, updatedAt, version, currentStep, ...carryForward } =
+      latest;
     return prisma.kycApplication.create({
       data: {
         ...carryForward,
@@ -426,15 +481,124 @@ export const KycService = {
   ) {
     const profile = await getTutorProfileOrThrow(userId);
     if (profile.kycStatus !== KycStatus.ACTIVE) {
-      throw new AppError("kyc/errors:mustBeActiveForAdditionalSubject", StatusCodes.CONFLICT);
+      throw new AppError(
+        "kyc/errors:mustBeActiveForAdditionalSubject",
+        StatusCodes.CONFLICT
+      );
     }
     if (!file) {
-      throw new AppError("kyc/errors:credentialDocumentRequired", StatusCodes.BAD_REQUEST);
+      throw new AppError(
+        "kyc/errors:credentialDocumentRequired",
+        StatusCodes.BAD_REQUEST
+      );
     }
     // Reuses the exact same credential-creation path — the "lighter flow"
     // is entirely about which admin queue it lands in (see kycAdmin.service),
     // not a different tutor-facing code path.
     return KycService.addCredential(userId, data, file);
+  },
+
+  // kyc.service.ts — add to KycService
+
+  async getStatus(userId: string) {
+    const profile = await prisma.tutorProfile.findFirst({
+      where: { userId, deletedAt: null },
+      select: { id: true, kycStatus: true },
+    });
+
+    if (!profile) {
+      return {
+        hasStarted: false,
+        kycStatus: null,
+        currentStep: null,
+        canEdit: false,
+        steps: { identity: false, biography: false, credentials: false },
+        rejectionFlags: [] as {
+          flagItem: string;
+          reason: string;
+          adminMessage: string | null;
+        }[],
+        isBanned: false,
+      };
+    }
+
+    const ban = await prisma.kycBan.findUnique({
+      where: { tutorProfileId: profile.id },
+      select: { reason: true, createdAt: true },
+    });
+
+    const application = await prisma.kycApplication.findFirst({
+      where: { tutorProfileId: profile.id, deletedAt: null },
+      orderBy: { version: "desc" },
+    });
+
+    if (!application) {
+      return {
+        hasStarted: false,
+        kycStatus: profile.kycStatus,
+        currentStep: null,
+        canEdit: !ban,
+        steps: { identity: false, biography: false, credentials: false },
+        rejectionFlags: [],
+        isBanned: !!ban,
+      };
+    }
+
+    const step1Complete =
+      !!application.idDocumentType &&
+      !!application.cniNumber &&
+      !!application.cniFrontPhotoId &&
+      !!application.cniBackPhotoId &&
+      !!application.selfieWithCniId &&
+      !!application.nonConvictionCertificateId;
+
+    const step2Complete =
+      !!application.fullLegalName &&
+      !!application.surname &&
+      !!application.dob &&
+      !!application.gender &&
+      !!application.currentStreet &&
+      !!application.currentNeighbourhood &&
+      !!application.currentCityId &&
+      !!application.currentRegionId &&
+      !!application.cityOfOrigin &&
+      !!application.regionOfOrigin &&
+      !!application.emergencyContactName &&
+      !!application.emergencyContactPhone;
+
+    const credentialCount = await prisma.tutorCredential.count({
+      where: { tutorProfileId: profile.id, subjectLinks: { some: {} } },
+    });
+    const step3Complete = credentialCount > 0;
+
+    // Mirrors assertEditable's rule: read-only once submitted, unless rejected.
+    const canEdit =
+      !ban &&
+      (application.currentStep !== KycStep.SUBMITTED ||
+        profile.kycStatus === KycStatus.REJECTED);
+
+    const rejectionFlags =
+      profile.kycStatus === KycStatus.REJECTED
+        ? await prisma.kycRejectionFlag.findMany({
+            where: { kycApplicationId: application.id },
+            orderBy: { createdAt: "desc" },
+            select: { flagItem: true, reason: true, adminMessage: true },
+          })
+        : [];
+
+    return {
+      hasStarted: true,
+      kycStatus: profile.kycStatus,
+      currentStep: application.currentStep,
+      canEdit,
+      steps: {
+        identity: step1Complete,
+        biography: step2Complete,
+        credentials: step3Complete,
+      },
+      rejectionFlags,
+      isBanned: !!ban,
+    };
   },
 };
 

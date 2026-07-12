@@ -16,7 +16,10 @@ function parseCredentialBody(body: Record<string, any>) {
       ? body.subjectIds
       : JSON.parse(body.subjectIds ?? "[]");
   } catch {
-    throw new AppError("kyc/errors:invalidSubjectIdsFormat", StatusCodes.BAD_REQUEST);
+    throw new AppError(
+      "kyc/errors:invalidSubjectIdsFormat",
+      StatusCodes.BAD_REQUEST
+    );
   }
   return {
     institutionName: body.institutionName,
@@ -28,14 +31,17 @@ function parseCredentialBody(body: Record<string, any>) {
   };
 }
 
-const filesFrom = (req: Request) => req.files as Record<string, Express.Multer.File[]>;
+const filesFrom = (req: Request) =>
+  req.files as Record<string, Express.Multer.File[]>;
 
 export const kycController = {
-  getMyApplication: catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const ctx = buildContext(req, res);
-    const result = await KycService.getMyApplication(ctx.userId!);
-    appResponder(StatusCodes.OK, result, res);
-  }),
+  getMyApplication: catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const result = await KycService.getMyApplication(ctx.userId!);
+      appResponder(StatusCodes.OK, result, res);
+    }
+  ),
 
   saveStep1: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
@@ -55,33 +61,46 @@ export const kycController = {
     appResponder(StatusCodes.OK, result, res);
   }),
 
-  addCredential: catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const ctx = buildContext(req, res);
-    const parsed = CredentialInputSchema.parse(parseCredentialBody(req.body));
-    const result = await KycService.addCredential(ctx.userId!, parsed, req.file!);
-    appResponder(StatusCodes.CREATED, result, res);
-  }),
+  addCredential: catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const parsed = CredentialInputSchema.parse(parseCredentialBody(req.body));
+      const result = await KycService.addCredential(
+        ctx.userId!,
+        parsed,
+        req.file!
+      );
+      appResponder(StatusCodes.CREATED, result, res);
+    }
+  ),
 
-  removeCredential: catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const ctx = buildContext(req, res);
-    await KycService.removeCredential(ctx.userId!, req.params.credentialId);
-    appResponder(StatusCodes.OK, { removed: true }, res);
-  }),
+  removeCredential: catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      await KycService.removeCredential(ctx.userId!, req.params.credentialId);
+      appResponder(StatusCodes.OK, { removed: true }, res);
+    }
+  ),
 
   uploadCv: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
     if (!req.file) {
-      throw new AppError("media/errors:noFileProvided", StatusCodes.BAD_REQUEST);
+      throw new AppError(
+        "media/errors:noFileProvided",
+        StatusCodes.BAD_REQUEST
+      );
     }
     const result = await KycService.uploadCv(ctx.userId!, req.file);
     appResponder(StatusCodes.OK, result, res);
   }),
 
-  submitApplication: catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const ctx = buildContext(req, res);
-    const result = await KycService.submitApplication(ctx.userId!);
-    appResponder(StatusCodes.OK, result, res);
-  }),
+  submitApplication: catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const result = await KycService.submitApplication(ctx.userId!);
+      appResponder(StatusCodes.OK, result, res);
+    }
+  ),
 
   resubmit: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
@@ -89,11 +108,25 @@ export const kycController = {
     appResponder(StatusCodes.OK, result, res);
   }),
 
-  addAdditionalSubject: catchAsync(async (req: Request, res: Response): Promise<void> => {
+  addAdditionalSubject: catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const parsed = AdditionalSubjectSchema.parse(
+        parseCredentialBody(req.body)
+      );
+      const result = await KycService.addAdditionalSubject(
+        ctx.userId!,
+        parsed,
+        req.file!
+      );
+      appResponder(StatusCodes.CREATED, result, res);
+    }
+  ),
+
+  getStatus: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
-    const parsed = AdditionalSubjectSchema.parse(parseCredentialBody(req.body));
-    const result = await KycService.addAdditionalSubject(ctx.userId!, parsed, req.file!);
-    appResponder(StatusCodes.CREATED, result, res);
+    const result = await KycService.getStatus(ctx.userId!);
+    appResponder(StatusCodes.OK, result, res);
   }),
 };
 
