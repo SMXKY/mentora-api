@@ -96,6 +96,25 @@ export class AuthController {
     appResponder(StatusCodes.OK, result, res);
   });
 
+  loginAdmin = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { identifier, password } = req.body;
+      const userAgent = req.headers["user-agent"];
+      const ip =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+        req.socket.remoteAddress ||
+        req.ip;
+
+      const result = await AuthService.loginAdmin(
+        identifier,
+        password,
+        userAgent,
+        ip
+      );
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
+
   changePassword = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
       const ctx = buildContext(req, res);

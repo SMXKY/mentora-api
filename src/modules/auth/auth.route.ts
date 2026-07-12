@@ -89,7 +89,8 @@ router.post(
   authController.reactivateMe
 );
 
-router.post("/login", validate(LoginSchema), authController.login);
+router.post("/user/login", validate(LoginSchema), authController.login);
+router.post("/admin/login", validate(LoginSchema), authController.loginAdmin);
 
 router.post(
   "/forgot-password",

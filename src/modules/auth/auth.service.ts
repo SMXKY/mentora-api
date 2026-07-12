@@ -53,6 +53,7 @@ const CAMEROON_PHONE_REGEX = /^\+237[6-9][0-9]{8}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const SELF_REGISTRATION_ROLES = ["Parent", "Student", "Tutor"] as const;
+type RoleGate = (roleNames: string[]) => boolean;
 type SelfRegistrationRole = (typeof SELF_REGISTRATION_ROLES)[number];
 
 const ADMIN_ASSIGNABLE_ROLES = ["Admin", "Moderator", "Support Agent"] as const;
@@ -529,11 +530,13 @@ export class AuthService {
     return { message: "auth/success:adminCreated" };
   }
 
-  static async login(
+  private static async authenticateCore(
     identifier: string,
     password: string,
     userAgent: string | undefined,
-    ip: string | undefined
+    ip: string | undefined,
+    isAllowed: RoleGate,
+    deniedAuditEvent: string
   ): Promise<{ user: any; token: string }> {
     if (ip && (await isIpLocked(ip))) {
       throw new AppError(
@@ -593,7 +596,8 @@ export class AuthService {
     }
 
     const isValid = await argon2.verify(user.password, password);
-    if (!isValid) {
+
+    const failLoginAttempt = async () => {
       if (ip) await recordFailedIpAttempt(ip);
       const justLocked = await recordFailedAccountAttempt(user.id);
 
@@ -626,6 +630,43 @@ export class AuthService {
           }
         );
       }
+    };
+
+    if (!isValid) {
+      await failLoginAttempt();
+      throw new AppError(
+        "auth/errors:invalidCredentials",
+        StatusCodes.UNAUTHORIZED
+      );
+    }
+
+    // Role gate runs only after a correct password, and on failure is
+    // treated identically to a wrong password (same counters, same error)
+    // so the two cases are indistinguishable from the outside.
+    const activeRoles = await prisma.userRole.findMany({
+      where: {
+        userId: user.id,
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { role: { select: { name: true } } },
+    });
+    const roleNames = activeRoles.map((ur) => ur.role.name);
+
+    if (!isAllowed(roleNames)) {
+      await failLoginAttempt();
+
+      AuditService.record(
+        { userId: user.id, ipAddress: ip, userAgent },
+        "users",
+        {
+          operation: LogOperation.AUTH,
+          category: LogCategory.AUTH,
+          recordId: user.id,
+          changedFields: [],
+          eventType: deniedAuditEvent,
+        }
+      );
 
       throw new AppError(
         "auth/errors:invalidCredentials",
@@ -712,6 +753,44 @@ export class AuthService {
     });
 
     return AuthService.buildLoginResponse(user.id, ip, userAgent, deviceId);
+  }
+
+  static async login(
+    identifier: string,
+    password: string,
+    userAgent: string | undefined,
+    ip: string | undefined
+  ): Promise<{ user: any; token: string }> {
+    return AuthService.authenticateCore(
+      identifier,
+      password,
+      userAgent,
+      ip,
+      (roles) =>
+        roles.some((r) =>
+          (SELF_REGISTRATION_ROLES as readonly string[]).includes(r)
+        ),
+      "user.login_denied_admin_role"
+    );
+  }
+
+  static async loginAdmin(
+    identifier: string,
+    password: string,
+    userAgent: string | undefined,
+    ip: string | undefined
+  ): Promise<{ user: any; token: string }> {
+    return AuthService.authenticateCore(
+      identifier,
+      password,
+      userAgent,
+      ip,
+      (roles) =>
+        !roles.some((r) =>
+          (SELF_REGISTRATION_ROLES as readonly string[]).includes(r)
+        ),
+      "user.login_denied_self_registration_role"
+    );
   }
 
   static async changePassword(
@@ -1182,7 +1261,12 @@ export class AuthService {
     });
 
     AuditService.record(
-      { userId: user.id, userEmail: user.email ?? undefined, ipAddress: ip, userAgent },
+      {
+        userId: user.id,
+        userEmail: user.email ?? undefined,
+        ipAddress: ip,
+        userAgent,
+      },
       "users",
       {
         operation: LogOperation.REACTIVATE,
