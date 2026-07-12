@@ -115,6 +115,13 @@ export async function evaluateCompletion(
       where: { userId, deletedAt: null },
       select: { minRateXaf: true, maxRateXaf: true, profilePictureUrl: true },
     });
+
+    const baseUser = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+
     // bio, teachingMode, and cityId are NOT NULL on TutorProfile, so a row
     // existing at all already satisfies "information/bio/location/mode".
     // Subjects are deliberately NOT a completion requirement here — a
@@ -135,7 +142,7 @@ export async function evaluateCompletion(
     items.push({
       key: "photo",
       labelCode: "account_completion/items:photo",
-      complete: !!profile?.profilePictureUrl,
+      complete: !!(baseUser?.profilePictureUrl || profile?.profilePictureUrl),
     });
   }
 
