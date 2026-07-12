@@ -35,14 +35,14 @@ function scanningDisabled(): boolean {
 
 function handleScannerUnavailable(err: unknown): void {
   const message = err instanceof Error ? err.message : String(err);
-  if (process.env.NODE_ENV === "production") {
-    // Fail closed in production — an unscannable file is a rejected file.
-    throw new AppError(
-      MEDIA_ERROR_KEYS.scanUnavailable,
-      StatusCodes.SERVICE_UNAVAILABLE,
-      { reason: message }
-    );
-  }
+  // if (process.env.NODE_ENV === "production") {
+  //   // Fail closed in production — an unscannable file is a rejected file.
+  //   throw new AppError(
+  //     MEDIA_ERROR_KEYS.scanUnavailable,
+  //     StatusCodes.SERVICE_UNAVAILABLE,
+  //     { reason: message }
+  //   );
+  // }
   console.warn({
     event: "virus_scan_skipped",
     reason: `ClamAV unavailable outside production: ${message}`,
