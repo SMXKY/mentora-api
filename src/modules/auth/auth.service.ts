@@ -1101,6 +1101,111 @@ export class AuthService {
     return evaluateCompletion(ctx.userId!);
   }
 
+  // auth.service.ts — add inside AuthService class
+
+  static async requestEmailVerification(
+    ctx: ServiceContext,
+    email: string
+  ): Promise<void> {
+    if (!EMAIL_REGEX.test(email)) {
+      throw new AppError(
+        "auth/errors:invalidEmailFormat",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: ctx.userId },
+      select: { id: true, isEmailVerified: true },
+    });
+
+    if (!user) {
+      throw new AppError("auth/errors:userNotFound", StatusCodes.UNAUTHORIZED);
+    }
+
+    if (user.isEmailVerified) {
+      throw new AppError(
+        "auth/errors:emailAlreadyVerified",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    const existing = await prisma.user.findFirst({
+      where: { email, deletedAt: null, NOT: { id: user.id } },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new AppError(
+        "auth/errors:emailAlreadyRegistered",
+        StatusCodes.CONFLICT
+      );
+    }
+
+    const code = await OtpService.generateAndStoreOtp(email);
+    await deliverEmailOtp(email, code);
+  }
+
+  static async confirmEmailVerification(
+    ctx: ServiceContext,
+    email: string,
+    code: string
+  ): Promise<{ message: string }> {
+    if (!EMAIL_REGEX.test(email)) {
+      throw new AppError(
+        "auth/errors:invalidEmailFormat",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: ctx.userId },
+      select: { id: true, isEmailVerified: true },
+    });
+
+    if (!user) {
+      throw new AppError("auth/errors:userNotFound", StatusCodes.UNAUTHORIZED);
+    }
+
+    if (user.isEmailVerified) {
+      throw new AppError(
+        "auth/errors:emailAlreadyVerified",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+
+    await OtpService.verifyOtp(email, code);
+
+    // Re-check uniqueness right before commit — closes the race where
+    // someone else claimed this email between request and confirm.
+    const existing = await prisma.user.findFirst({
+      where: { email, deletedAt: null, NOT: { id: user.id } },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new AppError(
+        "auth/errors:emailAlreadyRegistered",
+        StatusCodes.CONFLICT
+      );
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { email, isEmailVerified: true },
+    });
+
+    AuditService.record(ctx, "users", {
+      operation: LogOperation.UPDATE,
+      category: LogCategory.AUTH,
+      recordId: user.id,
+      changedFields: ["email", "isEmailVerified"],
+      eventType: "user.email_verified",
+    });
+
+    return { message: "auth/success:emailVerified" };
+  }
+
   /**
    * Sends a fresh OTP for passwordless (Google-auth) accounts to confirm
    * before deactivating. Accounts with a password confirm with it instead

@@ -202,3 +202,27 @@ export const ReactivateAccountSchema = z
 
 export type DeactivateAccountInput = z.infer<typeof DeactivateAccountSchema>;
 export type ReactivateAccountInput = z.infer<typeof ReactivateAccountSchema>;
+
+// ── Post-registration email verification ────────────────────
+// For accounts registered via phone that don't have an email on file yet.
+// isEmailVerified is forced true at registration for email/Google accounts,
+// so this flow only ever applies to a currently-null email.
+export const RequestEmailVerificationSchema = z
+  .object({
+    email: z.string().email("auth/errors:invalidEmailFormat"),
+  })
+  .openapi("RequestEmailVerification");
+
+export const ConfirmEmailVerificationSchema = z
+  .object({
+    email: z.string().email("auth/errors:invalidEmailFormat"),
+    code: z.string().length(6, "auth/errors:invalidOtpLength"),
+  })
+  .openapi("ConfirmEmailVerification");
+
+export type RequestEmailVerificationInput = z.infer<
+  typeof RequestEmailVerificationSchema
+>;
+export type ConfirmEmailVerificationInput = z.infer<
+  typeof ConfirmEmailVerificationSchema
+>;

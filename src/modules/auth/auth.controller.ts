@@ -6,6 +6,7 @@ import { AuthService } from "./auth.service";
 import { StatusCodes } from "http-status-codes";
 import { OtpService } from "../../services/otp";
 import { AppError } from "../../utils/AppError.util";
+import { ServiceContext } from "../../base/base.types";
 
 export class AuthController {
   requestPhoneOtp = catchAsync(
@@ -80,6 +81,30 @@ export class AuthController {
     async (req: Request, res: Response): Promise<void> => {
       const ctx = buildContext(req, res);
       const result = await AuthService.getCompletion(ctx);
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
+
+  requestEmailVerification = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { email } = req.body;
+      const ctx = buildContext(req, res);
+
+      await AuthService.requestEmailVerification(ctx, email);
+      appResponder(StatusCodes.OK, { message: "auth/success:otpSent" }, res);
+    }
+  );
+
+  confirmEmailVerification = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { email, code } = req.body;
+      const ctx = buildContext(req, res);
+
+      const result = await AuthService.confirmEmailVerification(
+        ctx,
+        email,
+        code
+      );
       appResponder(StatusCodes.OK, result, res);
     }
   );

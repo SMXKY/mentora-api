@@ -16,6 +16,8 @@ import {
   CompletionResponseSchema,
   DeactivateAccountSchema,
   ReactivateAccountSchema,
+  ConfirmEmailVerificationSchema,
+  RequestEmailVerificationSchema,
 } from "./auth.types";
 import { z } from "zod";
 
@@ -523,6 +525,64 @@ registry.registerPath({
         "Neither or both of password/otpCode provided, or wrong confirmation type for this account",
     },
     401: { description: "Incorrect password/OTP, or no valid session token" },
+  },
+});
+
+// ── Post-registration email verification ────────────────────────────────────
+
+registry.registerPath({
+  method: "post",
+  path: `${basePath}/email-verification/request`,
+  tags,
+  summary: "Request an OTP to verify a new email address (authenticated)",
+  description:
+    "For accounts without a verified email (e.g. registered via phone). Sends a " +
+    "6-digit OTP to the given email address. Fails if the caller's email is " +
+    "already verified, or if the address is already registered to another account.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      content: {
+        "application/json": { schema: RequestEmailVerificationSchema },
+      },
+    },
+  },
+  responses: {
+    200: { description: "OTP sent" },
+    400: {
+      description:
+        "Invalid email format, or the caller's email is already verified",
+    },
+    401: { description: "No valid session token" },
+    409: { description: "Email already registered to another account" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: `${basePath}/email-verification/confirm`,
+  tags,
+  summary: "Confirm email verification with OTP (authenticated)",
+  description:
+    "Verifies the OTP sent to the given email address, then sets it as the " +
+    "caller's email and marks it verified. Re-checks that the email hasn't been " +
+    "claimed by another account since the OTP was requested.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      content: {
+        "application/json": { schema: ConfirmEmailVerificationSchema },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Email verified successfully" },
+    400: {
+      description:
+        "Invalid email format, invalid/expired OTP, or already verified",
+    },
+    401: { description: "No valid session token" },
+    409: { description: "Email already registered to another account" },
   },
 });
 

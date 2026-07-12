@@ -17,6 +17,8 @@ import {
   ChangePasswordSchema,
   DeactivateAccountSchema,
   ReactivateAccountSchema,
+  RequestEmailVerificationSchema,
+  ConfirmEmailVerificationSchema,
 } from "./auth.types";
 import restrictTo from "../../middlewares/restrictTo.middleware";
 import { permissions } from "../../data/permission.data";
@@ -45,6 +47,20 @@ router.post(
   "/register/email/verify-otp",
   validate(VerifyEmailOtpSchema),
   authController.verifyEmailOtp
+);
+
+router.post(
+  "/email-verification/request",
+  protect,
+  validate(RequestEmailVerificationSchema),
+  authController.requestEmailVerification
+);
+
+router.post(
+  "/email-verification/confirm",
+  protect,
+  validate(ConfirmEmailVerificationSchema),
+  authController.confirmEmailVerification
 );
 
 router.post("/google", validate(GoogleAuthSchema), authController.googleAuth);
