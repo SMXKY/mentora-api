@@ -1042,7 +1042,10 @@ export class AuthService {
         isEmailVerified: user.isEmailVerified,
         isAccountComplete: user.isAccountComplete,
         preferredLanguage: user.preferredLanguage,
-        role: user.userRoles[0].role.name,
+        gender: user.gender,
+        profilePictureUrl: String(user.profilePictureUrl),
+        roles: user.userRoles,
+        status: user.status,
       },
     };
   }

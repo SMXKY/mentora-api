@@ -33,7 +33,10 @@ export const SessionStatusResponseSchema = z
         isEmailVerified: z.boolean(),
         isAccountComplete: z.boolean(),
         preferredLanguage: z.enum(["EN", "FR"]),
-        role: z.string(),
+        roles: z.any(),
+        status: z.string(),
+        gender: z.string(),
+        profilePictureUrl: z.string(),
       }),
     }),
   ])
