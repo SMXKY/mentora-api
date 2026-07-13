@@ -35,8 +35,22 @@ export const NotificationResponseSchema = z
     id: z.string().uuid(),
     recipientId: z.string(),
     type: z.string(),
-    titleCode: z.string(),
-    bodyCode: z.string(),
+    titleCode: z.string().openapi({
+      description:
+        "Internal i18n key — do not display. Use `title` for the rendered, localized text.",
+    }),
+    bodyCode: z.string().openapi({
+      description:
+        "Internal i18n key — do not display. Use `body` for the rendered, localized text.",
+    }),
+    title: z.string().openapi({
+      description:
+        "Rendered notification title, already localized to the recipient's preferredLanguage.",
+    }),
+    body: z.string().openapi({
+      description:
+        "Rendered notification body, already localized to the recipient's preferredLanguage.",
+    }),
     data: z.record(z.string(), z.unknown()).optional(),
     isTransactional: z.boolean(),
     readAt: z.string().datetime().optional(),

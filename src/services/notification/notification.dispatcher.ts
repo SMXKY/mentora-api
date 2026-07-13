@@ -9,6 +9,7 @@ import { sendEmailChannel } from "./email.channel";
 import { sendWhatsappChannel } from "./whatsapp.channel";
 import { sendPushChannel } from "./push.channel";
 import { sendSmsChannel } from "./sms.channel";
+import { resolveNotificationCopy } from "./notification.text";
 import { isUserOnline, emitToUser } from "../../socket";
 
 const CHANNEL_SENDERS: Record<
@@ -106,9 +107,20 @@ async function dispatchInApp(notification: Notification): Promise<void> {
   await recordDelivery(notification.id, "IN_APP", "DELIVERED", 1);
 
   if (online) {
+    const recipient = await prisma.user.findUnique({
+      where: { id: notification.recipientId },
+      select: { preferredLanguage: true },
+    });
+    const { title, body } = resolveNotificationCopy(
+      notification,
+      recipient?.preferredLanguage
+    );
+
     emitToUser(notification.recipientId, "notification:new", {
       id: notification.id,
       type: notification.type,
+      title,
+      body,
       data: notification.data,
       resourceType: notification.resourceType,
       resourceId: notification.resourceId,

@@ -1,8 +1,7 @@
 import * as admin from "firebase-admin";
 import prisma from "../../config/database.config";
-import { notificationRegistry } from "./notification.types";
 import { Notification } from "../../generated/prisma";
-import { t } from "../../shared/i18n/t";
+import { resolveNotificationCopy } from "./notification.text";
 
 let firebaseApp: admin.app.App | null = null;
 
@@ -35,20 +34,12 @@ export async function sendPushChannel(
     select: { preferredLanguage: true },
   });
 
-  const definition = notificationRegistry[notification.type];
-  const locale =
-    recipient?.preferredLanguage?.toLowerCase() === "fr" ? "fr" : "en";
-  const vars = notification.data as Record<string, unknown> | null;
-
-  const title = t(definition.titleCode, "You have a new notification", {
-    lng: locale,
-    ...vars,
-  }).slice(0, 50);
-
-  const body = t(definition.bodyCode, "You have a new notification", {
-    lng: locale,
-    ...vars,
-  }).slice(0, 100);
+  const resolved = resolveNotificationCopy(
+    notification,
+    recipient?.preferredLanguage
+  );
+  const title = resolved.title.slice(0, 50);
+  const body = resolved.body.slice(0, 100);
 
   const results = await Promise.allSettled(
     tokens.map((t) =>

@@ -25,4 +25,9 @@ export const buildContext = (req: Request, res: Response): ServiceContext => ({
   // Locale resolved by getUserLanguage middleware
   // Defaults to English if middleware has not run
   lang: (res.locals.lang as Languages) || "en",
+
+  // Stored user preference, set at registration/profile update — used to
+  // render notification copy consistently with the email/push channels,
+  // which also key off preferredLanguage rather than the request header.
+  preferredLanguage: res.locals.user?.preferredLanguage,
 });
