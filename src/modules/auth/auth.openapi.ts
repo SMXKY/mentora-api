@@ -16,6 +16,8 @@ import {
   CompletionResponseSchema,
   DeactivateAccountSchema,
   ReactivateAccountSchema,
+  ConfirmEmailVerificationSchema,
+  RequestEmailVerificationSchema,
 } from "./auth.types";
 import { z } from "zod";
 
@@ -229,27 +231,54 @@ registry.registerPath({
 
 registry.registerPath({
   method: "post",
-  path: `${basePath}/login`,
+  path: `${basePath}/user/login`,
   tags,
-  summary: "Log in with email, phone, or username and password",
+  summary:
+    "Log in with email, phone, or username and password (Parent/Student/Tutor)",
   description:
     "Accepts an identifier (email address, phone number, or username) and password. " +
+    "Restricted to accounts holding a Parent, Student, or Tutor role — any other account " +
+    "receives the same generic invalid-credentials response as a wrong password. " +
     "On success returns a session JWT and the full user payload including permissions. " +
     "Logs a new device alert email if the login originates from an unrecognised device.",
   request: {
-    body: {
-      content: { "application/json": { schema: LoginSchema } },
-    },
+    body: { content: { "application/json": { schema: LoginSchema } } },
   },
   responses: {
     200: {
       description: "Login successful",
       content: {
         "application/json": {
-          schema: z.object({
-            success: z.boolean(),
-            data: LoginResponseSchema,
-          }),
+          schema: z.object({ success: z.boolean(), data: LoginResponseSchema }),
+        },
+      },
+    },
+    401: { description: "Invalid credentials or account has no password set" },
+    403: { description: "Account suspended or banned" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: `${basePath}/admin/login`,
+  tags,
+  summary:
+    "Log in to the admin console with email, phone, or username and password",
+  description:
+    "Accepts an identifier (email address, phone number, or username) and password. " +
+    "Restricted to accounts that do not hold a Parent, Student, or Tutor role — any account " +
+    "limited to those roles receives the same generic invalid-credentials response as a wrong password. " +
+    "On success returns a session JWT and the full user payload including permissions. " +
+    "Logs a new device alert email if the login originates from an unrecognised device.",
+  request: {
+    body: { content: { "application/json": { schema: LoginSchema } } },
+  },
+  responses: {
+    200: {
+      description: "Login successful",
+      content: {
+        "application/json": {
+          schema: z.object({ success: z.boolean(), data: LoginResponseSchema }),
         },
       },
     },
@@ -441,7 +470,10 @@ registry.registerPath({
       description: "Completion status and missing items",
       content: {
         "application/json": {
-          schema: z.object({ success: z.boolean(), data: CompletionResponseSchema }),
+          schema: z.object({
+            success: z.boolean(),
+            data: CompletionResponseSchema,
+          }),
         },
       },
     },
@@ -455,7 +487,8 @@ registry.registerPath({
   method: "post",
   path: `${basePath}/me/deactivate/request-otp`,
   tags,
-  summary: "Request an OTP to confirm self-deactivation (passwordless accounts only)",
+  summary:
+    "Request an OTP to confirm self-deactivation (passwordless accounts only)",
   description:
     "Only usable by accounts with no password (Google sign-in). Sends a 6-digit " +
     "OTP to the account's email, to be passed as otpCode to POST /me/deactivate. " +
@@ -481,7 +514,9 @@ registry.registerPath({
     "anonymised automatically if it is never reactivated within that window.",
   security: [{ bearerAuth: [] }],
   request: {
-    body: { content: { "application/json": { schema: DeactivateAccountSchema } } },
+    body: {
+      content: { "application/json": { schema: DeactivateAccountSchema } },
+    },
   },
   responses: {
     200: { description: "Account deactivated" },
@@ -490,6 +525,64 @@ registry.registerPath({
         "Neither or both of password/otpCode provided, or wrong confirmation type for this account",
     },
     401: { description: "Incorrect password/OTP, or no valid session token" },
+  },
+});
+
+// ── Post-registration email verification ────────────────────────────────────
+
+registry.registerPath({
+  method: "post",
+  path: `${basePath}/email-verification/request`,
+  tags,
+  summary: "Request an OTP to verify a new email address (authenticated)",
+  description:
+    "For accounts without a verified email (e.g. registered via phone). Sends a " +
+    "6-digit OTP to the given email address. Fails if the caller's email is " +
+    "already verified, or if the address is already registered to another account.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      content: {
+        "application/json": { schema: RequestEmailVerificationSchema },
+      },
+    },
+  },
+  responses: {
+    200: { description: "OTP sent" },
+    400: {
+      description:
+        "Invalid email format, or the caller's email is already verified",
+    },
+    401: { description: "No valid session token" },
+    409: { description: "Email already registered to another account" },
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: `${basePath}/email-verification/confirm`,
+  tags,
+  summary: "Confirm email verification with OTP (authenticated)",
+  description:
+    "Verifies the OTP sent to the given email address, then sets it as the " +
+    "caller's email and marks it verified. Re-checks that the email hasn't been " +
+    "claimed by another account since the OTP was requested.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      content: {
+        "application/json": { schema: ConfirmEmailVerificationSchema },
+      },
+    },
+  },
+  responses: {
+    200: { description: "Email verified successfully" },
+    400: {
+      description:
+        "Invalid email format, invalid/expired OTP, or already verified",
+    },
+    401: { description: "No valid session token" },
+    409: { description: "Email already registered to another account" },
   },
 });
 
@@ -504,12 +597,21 @@ registry.registerPath({
     "password/otpCode, the same way login does. Returns a fresh session token " +
     "on success, exactly like login.",
   request: {
-    body: { content: { "application/json": { schema: ReactivateAccountSchema } } },
+    body: {
+      content: { "application/json": { schema: ReactivateAccountSchema } },
+    },
   },
   responses: {
     200: {
       description: "Account reactivated — new session issued",
-      content: { "application/json": { schema: z.object({ success: z.boolean(), data: z.object({ user: z.any(), token: z.string() }) }) } },
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.boolean(),
+            data: z.object({ user: z.any(), token: z.string() }),
+          }),
+        },
+      },
     },
     400: {
       description:

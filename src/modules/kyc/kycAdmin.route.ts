@@ -12,6 +12,8 @@ import {
   ReviewCredentialSchema,
   SpotCheckVerdictSchema,
   KycSlaConfigSchema,
+  KycQueueQuerySchema,
+  KycSubjectQueueQuerySchema,
 } from "./kyc.types";
 import protect from "../../middlewares/protect.middleware";
 import restrictTo from "../../middlewares/restrictTo.middleware";
@@ -25,7 +27,14 @@ router.use(protect);
 router.get(
   "/queue",
   restrictTo(permissions.kyc.queueRead),
+  validate(KycQueueQuerySchema, "query"),
   kycAdminController.getQueue
+);
+
+router.get(
+  "/queue/stats",
+  restrictTo(permissions.kyc.queueRead),
+  kycAdminController.getQueueStats
 );
 
 router.get(
@@ -77,6 +86,7 @@ router.post(
 router.get(
   "/subjects/queue",
   restrictTo(permissions.kyc.subjectsRead),
+  validate(KycSubjectQueueQuerySchema, "query"),
   kycAdminController.getSubjectQueue
 );
 

@@ -47,17 +47,17 @@ function mustJson(res, label) {
   return body;
 }
 
-function login(identifier, password) {
+function login(identifier, password, isAdmin) {
   const res = http.post(
-    `${BASE_URL}/api/v1/auth/login`,
+    `${BASE_URL}/api/v1/auth/${isAdmin ? "admin" : "user"}/login`,
     JSON.stringify({ identifier, password }),
     { headers: { "Content-Type": "application/json" } }
   );
   return res;
 }
 
-function loginOrFail(identifier, password, label) {
-  const res = login(identifier, password);
+function loginOrFail(identifier, password, label, isAdmin) {
+  const res = login(identifier, password, isAdmin);
   check(res, { [`${label}: login 200`]: (r) => r.status === 200 });
   if (res.status !== 200) fail(`${label}: could not log in — did you run the seed script?`);
   return mustJson(res, label).data.token;
@@ -135,7 +135,7 @@ export default function () {
     "first submission is PENDING": (r) => r.json().data.status === "PENDING",
   });
 
-  const adminToken = loginOrFail(SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD, "admin");
+  const adminToken = loginOrFail(SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD, "admin", true);
 
   const queueBeforeReject = http.get(`${BASE_URL}/api/v1/admin/kyc/queue`, json(adminToken));
   check(queueBeforeReject, {

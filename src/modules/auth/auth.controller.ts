@@ -6,6 +6,7 @@ import { AuthService } from "./auth.service";
 import { StatusCodes } from "http-status-codes";
 import { OtpService } from "../../services/otp";
 import { AppError } from "../../utils/AppError.util";
+import { ServiceContext } from "../../base/base.types";
 
 export class AuthController {
   requestPhoneOtp = catchAsync(
@@ -84,6 +85,30 @@ export class AuthController {
     }
   );
 
+  requestEmailVerification = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { email } = req.body;
+      const ctx = buildContext(req, res);
+
+      await AuthService.requestEmailVerification(ctx, email);
+      appResponder(StatusCodes.OK, { message: "auth/success:otpSent" }, res);
+    }
+  );
+
+  confirmEmailVerification = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { email, code } = req.body;
+      const ctx = buildContext(req, res);
+
+      const result = await AuthService.confirmEmailVerification(
+        ctx,
+        email,
+        code
+      );
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
+
   login = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const { identifier, password } = req.body;
     const userAgent = req.headers["user-agent"];
@@ -95,6 +120,25 @@ export class AuthController {
     const result = await AuthService.login(identifier, password, userAgent, ip);
     appResponder(StatusCodes.OK, result, res);
   });
+
+  loginAdmin = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const { identifier, password } = req.body;
+      const userAgent = req.headers["user-agent"];
+      const ip =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+        req.socket.remoteAddress ||
+        req.ip;
+
+      const result = await AuthService.loginAdmin(
+        identifier,
+        password,
+        userAgent,
+        ip
+      );
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
 
   changePassword = catchAsync(
     async (req: Request, res: Response): Promise<void> => {

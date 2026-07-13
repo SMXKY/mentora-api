@@ -13,6 +13,9 @@ import {
   ReviewCredentialSchema,
   SpotCheckVerdictSchema,
   KycSlaConfigSchema,
+  KycStatusResponseSchema,
+  KycQueueQuerySchema,
+  KycSubjectQueueQuerySchema,
 } from "./kyc.types";
 
 // ============================================================
@@ -31,6 +34,34 @@ const bearer = { security: [{ bearerAuth: [] }] };
 
 registry.registerPath({
   method: "get",
+  path: `${basePath}/me/status`,
+  tags: tutorTags,
+  summary: "Lightweight KYC status check for UI gating",
+  description:
+    "Answers 'has this user started KYC, and what state are they in' without " +
+    "the full application payload getMyApplication returns. Does not require " +
+    "profile completion — safe to call from any profile screen to decide " +
+    "whether to show 'Complete KYC', 'Continue KYC', 'Under review', or " +
+    "'Verified'. hasStarted is false if the tutor has never touched the " +
+    "wizard (or has no tutor profile at all, e.g. Parent/Student users).",
+  ...bearer,
+  responses: {
+    200: {
+      description: "Status snapshot",
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.boolean(),
+            data: KycStatusResponseSchema,
+          }),
+        },
+      },
+    },
+  },
+});
+
+registry.registerPath({
+  method: "get",
   path: `${basePath}/me`,
   tags: tutorTags,
   summary: "Get my KYC application (creates the first draft on first call)",
@@ -40,7 +71,9 @@ registry.registerPath({
     "the tutor left off: currentStep reflects the last step saved.",
   ...bearer,
   responses: {
-    200: { description: "Current application, credentials, and any rejection flags" },
+    200: {
+      description: "Current application, credentials, and any rejection flags",
+    },
     403: { description: "Profile is not yet 100% complete" },
   },
 });
@@ -75,7 +108,10 @@ registry.registerPath({
   },
   responses: {
     200: { description: "Step 1 saved, advances to STEP_2_BIOGRAPHY" },
-    400: { description: "Missing file(s), invalid CNI number format, or application is read-only" },
+    400: {
+      description:
+        "Missing file(s), invalid CNI number format, or application is read-only",
+    },
   },
 });
 
@@ -89,10 +125,14 @@ registry.registerPath({
     "emergency contact, and an optional self-declaration statement. Never " +
     "shown publicly — visible only to Admin/Super Admin during review.",
   ...bearer,
-  request: { body: { content: { "application/json": { schema: KycStep2Schema } } } },
+  request: {
+    body: { content: { "application/json": { schema: KycStep2Schema } } },
+  },
   responses: {
     200: { description: "Step 2 saved, advances to STEP_3_CREDENTIALS" },
-    400: { description: "Step 1 not complete yet, or a required field is missing" },
+    400: {
+      description: "Step 1 not complete yet, or a required field is missing",
+    },
   },
 });
 
@@ -112,7 +152,9 @@ registry.registerPath({
       content: {
         "multipart/form-data": {
           schema: CredentialInputSchema.extend({
-            subjectIds: z.string().openapi({ description: "JSON-encoded array of subject UUIDs" }),
+            subjectIds: z
+              .string()
+              .openapi({ description: "JSON-encoded array of subject UUIDs" }),
             document: z.string().openapi({ type: "string", format: "binary" }),
           }),
         },
@@ -121,7 +163,10 @@ registry.registerPath({
   },
   responses: {
     201: { description: "Credential added, PENDING review" },
-    400: { description: "No document attached, invalid subject id, or application is read-only" },
+    400: {
+      description:
+        "No document attached, invalid subject id, or application is read-only",
+    },
   },
 });
 
@@ -135,7 +180,10 @@ registry.registerPath({
   responses: {
     200: { description: "Credential removed" },
     404: { description: "Credential not found" },
-    409: { description: "Credential has already been reviewed and can no longer be removed" },
+    409: {
+      description:
+        "Credential has already been reviewed and can no longer be removed",
+    },
   },
 });
 
@@ -144,7 +192,8 @@ registry.registerPath({
   path: `${basePath}/me/cv`,
   tags: tutorTags,
   summary: "Upload an optional CV",
-  description: "PDF only, max 10MB. Purely supporting context for Admin — never required.",
+  description:
+    "PDF only, max 10MB. Purely supporting context for Admin — never required.",
   ...bearer,
   responses: { 200: { description: "CV attached to the current application" } },
 });
@@ -205,10 +254,41 @@ registry.registerPath({
   method: "get",
   path: `${adminBasePath}/queue`,
   tags: adminTags,
-  summary: "Full KYC review queue",
-  description: "PENDING, fully submitted applications, oldest first. Escalated applications are marked isEscalated.",
+  summary: "Full KYC review queue — searchable, filterable, sortable, paginated",
+  description:
+    "Defaults to PENDING, fully submitted applications, oldest first. Every " +
+    "row carries everything the queue table needs to render without a " +
+    "per-row re-fetch: tutor name/email/phone/avatar, city/region, " +
+    "document-completeness flags, credential and subject counts, prior " +
+    "rejection count, and SLA countdown (isEscalated, escalationDeadline, " +
+    "slaHoursRemaining). meta.counts carries dashboard-tile totals " +
+    "(by status, pendingEscalated, pendingDueSoon) so status tabs don't " +
+    "need a separate call. Query params: page, limit (max 100), sortBy " +
+    "(submittedAt|updatedAt|createdAt|fullLegalName|escalationDeadline), " +
+    "sortOrder (asc|desc), search (matches tutor name/email/phone or " +
+    "application fullLegalName/surname/cniNumber), status (comma-separated " +
+    "KycStatus list, defaults to PENDING), cityId, regionId, escalatedOnly.",
   ...bearer,
-  responses: { 200: { description: "Queue" } },
+  request: { query: KycQueueQuerySchema },
+  responses: {
+    200: {
+      description: "Paginated, enriched queue rows with meta.counts for dashboard tiles",
+    },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: `${adminBasePath}/queue/stats`,
+  tags: adminTags,
+  summary: "Dashboard-tile counts for the KYC queue",
+  description:
+    "Counts by KycStatus plus pendingEscalated/pendingDueSoon, independent " +
+    "of any queue filter — the same object embedded as meta.counts on " +
+    "GET /queue, exposed standalone for dashboard widgets that only need " +
+    "the totals.",
+  ...bearer,
+  responses: { 200: { description: "{ byStatus, pendingEscalated, pendingDueSoon }" } },
 });
 
 registry.registerPath({
@@ -218,12 +298,24 @@ registry.registerPath({
   summary: "Full review card for one application",
   description:
     "Returns every document, credential, and prior rejection for this " +
-    "tutor. The first time a given admin opens a given application, the " +
-    "server starts an internal review-duration clock used by the spot-check " +
-    "governance system (an approval decided in under 90 seconds is " +
-    "automatically flagged for Super Admin secondary review).",
+    "tutor, plus the tutor's contact info (name/email/phone/avatar) and " +
+    "resolved, directly-viewable URLs for every uploaded file — " +
+    "application.documentUrls (cniFrontPhotoUrl, cniBackPhotoUrl, " +
+    "selfieWithCniUrl, nonConvictionCertificateUrl, cvFileUrl) and each " +
+    "credential's documentViewUrl. The generic owner-scoped " +
+    "/media/:id/url endpoint 404s for an admin viewing someone else's " +
+    "file, so this is the only way to actually see a KYC document. The " +
+    "first time a given admin opens a given application, the server " +
+    "starts an internal review-duration clock (returned as review.openedAt, " +
+    "with review.minReviewSeconds = 90) used by the spot-check governance " +
+    "system — an approval decided before minReviewSeconds elapses is " +
+    "automatically flagged for Super Admin secondary review; the frontend " +
+    "can use openedAt to disable the approve button until then.",
   ...bearer,
-  responses: { 200: { description: "Review card" }, 404: { description: "Not found" } },
+  responses: {
+    200: { description: "Review card" },
+    404: { description: "Not found" },
+  },
 });
 
 registry.registerPath({
@@ -235,7 +327,11 @@ registry.registerPath({
     "The five-item checklist must be entirely true — enforced server-side " +
     "regardless of what the client sends. Moves status to IDENTITY_APPROVED.",
   ...bearer,
-  request: { body: { content: { "application/json": { schema: KycApproveIdentitySchema } } } },
+  request: {
+    body: {
+      content: { "application/json": { schema: KycApproveIdentitySchema } },
+    },
+  },
   responses: {
     200: { description: "Identity approved" },
     400: { description: "One or more checklist items is false" },
@@ -250,8 +346,13 @@ registry.registerPath({
   summary: "Reject the identity application",
   description: "At least one flagged item with a reason is required.",
   ...bearer,
-  request: { body: { content: { "application/json": { schema: KycRejectSchema } } } },
-  responses: { 200: { description: "Rejected" }, 400: { description: "No flags provided" } },
+  request: {
+    body: { content: { "application/json": { schema: KycRejectSchema } } },
+  },
+  responses: {
+    200: { description: "Rejected" },
+    400: { description: "No flags provided" },
+  },
 });
 
 registry.registerPath({
@@ -264,7 +365,9 @@ registry.registerPath({
     "account (login blocked, sessions invalidated) and auto-cancels pending " +
     "bookings, flagging paid ones for manual handling.",
   ...bearer,
-  request: { body: { content: { "application/json": { schema: KycBanSchema } } } },
+  request: {
+    body: { content: { "application/json": { schema: KycBanSchema } } },
+  },
   responses: { 200: { description: "Banned" } },
 });
 
@@ -277,8 +380,15 @@ registry.registerPath({
     "Reason must be at least 20 characters. Only valid from ACTIVE — this " +
     "is never an initial application outcome.",
   ...bearer,
-  request: { body: { content: { "application/json": { schema: KycSuspendTutorSchema } } } },
-  responses: { 200: { description: "Suspended" }, 409: { description: "Tutor is not ACTIVE" } },
+  request: {
+    body: {
+      content: { "application/json": { schema: KycSuspendTutorSchema } },
+    },
+  },
+  responses: {
+    200: { description: "Suspended" },
+    409: { description: "Tutor is not ACTIVE" },
+  },
 });
 
 registry.registerPath({
@@ -298,10 +408,14 @@ registry.registerPath({
   description:
     "Every pending subject claim, scored against the trained inference " +
     "engine and split into recommendApprove / recommendReview / " +
-    "newDocumentationRequired. Each entry carries a 0-100 score and a " +
-    "one-sentence explanation.",
+    "newDocumentationRequired. Each entry carries a 0-100 score, a " +
+    "one-sentence explanation, the matched/candidate credentials, and an " +
+    "embedded tutor summary (name, email, avatar) so the queue table needs " +
+    "no per-row re-fetch. Optional ?search matches the subject name or the " +
+    "claiming tutor's name/email.",
   ...bearer,
-  responses: { 200: { description: "Sectioned queue" } },
+  request: { query: KycSubjectQueueQuerySchema },
+  responses: { 200: { description: "Sectioned queue with meta.total" } },
 });
 
 registry.registerPath({
@@ -315,7 +429,9 @@ registry.registerPath({
     "weight future claims are scored against. If this is the tutor's first " +
     "approved subject and identity is already approved, the tutor goes ACTIVE.",
   ...bearer,
-  request: { body: { content: { "application/json": { schema: ApproveSubjectSchema } } } },
+  request: {
+    body: { content: { "application/json": { schema: ApproveSubjectSchema } } },
+  },
   responses: { 200: { description: "Approved" } },
 });
 
@@ -324,9 +440,12 @@ registry.registerPath({
   path: `${adminBasePath}/subjects/{tutorSubjectId}/reject`,
   tags: adminTags,
   summary: "Reject a subject claim",
-  description: "Never affects any other subject's status — a single-row decision.",
+  description:
+    "Never affects any other subject's status — a single-row decision.",
   ...bearer,
-  request: { body: { content: { "application/json": { schema: RejectSubjectSchema } } } },
+  request: {
+    body: { content: { "application/json": { schema: RejectSubjectSchema } } },
+  },
   responses: { 200: { description: "Rejected" } },
 });
 
@@ -342,7 +461,11 @@ registry.registerPath({
     "back to PENDING and disappears from the tutor's public profile until " +
     "re-verified.",
   ...bearer,
-  request: { body: { content: { "application/json": { schema: ReviewCredentialSchema } } } },
+  request: {
+    body: {
+      content: { "application/json": { schema: ReviewCredentialSchema } },
+    },
+  },
   responses: { 200: { description: "Reviewed" } },
 });
 
@@ -369,7 +492,11 @@ registry.registerPath({
     "3 BAD verdicts in a trailing 30-day window sets that admin's " +
     "kycCountersignatureRequired flag and sends them a warning notification.",
   ...bearer,
-  request: { body: { content: { "application/json": { schema: SpotCheckVerdictSchema } } } },
+  request: {
+    body: {
+      content: { "application/json": { schema: SpotCheckVerdictSchema } },
+    },
+  },
   responses: { 200: { description: "Verdict recorded" } },
 });
 
@@ -378,7 +505,8 @@ registry.registerPath({
   path: `${adminBasePath}/stats/{adminId}`,
   tags: adminTags,
   summary: "Per-admin governance statistics",
-  description: "Total reviewed, rejection rate, average review duration, and flagged-approval count over a trailing window.",
+  description:
+    "Total reviewed, rejection rate, average review duration, and flagged-approval count over a trailing window.",
   ...bearer,
   responses: { 200: { description: "Stats" } },
 });
@@ -397,8 +525,11 @@ registry.registerPath({
   path: `${adminBasePath}/sla-config`,
   tags: adminTags,
   summary: "Update the KYC SLA configuration",
-  description: "Defaults are 48 target hours and 5 max business days — persisted in PlatformConfig.",
+  description:
+    "Defaults are 48 target hours and 5 max business days — persisted in PlatformConfig.",
   ...bearer,
-  request: { body: { content: { "application/json": { schema: KycSlaConfigSchema } } } },
+  request: {
+    body: { content: { "application/json": { schema: KycSlaConfigSchema } } },
+  },
   responses: { 200: { description: "Updated config" } },
 });
