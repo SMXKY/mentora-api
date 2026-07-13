@@ -7,7 +7,12 @@ import { KycAdminService } from "./kycAdmin.service";
 
 export const kycAdminController = {
   getQueue: catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const result = await KycAdminService.getQueue();
+    const result = await KycAdminService.getQueue(req.query as any);
+    appResponder(StatusCodes.OK, result.data, res, result.meta);
+  }),
+
+  getQueueStats: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const result = await KycAdminService.getQueueStats();
     appResponder(StatusCodes.OK, result, res);
   }),
 
@@ -58,7 +63,7 @@ export const kycAdminController = {
   }),
 
   getSubjectQueue: catchAsync(async (req: Request, res: Response): Promise<void> => {
-    const result = await KycAdminService.getSubjectQueue();
+    const result = await KycAdminService.getSubjectQueue(req.query as any);
     appResponder(StatusCodes.OK, result, res);
   }),
 

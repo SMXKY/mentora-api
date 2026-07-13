@@ -180,6 +180,59 @@ export const KycSlaConfigSchema = z
   .openapi("KycSlaConfig");
 export type KycSlaConfigInput = z.infer<typeof KycSlaConfigSchema>;
 
+// ── Admin: queue search / filter / sort ─────────────────────
+const KycQueueStatusEnum = z.enum([
+  "PENDING",
+  "IDENTITY_APPROVED",
+  "ACTIVE",
+  "REJECTED",
+  "SUSPENDED",
+  "BANNED",
+  "PENDING_REVERIFICATION",
+]);
+
+export const KycQueueQuerySchema = z
+  .object({
+    page: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val, 10) : 1))
+      .pipe(z.number().int().min(1)),
+    limit: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val, 10) : 20))
+      .pipe(z.number().int().min(1).max(100)),
+    sortBy: z
+      .enum(["submittedAt", "updatedAt", "createdAt", "fullLegalName", "escalationDeadline"])
+      .optional()
+      .default("submittedAt"),
+    sortOrder: z.enum(["asc", "desc"]).optional().default("asc"),
+    search: z.string().trim().min(1).optional(),
+    // Comma-separated list, e.g. "PENDING,IDENTITY_APPROVED" — defaults to
+    // the classic pending-review queue when omitted.
+    status: z
+      .string()
+      .optional()
+      .transform((val) => (val ? val.split(",").map((s) => s.trim()) : undefined))
+      .pipe(z.array(KycQueueStatusEnum).optional()),
+    cityId: z.string().uuid().optional(),
+    regionId: z.string().uuid().optional(),
+    escalatedOnly: z
+      .string()
+      .optional()
+      .transform((val) => val === "true"),
+  })
+  .openapi("KycQueueQuery");
+export type KycQueueQueryInput = z.infer<typeof KycQueueQuerySchema>;
+
+export const KycSubjectQueueQuerySchema = z
+  .object({
+    search: z.string().trim().min(1).optional(),
+  })
+  .openapi("KycSubjectQueueQuery");
+export type KycSubjectQueueQueryInput = z.infer<typeof KycSubjectQueueQuerySchema>;
+
 // ── Status check (lightweight, for UI gating) ────────────────
 export const KycStepsProgressSchema = z
   .object({
