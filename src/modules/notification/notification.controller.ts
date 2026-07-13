@@ -4,9 +4,19 @@ import { buildContext } from "../../utils/buildContext.util";
 import { appResponder } from "../../utils/appResponder.util";
 import { AppError } from "../../utils/AppError.util";
 import { StatusCodes } from "http-status-codes";
+import { Notification } from "../../generated/prisma";
 import { NotificationRepository } from "./notification.repository";
+import { resolveNotificationCopy } from "../../services/notification/notification.text";
 
 const repository = new NotificationRepository();
+
+/** Attaches rendered title/body to a raw row — titleCode/bodyCode are i18n keys, never display text on their own. */
+function withResolvedCopy<T extends Notification>(
+  notification: T,
+  preferredLanguage?: string | null
+): T & { title: string; body: string } {
+  return { ...notification, ...resolveNotificationCopy(notification, preferredLanguage) };
+}
 
 export const notificationController = {
   list: catchAsync(async (req: Request, res: Response): Promise<void> => {
@@ -23,7 +33,8 @@ export const notificationController = {
       },
     });
 
-    appResponder(StatusCodes.OK, result.data, res, result.meta);
+    const data = result.data.map((n) => withResolvedCopy(n, ctx.preferredLanguage));
+    appResponder(StatusCodes.OK, data, res, result.meta);
   }),
 
   getById: catchAsync(async (req: Request, res: Response): Promise<void> => {
@@ -32,7 +43,11 @@ export const notificationController = {
       req.params.id,
       ctx.userId!
     );
-    appResponder(StatusCodes.OK, notification as object, res);
+    appResponder(
+      StatusCodes.OK,
+      withResolvedCopy(notification, ctx.preferredLanguage) as object,
+      res
+    );
   }),
 
   unreadCount: catchAsync(
@@ -49,7 +64,11 @@ export const notificationController = {
       req.params.id,
       ctx.userId!
     );
-    appResponder(StatusCodes.OK, notification as object, res);
+    appResponder(
+      StatusCodes.OK,
+      withResolvedCopy(notification, ctx.preferredLanguage) as object,
+      res
+    );
   }),
 
   markAllAsRead: catchAsync(

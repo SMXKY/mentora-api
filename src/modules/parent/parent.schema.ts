@@ -13,6 +13,7 @@ export const CreateManagedStudentSchema = z
     preferredMode: z.enum(["ONLINE", "HOME", "BOTH"]).optional(),
     preferredLanguage: z.enum(["EN", "FR"]).optional(),
     specialNotes: z.string().optional(),
+    subjectIds: z.array(z.string().uuid()).optional(),
   })
   .openapi("CreateManagedStudent");
 export type CreateManagedStudentInput = z.infer<typeof CreateManagedStudentSchema>;

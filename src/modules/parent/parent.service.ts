@@ -28,13 +28,27 @@ export const ParentService = {
   /** A Parent-managed child has no login of their own — userId stays null,
    * distinguishing it from a self-registered Student's own profile. */
   async createManagedStudent(guardianId: string, data: CreateManagedStudentInput) {
-    return prisma.studentProfile.create({
+    const { subjectIds, ...profileData } = data;
+
+    const profile = await prisma.studentProfile.create({
       data: {
-        ...data,
+        ...profileData,
         dob: data.dob ? new Date(data.dob) : undefined,
         guardianId,
         userId: null,
       },
+    });
+
+    if (subjectIds && subjectIds.length > 0) {
+      await prisma.studentProfileSubject.createMany({
+        data: subjectIds.map((subjectId) => ({ studentProfileId: profile.id, subjectId })),
+        skipDuplicates: true,
+      });
+    }
+
+    return prisma.studentProfile.findUniqueOrThrow({
+      where: { id: profile.id },
+      include: { subjects: { include: { subject: true } }, level: true },
     });
   },
 
@@ -44,9 +58,26 @@ export const ParentService = {
     data: UpdateManagedStudentInput
   ) {
     await assertOwnedByGuardian(studentProfileId, guardianId);
-    return prisma.studentProfile.update({
+    const { subjectIds, ...profileData } = data;
+
+    await prisma.studentProfile.update({
       where: { id: studentProfileId },
-      data: { ...data, dob: data.dob ? new Date(data.dob) : undefined },
+      data: { ...profileData, dob: data.dob ? new Date(data.dob) : undefined },
+    });
+
+    if (subjectIds) {
+      await prisma.$transaction([
+        prisma.studentProfileSubject.deleteMany({ where: { studentProfileId } }),
+        prisma.studentProfileSubject.createMany({
+          data: subjectIds.map((subjectId) => ({ studentProfileId, subjectId })),
+          skipDuplicates: true,
+        }),
+      ]);
+    }
+
+    return prisma.studentProfile.findUniqueOrThrow({
+      where: { id: studentProfileId },
+      include: { subjects: { include: { subject: true } }, level: true },
     });
   },
 

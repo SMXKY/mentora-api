@@ -8,6 +8,8 @@ export interface ServiceContext {
   ipAddress?: string;
   userAgent?: string;
   lang?: Languages;
+  /** Recipient's stored language preference — used for notification copy, distinct from `lang` (request Accept-Language). */
+  preferredLanguage?: string | null;
 }
 
 export interface OffsetPaginationParams {

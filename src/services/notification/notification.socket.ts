@@ -1,6 +1,7 @@
 import { Socket } from "socket.io";
 import prisma from "../../config/database.config";
 import NotificationService from "./notification.service";
+import { resolveNotificationCopy } from "./notification.text";
 
 interface AuthedSocket extends Socket {
   data: { user: { id: string } };
@@ -27,13 +28,25 @@ export async function handleNotificationSync(
     if (isNaN(sinceDate.getTime())) return;
 
     const missed = await NotificationService.getSince(userId, sinceDate);
-    for (const notification of missed) {
-      socket.emit("notification:new", {
-        id: notification.id,
-        type: notification.type,
-        data: notification.data,
-        createdAt: notification.createdAt.toISOString(),
+    if (missed.length > 0) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { preferredLanguage: true },
       });
+      for (const notification of missed) {
+        const { title, body } = resolveNotificationCopy(
+          notification,
+          user?.preferredLanguage
+        );
+        socket.emit("notification:new", {
+          id: notification.id,
+          type: notification.type,
+          title,
+          body,
+          data: notification.data,
+          createdAt: notification.createdAt.toISOString(),
+        });
+      }
     }
 
     const unreadCount = await NotificationService.getUnreadCount(userId);
