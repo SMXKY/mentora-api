@@ -4,6 +4,19 @@ import { StatusCodes } from "http-status-codes";
 import { KycStatus, SubjectVerificationStatus } from "../../generated/prisma";
 import { UpdateMyTutorProfileInput, UpdateSubjectPricingInput } from "./tutor.schema";
 import { MaterialsService } from "../materials/materials.service";
+import { resolveStorageUrl } from "../../services/media";
+
+// Both fields are stored as bare relative storage paths — resolve them to
+// fetchable URLs through the active adapter on every read, never on write.
+function withResolvedMediaUrls<
+  T extends { profilePictureUrl?: string | null; introVideoUrl?: string | null }
+>(profile: T): T {
+  return {
+    ...profile,
+    profilePictureUrl: resolveStorageUrl(profile.profilePictureUrl),
+    introVideoUrl: resolveStorageUrl(profile.introVideoUrl),
+  };
+}
 
 const PUBLIC_TUTOR_SELECT = {
   id: true,
@@ -32,7 +45,7 @@ const PUBLIC_TUTOR_SELECT = {
 
 export const TutorService = {
   async getMyProfile(userId: string) {
-    return prisma.tutorProfile.findFirst({
+    const profile = await prisma.tutorProfile.findFirst({
       where: { userId, deletedAt: null },
       include: {
         city: true,
@@ -40,6 +53,7 @@ export const TutorService = {
         credentials: { include: { subjectLinks: { include: { subject: true } } } },
       },
     });
+    return profile ? withResolvedMediaUrls(profile) : profile;
   },
 
   /** Create-or-update — closes the exact gap KYC's completion gate needs:
@@ -97,7 +111,7 @@ export const TutorService = {
     // immediately with no separate write needed (see getPublicLessonPlans).
     const lessonPlans = await MaterialsService.getPublicLessonPlans(tutorProfileId);
 
-    return { ...profile, lessonPlans };
+    return { ...withResolvedMediaUrls(profile), lessonPlans };
   },
 };
 

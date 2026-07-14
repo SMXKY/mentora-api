@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import * as FileType from "file-type";
 import {
   S3Client,
   PutObjectCommand,
@@ -67,19 +68,59 @@ function getClient(): { client: S3Client; config: R2Config } {
   return { client: clientSingleton, config: configSingleton };
 }
 
+// R2 has intermittent transient failures (observed in production). Every
+// call in this adapter goes through here rather than trusting the S3 SDK's
+// own retry strategy alone, because `op` rebuilds any consumed request body
+// (read stream / write stream) fresh on each attempt — a raw SDK retry
+// would resend an already-drained stream and silently upload 0 bytes.
+async function withRetry<T>(op: () => Promise<T>, label: string): Promise<T> {
+  const maxAttempts = 4;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await op();
+    } catch (err) {
+      lastErr = err;
+      if (attempt === maxAttempts) break;
+      const delayMs = Math.min(500 * 2 ** (attempt - 1), 8000) + Math.random() * 250;
+      console.error({
+        event: "r2_storage_retry",
+        op: label,
+        attempt,
+        maxAttempts,
+        delayMs: Math.round(delayMs),
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastErr;
+}
+
 export class CloudflareR2StorageAdapter implements StorageAdapter {
   async put(tempFilePath: string, relativePath: string): Promise<void> {
     const key = buildKey(relativePath);
     const { client, config } = getClient();
     const stats = fs.statSync(tempFilePath);
+    // Without this, R2 serves every object as application/octet-stream —
+    // browsers then download KYC photos/PDFs instead of rendering them
+    // inline wherever the app links directly to the R2 URL.
+    const detected = await FileType.fromFile(tempFilePath);
 
-    await client.send(
-      new PutObjectCommand({
-        Bucket: config.bucket,
-        Key: key,
-        Body: fs.createReadStream(tempFilePath),
-        ContentLength: stats.size,
-      })
+    await withRetry(
+      () =>
+        client.send(
+          new PutObjectCommand({
+            Bucket: config.bucket,
+            Key: key,
+            // Rebuilt fresh on every attempt — a read stream can only be
+            // drained once, so a retry with the same stream would upload 0 bytes.
+            Body: fs.createReadStream(tempFilePath),
+            ContentLength: stats.size,
+            ContentType: detected?.mime ?? "application/octet-stream",
+          })
+        ),
+      `put ${key}`
     );
   }
 
@@ -87,8 +128,9 @@ export class CloudflareR2StorageAdapter implements StorageAdapter {
     const key = buildKey(relativePath);
     const { client, config } = getClient();
     try {
-      await client.send(
-        new DeleteObjectCommand({ Bucket: config.bucket, Key: key })
+      await withRetry(
+        () => client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key })),
+        `remove ${key}`
       );
     } catch (err: any) {
       // Same policy as the other adapters: deletion failures never
@@ -112,17 +154,19 @@ export class CloudflareR2StorageAdapter implements StorageAdapter {
     const { client, config } = getClient();
     fs.mkdirSync(path.dirname(destTempPath), { recursive: true });
 
-    const response = await client.send(
-      new GetObjectCommand({ Bucket: config.bucket, Key: key })
-    );
-    const body = response.Body as NodeJS.ReadableStream;
+    await withRetry(async () => {
+      const response = await client.send(
+        new GetObjectCommand({ Bucket: config.bucket, Key: key })
+      );
+      const body = response.Body as NodeJS.ReadableStream;
 
-    await new Promise<void>((resolve, reject) => {
-      const writeStream = fs.createWriteStream(destTempPath);
-      body.on("error", reject);
-      writeStream.on("error", reject);
-      writeStream.on("close", resolve);
-      body.pipe(writeStream);
-    });
+      await new Promise<void>((resolve, reject) => {
+        const writeStream = fs.createWriteStream(destTempPath);
+        body.on("error", reject);
+        writeStream.on("error", reject);
+        writeStream.on("close", resolve);
+        body.pipe(writeStream);
+      });
+    }, `fetchToTemp ${key}`);
   }
 }

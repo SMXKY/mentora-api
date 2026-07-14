@@ -19,6 +19,12 @@ import { StatusCodes } from "http-status-codes";
 export class UserController extends BaseController<any> {
   protected service = new UserService();
 
+  getMe = catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    const result = await this.service.getMe(ctx.userId!);
+    appResponder(StatusCodes.OK, result, res);
+  });
+
   updateMe = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
     const record = await this.service.update(ctx.userId!, req.body, ctx);

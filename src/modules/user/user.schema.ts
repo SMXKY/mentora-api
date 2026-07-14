@@ -88,3 +88,61 @@ export const UserResponseSchema = z
     updatedAt: z.string().datetime(),
   })
   .openapi("User");
+
+// Lightweight self-view of a tutor/student profile — deliberately not the
+// full profile shape. Excludes matching/search internals (compositeScore,
+// responseRate, newTutorBoostExpiresAt, rate bounds) and admin-facing
+// fields (isPaymentOverdue, KYC timestamps/rejection reason) for tutors;
+// excludes guardian-managed children for students (see MeResponseSchema).
+const MeTutorProfileSchema = z
+  .object({
+    id: z.string().uuid(),
+    bio: z.string(),
+    yearsOfExperience: z.number().int(),
+    teachingMode: z.string(),
+    languages: z.array(z.string()),
+    kycStatus: z.string(),
+    completedSessionsCount: z.number().int(),
+    cityId: z.string().uuid(),
+    neighbourhood: z.string().nullable(),
+  })
+  .openapi("MeTutorProfile");
+
+const MeStudentProfileSchema = z
+  .object({
+    id: z.string().uuid(),
+    firstName: z.string(),
+    levelId: z.string().uuid().nullable(),
+    schoolType: z.string().nullable(),
+    preferredLanguage: z.string().nullable(),
+  })
+  .openapi("MeStudentProfile");
+
+// GET /users/me — cheap, cacheable self-profile. Not a full data dump:
+// bookings, wallet, disputes, KYC history, risk scores, and support
+// tickets each have their own dedicated routes.
+export const MeResponseSchema = z
+  .object({
+    id: z.string().uuid(),
+    firstName: z.string().nullable(),
+    lastName: z.string().nullable(),
+    username: z.string().nullable(),
+    email: z.string().nullable(),
+    isEmailVerified: z.boolean(),
+    phoneNumber: z.string().nullable(),
+    whatsappNumber: z.string().nullable(),
+    whatsappOptIn: z.boolean(),
+    dob: z.string().datetime().nullable(),
+    gender: z.string(),
+    profilePictureUrl: z.string().nullable(),
+    address: z.string().nullable(),
+    preferredLanguage: z.string(),
+    notificationsMuted: z.boolean(),
+    status: z.string(),
+    isAccountComplete: z.boolean(),
+    lastLoggedInAt: z.string().datetime().nullable(),
+    roles: z.array(z.string()),
+    tutorProfile: MeTutorProfileSchema.nullable(),
+    studentProfile: MeStudentProfileSchema.nullable(),
+  })
+  .openapi("MeResponse");

@@ -66,6 +66,8 @@ router.get(
 
 // Self-service — must be registered before the generic "/:id" routes below,
 // otherwise Express would treat "me" as an :id value.
+router.get("/me", protect, userController.getMe);
+
 router.patch("/me", protect, validate(UpdateMeSchema), userController.updateMe);
 
 router.patch(

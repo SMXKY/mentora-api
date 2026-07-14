@@ -4,6 +4,7 @@ import {
   UpdateUserSchema,
   UpdateMeSchema,
   UserResponseSchema,
+  MeResponseSchema,
 } from "./user.schema";
 import { z } from "zod";
 
@@ -133,6 +134,25 @@ registry.registerPath({
 });
 
 // ── Self-service ─────────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: "get",
+  path: `${basePath}/me`,
+  tags,
+  summary: "Get the caller's own profile",
+  description:
+    "Returns the authenticated user's own profile, roles, and a summary of their " +
+    "tutor/student profile if applicable. Does not include bookings, wallet, " +
+    "disputes, or other list-shaped/admin data — see dedicated endpoints for those.",
+  security: [{ bearerAuth: [] }],
+  responses: {
+    200: {
+      description: "Caller's own profile",
+      content: { "application/json": { schema: MeResponseSchema } },
+    },
+    401: { description: "No valid session token" },
+  },
+});
 
 registry.registerPath({
   method: "patch",
