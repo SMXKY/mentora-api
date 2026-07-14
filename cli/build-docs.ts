@@ -19,6 +19,8 @@ import "../src/modules/student/student.openapi";
 import "../src/modules/parent/parent.openapi";
 import "../src/modules/tutor/tutor.openapi";
 import "../src/modules/dashboard/dashboard.openapi";
+import "../src/modules/materials/materials.openapi";
+import "../src/modules/materials/materialsAdmin.openapi";
 // testResource is a scaffold template, not a mounted module — excluded on purpose
 
 async function main() {

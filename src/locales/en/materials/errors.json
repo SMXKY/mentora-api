@@ -1,0 +1,19 @@
+{
+  "fieldRequired": "This field is required.",
+  "tutorProfileRequired": "No tutor profile was found for this account.",
+  "kycNotApproved": "Your KYC verification must be approved before you can manage learning materials.",
+  "collectionNotFound": "This collection was not found.",
+  "sectionNotFound": "This section was not found.",
+  "materialNotFound": "This material was not found.",
+  "subjectNotFound": "This subject was not found.",
+  "levelNotFound": "This level was not found.",
+  "lessonPlanNotFound": "This collection does not have a lesson plan yet.",
+  "lessonPlanAlreadyExists": "This collection already has a lesson plan.",
+  "lessonPlanTopicNotFound": "This lesson plan topic was not found.",
+  "disputeLocked": "This item is attached to an unresolved dispute and cannot be deleted until it is resolved.",
+  "invalidTipTapContent": "This note's content is not in a valid format.",
+  "notAWrittenNote": "This material is not a written note.",
+  "materialHasNoFile": "This material has no file to replace.",
+  "reorderListEmpty": "Please provide at least one item to reorder.",
+  "downloadPolicyInvalidType": "This is not a valid material content type."
+}

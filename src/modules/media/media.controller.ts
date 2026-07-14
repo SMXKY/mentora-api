@@ -34,6 +34,7 @@ export const uploadPolicies: Record<
   LESSON_NOTE: { allowedTypes: pdf, maxSizeMB: 20 },
   LESSON_AUDIO: { allowedTypes: audio, maxSizeMB: 50 },
   LESSON_VIDEO: { allowedTypes: videos, maxSizeMB: 500 },
+  LESSON_IMAGE: { allowedTypes: images, maxSizeMB: 15 },
   SESSION_RECORDING: { allowedTypes: videos, maxSizeMB: 500 },
   WHITEBOARD_EXPORT: { allowedTypes: [...images, ...pdf], maxSizeMB: 20 },
   RECEIPT: { allowedTypes: [...images, ...pdf], maxSizeMB: 10 },

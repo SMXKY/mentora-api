@@ -1,0 +1,19 @@
+{
+  "fieldRequired": "Ce champ est obligatoire.",
+  "tutorProfileRequired": "Aucun profil de tuteur n'a été trouvé pour ce compte.",
+  "kycNotApproved": "Votre vérification KYC doit être approuvée avant de pouvoir gérer vos supports pédagogiques.",
+  "collectionNotFound": "Cette collection est introuvable.",
+  "sectionNotFound": "Cette section est introuvable.",
+  "materialNotFound": "Ce support est introuvable.",
+  "subjectNotFound": "Cette matière est introuvable.",
+  "levelNotFound": "Ce niveau est introuvable.",
+  "lessonPlanNotFound": "Cette collection n'a pas encore de plan de cours.",
+  "lessonPlanAlreadyExists": "Cette collection possède déjà un plan de cours.",
+  "lessonPlanTopicNotFound": "Ce sujet du plan de cours est introuvable.",
+  "disputeLocked": "Cet élément est lié à un litige non résolu et ne peut pas être supprimé tant qu'il n'est pas résolu.",
+  "invalidTipTapContent": "Le contenu de cette note n'est pas dans un format valide.",
+  "notAWrittenNote": "Ce support n'est pas une note écrite.",
+  "materialHasNoFile": "Ce support n'a pas de fichier à remplacer.",
+  "reorderListEmpty": "Veuillez fournir au moins un élément à réordonner.",
+  "downloadPolicyInvalidType": "Ce type de contenu de support n'est pas valide."
+}

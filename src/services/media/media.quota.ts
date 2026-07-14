@@ -3,7 +3,7 @@ import { AppError } from "../../utils/AppError.util";
 import { StatusCodes } from "http-status-codes";
 import { MEDIA_ERROR_KEYS } from "./media.types";
 
-async function resolveQuotaLimitBytes(userId: string): Promise<bigint> {
+export async function resolveQuotaLimitBytes(userId: string): Promise<bigint> {
   const override = await prisma.storageQuotaOverride.findUnique({
     where: { userId },
     select: { quotaLimitBytes: true, expiresAt: true },
