@@ -1,0 +1,70 @@
+{
+  "password": "K6KycRealTutor#12345",
+  "tutors": [
+    {
+      "email": "k6.kyc.real.1@mentora.test",
+      "firstName": "Marie",
+      "lastName": "Nkeng",
+      "tutorProfileId": "30501a59-79df-42b4-a2e1-c1d90ba5322c",
+      "userId": "38182886-8a0a-4255-bc0e-fce04a426762",
+      "cniNumber": "800200000",
+      "cityId": "1b1d60cb-1d3a-4a7d-9a46-f24c4e3ab1a4",
+      "cityName": "Yaoundé",
+      "regionId": "39dfaff5-70c4-482b-8bf8-8e534cfc6916",
+      "subjectId": "bf8d83fd-00d2-4b87-b7cf-cbd9af385740",
+      "fixtureDir": "tutor-1"
+    },
+    {
+      "email": "k6.kyc.real.2@mentora.test",
+      "firstName": "Jean",
+      "lastName": "Fotso",
+      "tutorProfileId": "96fabd6f-3c63-4926-ac49-339820ea0c37",
+      "userId": "32d0f1d3-60d3-400d-911c-58f6e8ae8d71",
+      "cniNumber": "800200001",
+      "cityId": "3892bc0a-7f77-4eb6-a71a-bde70789a062",
+      "cityName": "Douala",
+      "regionId": "032e8975-d846-4ebb-b3e5-1d70be629e60",
+      "subjectId": "bf8d83fd-00d2-4b87-b7cf-cbd9af385740",
+      "fixtureDir": "tutor-2"
+    },
+    {
+      "email": "k6.kyc.real.3@mentora.test",
+      "firstName": "Fatima",
+      "lastName": "Bello",
+      "tutorProfileId": "44c204aa-fe66-45f7-a8d4-f47d127d9943",
+      "userId": "573a6033-6f4e-4f01-848a-45536d76fd98",
+      "cniNumber": "800200002",
+      "cityId": "2d1ff21b-27ec-4e28-89eb-e85488c4d9c3",
+      "cityName": "Bafia",
+      "regionId": "39dfaff5-70c4-482b-8bf8-8e534cfc6916",
+      "subjectId": "bf8d83fd-00d2-4b87-b7cf-cbd9af385740",
+      "fixtureDir": "tutor-3"
+    },
+    {
+      "email": "k6.kyc.real.4@mentora.test",
+      "firstName": "Paul",
+      "lastName": "Njoya",
+      "tutorProfileId": "7cea3f49-430e-40d3-95a8-a8efdab097d8",
+      "userId": "eda087e6-febc-4f8f-a19f-acd8d0d89533",
+      "cniNumber": "800200003",
+      "cityId": "1b1d60cb-1d3a-4a7d-9a46-f24c4e3ab1a4",
+      "cityName": "Yaoundé",
+      "regionId": "39dfaff5-70c4-482b-8bf8-8e534cfc6916",
+      "subjectId": "bf8d83fd-00d2-4b87-b7cf-cbd9af385740",
+      "fixtureDir": "tutor-4"
+    },
+    {
+      "email": "k6.kyc.real.5@mentora.test",
+      "firstName": "Grace",
+      "lastName": "Tchoumi",
+      "tutorProfileId": "76d17573-1b6e-4562-ac8f-8834671002e7",
+      "userId": "a3b2dcac-34df-48e2-8eec-59d5bb6fa6f6",
+      "cniNumber": "800200004",
+      "cityId": "3892bc0a-7f77-4eb6-a71a-bde70789a062",
+      "cityName": "Douala",
+      "regionId": "032e8975-d846-4ebb-b3e5-1d70be629e60",
+      "subjectId": "bf8d83fd-00d2-4b87-b7cf-cbd9af385740",
+      "fixtureDir": "tutor-5"
+    }
+  ]
+}

@@ -35,7 +35,7 @@ import { evaluateCompletion } from "../../services/accountCompletion/accountComp
 import { signResetToken, verifyResetToken } from "./utils/signResetToken";
 import { deliverOtp } from "../../services/otp/dilivery";
 import getUserPermissions from "../../utils/getUserPermissions.util";
-import { applyFtpUrlTransform } from "../../utils/applyFtpUrl.util";
+import { resolveStorageUrl } from "../../services/media";
 import { AuditService } from "../../utils/logUserActivity.util";
 import { LogCategory, LogOperation } from "../../generated/prisma";
 import {
@@ -1043,7 +1043,7 @@ export class AuthService {
         isAccountComplete: user.isAccountComplete,
         preferredLanguage: user.preferredLanguage,
         gender: user.gender,
-        profilePictureUrl: String(user.profilePictureUrl),
+        profilePictureUrl: resolveStorageUrl(user.profilePictureUrl),
         roles: user.userRoles,
         status: user.status,
       },
@@ -1088,9 +1088,7 @@ export class AuthService {
       user: {
         ...user,
         roles: user.userRoles.map((ur) => ur.role.name),
-        profilePictureUrl: user.profilePictureUrl
-          ? applyFtpUrlTransform(user.profilePictureUrl)
-          : null,
+        profilePictureUrl: resolveStorageUrl(user.profilePictureUrl),
         permissions,
       },
       token: await issueSessionToken(userId, resolvedDeviceId),

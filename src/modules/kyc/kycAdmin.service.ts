@@ -22,7 +22,7 @@ import NotificationService from "../../services/notification/notification.servic
 import { permissions } from "../../data/permission.data";
 import AdminUserService from "../adminUser/adminUser.service";
 import { MediaService } from "../../services/media/media.service";
-import { getStorageAdapter } from "../../services/media";
+import { getStorageAdapter, resolveStorageUrl } from "../../services/media";
 import {
   KycChecklistInput,
   KycRejectInput,
@@ -371,8 +371,9 @@ export const KycAdminService = {
           lastName: app.tutorProfile.user.lastName,
           email: app.tutorProfile.user.email,
           phoneNumber: app.tutorProfile.user.phoneNumber,
-          profilePictureUrl:
-            app.tutorProfile.profilePictureUrl ?? app.tutorProfile.user.profilePictureUrl,
+          profilePictureUrl: resolveStorageUrl(
+            app.tutorProfile.profilePictureUrl ?? app.tutorProfile.user.profilePictureUrl
+          ),
         },
         location: {
           cityId: app.currentCity?.id ?? null,
@@ -543,8 +544,19 @@ export const KycAdminService = {
       orderBy: { createdAt: "desc" },
     });
 
+    const tutorProfileWithResolvedPicture = {
+      ...application.tutorProfile,
+      profilePictureUrl: resolveStorageUrl(
+        application.tutorProfile.profilePictureUrl ?? application.tutorProfile.user.profilePictureUrl
+      ),
+      user: {
+        ...application.tutorProfile.user,
+        profilePictureUrl: resolveStorageUrl(application.tutorProfile.user.profilePictureUrl),
+      },
+    };
+
     return {
-      application: { ...application, documentUrls },
+      application: { ...application, tutorProfile: tutorProfileWithResolvedPicture, documentUrls },
       credentials: credentialsWithUrls,
       previousRejections,
       review: {
@@ -797,8 +809,9 @@ export const KycAdminService = {
               .filter(Boolean)
               .join(" "),
             email: ts.tutorProfile.user.email,
-            profilePictureUrl:
-              ts.tutorProfile.profilePictureUrl ?? ts.tutorProfile.user.profilePictureUrl,
+            profilePictureUrl: resolveStorageUrl(
+              ts.tutorProfile.profilePictureUrl ?? ts.tutorProfile.user.profilePictureUrl
+            ),
           },
           candidateCredentials: credentials,
           ...result,

@@ -25,3 +25,16 @@ export function getStorageAdapter(): StorageAdapter {
   adapter = createAdapter();
   return adapter;
 }
+
+/**
+ * Resolves a stored relative path (e.g. "profile-photos/uuid.jpg") into a
+ * fully qualified, fetchable URL through whichever adapter is currently
+ * active (STORAGE_PROVIDER) — never hardcode a provider's base URL at a
+ * call site, or the link breaks silently the moment the provider changes.
+ */
+export function resolveStorageUrl(
+  relativePath: string | null | undefined
+): string | null {
+  if (!relativePath) return null;
+  return getStorageAdapter().resolveUrl(relativePath);
+}

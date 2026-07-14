@@ -36,7 +36,7 @@ export const SessionStatusResponseSchema = z
         roles: z.any(),
         status: z.string(),
         gender: z.string(),
-        profilePictureUrl: z.string(),
+        profilePictureUrl: z.string().nullable(),
       }),
     }),
   ])
