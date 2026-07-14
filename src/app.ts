@@ -28,6 +28,7 @@ import studentRouter from "./modules/student";
 import parentRouter from "./modules/parent";
 import tutorRouter from "./modules/tutor";
 import dashboardRouter from "./modules/dashboard";
+import { materialsRouter, materialsAdminRouter } from "./modules/materials";
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -156,6 +157,8 @@ app.use("/api/v1/students", studentRouter);
 app.use("/api/v1/parents", parentRouter);
 app.use("/api/v1/tutors", tutorRouter);
 app.use("/api/v1/dashboards", dashboardRouter);
+app.use("/api/v1/materials", materialsRouter);
+app.use("/api/v1/admin/materials", materialsAdminRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(

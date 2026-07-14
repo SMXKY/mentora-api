@@ -166,17 +166,21 @@ export const KycService = {
       );
     }
 
-    const [
-      cniFrontPhotoId,
-      cniBackPhotoId,
-      selfieWithCniId,
-      nonConvictionCertificateId,
-    ] = await Promise.all([
-      uploadKycDoc(userId, files.cniFront, IMAGE_TYPES, 5),
-      uploadKycDoc(userId, files.cniBack, IMAGE_TYPES, 5),
-      uploadKycDoc(userId, files.selfie, IMAGE_TYPES, 5),
-      uploadKycDoc(userId, files.nonConvictionCertificate, PDF_TYPES, 5),
-    ]);
+    // Sequential, not Promise.all — each upload opens its own FTP connection
+    // in production (ftp.storage.ts has no connection pooling), and shared
+    // FTP hosting (Interserver) commonly caps simultaneous connections per
+    // account well below 4. Running these concurrently intermittently/
+    // consistently fails step 1 specifically, since every other upload path
+    // in the app only ever uploads one file at a time.
+    const cniFrontPhotoId = await uploadKycDoc(userId, files.cniFront, IMAGE_TYPES, 5);
+    const cniBackPhotoId = await uploadKycDoc(userId, files.cniBack, IMAGE_TYPES, 5);
+    const selfieWithCniId = await uploadKycDoc(userId, files.selfie, IMAGE_TYPES, 5);
+    const nonConvictionCertificateId = await uploadKycDoc(
+      userId,
+      files.nonConvictionCertificate,
+      PDF_TYPES,
+      5
+    );
 
     return prisma.kycApplication.update({
       where: { id: application.id },

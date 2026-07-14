@@ -173,9 +173,9 @@ async function buildStudentDashboard(userId: string): Promise<DashboardResponse>
 
   const ratingByBooking = new Map(myReviews.map((r) => [r.bookingId, r.overallRating]));
 
-  // Materials module doesn't exist yet (no write path) — correctly empty
-  // until Module 11 is built, per the same "query the real table" approach
-  // used for bookings/disputes above.
+  // Module 8.5 Learning Materials exists now, but student/parent access
+  // (MaterialAccess, booking-linked grants) is explicitly out of scope for
+  // this build — stays empty until that access layer is built.
   const recentMaterials: { id: string; title: string; uploadedAt: string }[] = [];
 
   return {
@@ -227,41 +227,48 @@ async function buildTutorDashboard(userId: string): Promise<DashboardResponse> {
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [pending, upcoming, wallet, nextPayout, completion, monthEscrow, reviews, common] = await Promise.all([
-    prisma.booking.findMany({
-      where: { tutorProfileId: tutorProfile.id, status: "REQUESTED", deletedAt: null },
-      orderBy: { createdAt: "asc" },
-      take: 20,
-      include: bookingInclude,
-    }),
-    prisma.booking.findMany({
-      where: {
-        tutorProfileId: tutorProfile.id,
-        status: { in: [...ACTIVE_BOOKING_STATUSES] },
-        sessionDate: { gte: new Date() },
-        deletedAt: null,
-      },
-      orderBy: { sessionDate: "asc" },
-      take: 10,
-      include: bookingInclude,
-    }),
-    prisma.wallet.findUnique({ where: { userId } }),
-    prisma.payoutQueue.findFirst({
-      where: { userId, status: { in: ["PENDING", "PROCESSING", "WAITING_ON_FLOAT"] } },
-      orderBy: { createdAt: "desc" },
-    }),
-    evaluateCompletion(userId),
-    prisma.escrowHold.aggregate({
-      where: { tutorId: userId, releasedAt: { gte: startOfMonth } },
-      _sum: { netTutorAmountXaf: true },
-    }),
-    prisma.review.findMany({
-      where: { subjectId: userId, subjectRole: "TUTOR", status: { in: ["SUBMITTED", "REVEALED"] } },
-      orderBy: { createdAt: "desc" },
-      take: 3,
-    }),
-    commonUnreadCounts(userId),
-  ]);
+  const [pending, upcoming, wallet, nextPayout, completion, monthEscrow, reviews, common, materialsUploadedCount] =
+    await Promise.all([
+      prisma.booking.findMany({
+        where: { tutorProfileId: tutorProfile.id, status: "REQUESTED", deletedAt: null },
+        orderBy: { createdAt: "asc" },
+        take: 20,
+        include: bookingInclude,
+      }),
+      prisma.booking.findMany({
+        where: {
+          tutorProfileId: tutorProfile.id,
+          status: { in: [...ACTIVE_BOOKING_STATUSES] },
+          sessionDate: { gte: new Date() },
+          deletedAt: null,
+        },
+        orderBy: { sessionDate: "asc" },
+        take: 10,
+        include: bookingInclude,
+      }),
+      prisma.wallet.findUnique({ where: { userId } }),
+      prisma.payoutQueue.findFirst({
+        where: { userId, status: { in: ["PENDING", "PROCESSING", "WAITING_ON_FLOAT"] } },
+        orderBy: { createdAt: "desc" },
+      }),
+      evaluateCompletion(userId),
+      prisma.escrowHold.aggregate({
+        where: { tutorId: userId, releasedAt: { gte: startOfMonth } },
+        _sum: { netTutorAmountXaf: true },
+      }),
+      prisma.review.findMany({
+        where: { subjectId: userId, subjectRole: "TUTOR", status: { in: ["SUBMITTED", "REVEALED"] } },
+        orderBy: { createdAt: "desc" },
+        take: 3,
+      }),
+      commonUnreadCounts(userId),
+      // Module 8.5 — Learning Materials. Not gated by KYC/completion here:
+      // the dashboard renders "even if empty" for tutors who haven't
+      // unlocked the module yet, same as the earnings/bookings fields above.
+      prisma.material.count({
+        where: { collection: { tutorProfileId: tutorProfile.id }, deletedAt: null },
+      }),
+    ]);
 
   return {
     role: "TUTOR",
@@ -286,8 +293,7 @@ async function buildTutorDashboard(userId: string): Promise<DashboardResponse> {
       writtenReview: r.writtenReview,
       createdAt: r.createdAt.toISOString(),
     })),
-    // Materials module doesn't exist yet — correctly 0 until Module 11 is built.
-    materialsUploadedCount: 0,
+    materialsUploadedCount,
   };
 }
 

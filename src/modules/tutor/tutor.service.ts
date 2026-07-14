@@ -3,6 +3,7 @@ import { AppError } from "../../utils/AppError.util";
 import { StatusCodes } from "http-status-codes";
 import { KycStatus, SubjectVerificationStatus } from "../../generated/prisma";
 import { UpdateMyTutorProfileInput, UpdateSubjectPricingInput } from "./tutor.schema";
+import { MaterialsService } from "../materials/materials.service";
 
 const PUBLIC_TUTOR_SELECT = {
   id: true,
@@ -90,7 +91,13 @@ export const TutorService = {
       // a suspended/pending tutor's existence is not public information.
       throw new AppError("tutor/errors:tutorProfileNotFound", StatusCodes.NOT_FOUND);
     }
-    return profile;
+
+    // Module 8.5 — Learning Materials: only reachable once the tutor is
+    // confirmed ACTIVE above, so a KYC suspension/ban hides collections
+    // immediately with no separate write needed (see getPublicLessonPlans).
+    const lessonPlans = await MaterialsService.getPublicLessonPlans(tutorProfileId);
+
+    return { ...profile, lessonPlans };
   },
 };
 

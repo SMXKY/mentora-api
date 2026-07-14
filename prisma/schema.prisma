@@ -1054,6 +1054,7 @@ enum FileCategory {
   LESSON_NOTE
   LESSON_AUDIO
   LESSON_VIDEO
+  LESSON_IMAGE
   SESSION_RECORDING
   WHITEBOARD_EXPORT
   RECEIPT
@@ -1227,6 +1228,7 @@ model Collection {
   name           String  @db.VarChar(255)
   description    String?
   isPublished    Boolean @default(false) @map("is_published")
+  orderIndex     Int     @default(0) @map("order_index")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
@@ -1245,6 +1247,7 @@ model Collection {
   @@index([levelId])
   @@index([isPublished])
   @@index([tutorProfileId, subjectId], map: "idx_collection_tutor_subject")
+  @@index([tutorProfileId, orderIndex], map: "idx_collection_tutor_order")
   @@index([deletedAt])
   @@map("collections")
 }

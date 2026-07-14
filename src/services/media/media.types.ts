@@ -41,6 +41,7 @@ export const categoryFolderMap: Record<FileCategory, string> = {
   LESSON_NOTE: "lesson-notes",
   LESSON_AUDIO: "lesson-audio",
   LESSON_VIDEO: "lesson-videos",
+  LESSON_IMAGE: "lesson-images",
   SESSION_RECORDING: "session-recordings",
   WHITEBOARD_EXPORT: "whiteboard-exports",
   RECEIPT: "receipts",

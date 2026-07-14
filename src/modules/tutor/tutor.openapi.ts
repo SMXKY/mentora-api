@@ -79,7 +79,11 @@ registry.registerPath({
     "pending, suspended, or banned tutor 404s exactly the same as an id that " +
     "doesn't exist at all, so their status is never leaked. Only APPROVED " +
     "subjects appear; KYC-internal fields (credentials, kycStatus, address) " +
-    "are never included.",
+    "are never included. Includes lessonPlans — one entry per published " +
+    "collection with a published lesson plan, each topic carrying a " +
+    "computed status ('coming_soon' if unlinked or its section has no " +
+    "materials yet, otherwise 'available'). A collection with no published " +
+    "lesson plan is simply absent from the array, not shown empty.",
   request: { params: z.object({ id: z.string().uuid() }) },
   responses: {
     200: { description: "Public profile" },

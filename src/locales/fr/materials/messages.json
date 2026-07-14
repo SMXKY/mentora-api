@@ -1,0 +1,8 @@
+{
+  "removalReason": {
+    "POLICY_VIOLATION": "Violation de la politique de contenu de la plateforme",
+    "COPYRIGHT": "Atteinte au droit d'auteur ou à la propriété intellectuelle",
+    "INAPPROPRIATE_CONTENT": "Contenu inapproprié",
+    "OTHER": "Autre raison (voir la note de révision)"
+  }
+}
