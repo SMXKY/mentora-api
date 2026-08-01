@@ -1,11 +1,20 @@
 import prisma from "../../config/database.config";
 import { AppError } from "../../utils/AppError.util";
 import { StatusCodes } from "http-status-codes";
-import { ReviewAuthorRole, ReviewSubjectRole, ReviewStatus } from "../../generated/prisma";
+import {
+  ReviewAuthorRole,
+  ReviewSubjectRole,
+  ReviewStatus,
+} from "../../generated/prisma";
 import { tryRevealWindow } from "../../services/review/reviewWindow.service";
 import { SubmitReviewInput } from "./review.types";
 
-async function resolveRoleForUser(bookingId: string, userId: string, bookerId: string | null, tutorUserId: string) {
+async function resolveRoleForUser(
+  bookingId: string,
+  userId: string,
+  bookerId: string | null,
+  tutorUserId: string
+) {
   const isBooker = bookerId === userId;
   const isTutor = tutorUserId === userId;
   if (!isBooker && !isTutor) {
@@ -20,28 +29,40 @@ async function resolveRoleForUser(bookingId: string, userId: string, bookerId: s
   if (isTutor) {
     return {
       authorRole: ReviewAuthorRole.TUTOR,
-      subjectRole: bookerRole === "STUDENT" ? ReviewSubjectRole.STUDENT : ReviewSubjectRole.PARENT,
+      subjectRole:
+        bookerRole === "STUDENT"
+          ? ReviewSubjectRole.STUDENT
+          : ReviewSubjectRole.PARENT,
       subjectId: bookerId!,
       isBooker: false,
     };
   }
   return {
-    authorRole: bookerRole === "STUDENT" ? ReviewAuthorRole.STUDENT : ReviewAuthorRole.PARENT,
+    authorRole:
+      bookerRole === "STUDENT"
+        ? ReviewAuthorRole.STUDENT
+        : ReviewAuthorRole.PARENT,
     subjectRole: ReviewSubjectRole.TUTOR,
     subjectId: tutorUserId,
     isBooker: true,
   };
 }
 
-async function submitReview(userId: string, bookingId: string, input: SubmitReviewInput) {
+async function submitReview(
+  userId: string,
+  bookingId: string,
+  input: SubmitReviewInput
+) {
   const booking = await prisma.booking.findFirst({
     where: { id: bookingId, deletedAt: null },
     include: { tutorProfile: { select: { userId: true } } },
   });
-  if (!booking) throw new AppError("booking/errors:bookingNotFound", StatusCodes.NOT_FOUND);
+  if (!booking)
+    throw new AppError("booking/errors:bookingNotFound", StatusCodes.NOT_FOUND);
 
   const window = await prisma.reviewWindow.findUnique({ where: { bookingId } });
-  if (!window) throw new AppError("review/errors:windowNotOpen", StatusCodes.BAD_REQUEST);
+  if (!window)
+    throw new AppError("review/errors:windowNotOpen", StatusCodes.BAD_REQUEST);
   // A submission is accepted right up until the window is revealed (by
   // either both sides submitting, or the closesAt sweep) — closesAt alone
   // doesn't block a last-minute submission, only the reveal does.
@@ -49,15 +70,19 @@ async function submitReview(userId: string, bookingId: string, input: SubmitRevi
     throw new AppError("review/errors:windowClosed", StatusCodes.BAD_REQUEST);
   }
 
-  const { authorRole, subjectRole, subjectId, isBooker } = await resolveRoleForUser(
-    bookingId,
-    userId,
-    booking.bookerId,
-    booking.tutorProfile.userId
-  );
+  const { authorRole, subjectRole, subjectId, isBooker } =
+    await resolveRoleForUser(
+      bookingId,
+      userId,
+      booking.bookerId,
+      booking.tutorProfile.userId
+    );
 
-  const existing = await prisma.review.findUnique({ where: { bookingId_authorId: { bookingId, authorId: userId } } });
-  if (existing) throw new AppError("review/errors:alreadySubmitted", StatusCodes.CONFLICT);
+  const existing = await prisma.review.findUnique({
+    where: { bookingId_authorId: { bookingId, authorId: userId } },
+  });
+  if (existing)
+    throw new AppError("review/errors:alreadySubmitted", StatusCodes.CONFLICT);
 
   const review = await prisma.$transaction(async (tx) => {
     const created = await tx.review.create({
@@ -91,15 +116,35 @@ async function submitReview(userId: string, bookingId: string, input: SubmitRevi
   return prisma.review.findUniqueOrThrow({ where: { id: review.id } });
 }
 
-async function listTutorReviewsByProfile(tutorProfileId: string, cursor: string | undefined, limit: number) {
-  const tutorProfile = await prisma.tutorProfile.findUnique({ where: { id: tutorProfileId }, select: { userId: true } });
-  if (!tutorProfile) throw new AppError("tutor/errors:tutorProfileNotFound", StatusCodes.NOT_FOUND);
+async function listTutorReviewsByProfile(
+  tutorProfileId: string,
+  cursor: string | undefined,
+  limit: number
+) {
+  const tutorProfile = await prisma.tutorProfile.findUnique({
+    where: { id: tutorProfileId },
+    select: { userId: true },
+  });
+  if (!tutorProfile)
+    throw new AppError(
+      "tutor/errors:tutorProfileNotFound",
+      StatusCodes.NOT_FOUND
+    );
   return listTutorReviews(tutorProfile.userId, cursor, limit);
 }
 
-async function listTutorReviews(tutorUserId: string, cursor: string | undefined, limit: number) {
+async function listTutorReviews(
+  tutorUserId: string,
+  cursor: string | undefined,
+  limit: number
+) {
   const rows = await prisma.review.findMany({
-    where: { subjectId: tutorUserId, subjectRole: ReviewSubjectRole.TUTOR, status: ReviewStatus.REVEALED, deletedAt: null },
+    where: {
+      subjectId: tutorUserId,
+      subjectRole: ReviewSubjectRole.TUTOR,
+      status: ReviewStatus.REVEALED,
+      deletedAt: null,
+    },
     orderBy: [{ revealedAt: "desc" }, { id: "desc" }],
     ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     take: limit + 1,
@@ -116,6 +161,9 @@ async function listTutorReviews(tutorUserId: string, cursor: string | undefined,
       tutorResponseAt: true,
       revealedAt: true,
       createdAt: true,
+      author: {
+        select: { firstName: true },
+      },
     },
   });
 
@@ -124,17 +172,32 @@ async function listTutorReviews(tutorUserId: string, cursor: string | undefined,
 
   return {
     data: page,
-    meta: { nextCursor: hasNextPage ? page[page.length - 1].id : null, hasNextPage, limit },
+    meta: {
+      nextCursor: hasNextPage ? page[page.length - 1].id : null,
+      hasNextPage,
+      limit,
+    },
   };
 }
 
-async function respondToReview(tutorUserId: string, reviewId: string, response: string) {
-  const review = await prisma.review.findUnique({ where: { id: reviewId } });
-  if (!review) throw new AppError("review/errors:reviewNotFound", StatusCodes.NOT_FOUND);
-  if (review.subjectId !== tutorUserId || review.subjectRole !== ReviewSubjectRole.TUTOR) {
+async function respondToReview(
+  tutorUserId: string,
+  reviewId: string,
+  response: string
+) {
+  const review = await prisma.review.findUnique({
+    where: { id: reviewId, deletedAt: null },
+  });
+  if (!review)
+    throw new AppError("review/errors:reviewNotFound", StatusCodes.NOT_FOUND);
+  if (
+    review.subjectId !== tutorUserId ||
+    review.subjectRole !== ReviewSubjectRole.TUTOR
+  ) {
     throw new AppError("review/errors:notYourReview", StatusCodes.FORBIDDEN);
   }
-  if (review.tutorResponse) throw new AppError("review/errors:alreadyResponded", StatusCodes.CONFLICT);
+  if (review.tutorResponse)
+    throw new AppError("review/errors:alreadyResponded", StatusCodes.CONFLICT);
 
   return prisma.review.update({
     where: { id: reviewId },
@@ -142,5 +205,10 @@ async function respondToReview(tutorUserId: string, reviewId: string, response: 
   });
 }
 
-export const ReviewService = { submitReview, listTutorReviews, listTutorReviewsByProfile, respondToReview };
+export const ReviewService = {
+  submitReview,
+  listTutorReviews,
+  listTutorReviewsByProfile,
+  respondToReview,
+};
 export default ReviewService;

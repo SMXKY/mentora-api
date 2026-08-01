@@ -106,12 +106,18 @@ async function assertSectionOwnership(collectionId: string, sectionId: string) {
     where: { id: sectionId, collectionId, deletedAt: null },
   });
   if (!section) {
-    throw new AppError("materials/errors:sectionNotFound", StatusCodes.NOT_FOUND);
+    throw new AppError(
+      "materials/errors:sectionNotFound",
+      StatusCodes.NOT_FOUND
+    );
   }
   return section;
 }
 
-async function assertMaterialOwnership(collectionId: string, materialId: string) {
+async function assertMaterialOwnership(
+  collectionId: string,
+  materialId: string
+) {
   const material = await prisma.material.findFirst({
     where: { id: materialId, collectionId, deletedAt: null },
   });
@@ -189,14 +195,23 @@ async function createCollection(
     prisma.level.findUnique({ where: { id: input.levelId } }),
   ]);
   if (!subject) {
-    throw new AppError("materials/errors:subjectNotFound", StatusCodes.NOT_FOUND);
+    throw new AppError(
+      "materials/errors:subjectNotFound",
+      StatusCodes.NOT_FOUND
+    );
   }
   if (!level) {
     throw new AppError("materials/errors:levelNotFound", StatusCodes.NOT_FOUND);
   }
-  await assertTutorApprovedForSubject(tutorProfileId, input.subjectId, input.levelId);
+  await assertTutorApprovedForSubject(
+    tutorProfileId,
+    input.subjectId,
+    input.levelId
+  );
 
-  const count = await prisma.collection.count({ where: { tutorProfileId, deletedAt: null } });
+  const count = await prisma.collection.count({
+    where: { tutorProfileId, deletedAt: null },
+  });
 
   const collection = await prisma.collection.create({
     data: {
@@ -270,7 +285,10 @@ async function getCollection(tutorProfileId: string, collectionId: string) {
         where: { deletedAt: null },
         orderBy: { orderIndex: "asc" },
         include: {
-          materials: { where: { deletedAt: null }, orderBy: { orderIndex: "asc" } },
+          materials: {
+            where: { deletedAt: null },
+            orderBy: { orderIndex: "asc" },
+          },
         },
       },
       materials: {
@@ -288,7 +306,10 @@ async function updateCollection(
   ctx: ServiceContext,
   input: CollectionUpdateInput
 ) {
-  const existing = await assertCollectionOwnership(tutorProfileId, collectionId);
+  const existing = await assertCollectionOwnership(
+    tutorProfileId,
+    collectionId
+  );
 
   const updated = await prisma.collection.update({
     where: { id: collectionId },
@@ -382,7 +403,10 @@ async function reorderCollections(
  * (student/parent material access, currently out of scope) starts logging
  * reads — the query is correct and forward-compatible today.
  */
-async function getCollectionStats(tutorProfileId: string, collectionId: string) {
+async function getCollectionStats(
+  tutorProfileId: string,
+  collectionId: string
+) {
   await assertCollectionOwnership(tutorProfileId, collectionId);
 
   const materials = await prisma.material.findMany({
@@ -393,7 +417,11 @@ async function getCollectionStats(tutorProfileId: string, collectionId: string) 
 
   const [collectionReads, materialReads] = await Promise.all([
     prisma.auditLog.findMany({
-      where: { tableName: "collections", targetId: collectionId, category: LogCategory.READ },
+      where: {
+        tableName: "collections",
+        targetId: collectionId,
+        category: LogCategory.READ,
+      },
       select: { actorId: true },
     }),
     materialIds.length
@@ -406,10 +434,14 @@ async function getCollectionStats(tutorProfileId: string, collectionId: string) 
           },
           _count: { targetId: true },
         })
-      : Promise.resolve([] as { targetId: string | null; _count: { targetId: number } }[]),
+      : Promise.resolve(
+          [] as { targetId: string | null; _count: { targetId: number } }[]
+        ),
   ]);
 
-  const uniqueStudents = new Set(collectionReads.map((r) => r.actorId).filter(Boolean)).size;
+  const uniqueStudents = new Set(
+    collectionReads.map((r) => r.actorId).filter(Boolean)
+  ).size;
   const viewCountByMaterial = new Map(
     materialReads.map((r) => [r.targetId, r._count.targetId])
   );
@@ -433,7 +465,9 @@ async function createSection(
 ) {
   await assertCollectionOwnership(tutorProfileId, collectionId);
 
-  const count = await prisma.section.count({ where: { collectionId, deletedAt: null } });
+  const count = await prisma.section.count({
+    where: { collectionId, deletedAt: null },
+  });
 
   const section = await prisma.section.create({
     data: {
@@ -522,7 +556,10 @@ async function reorderSections(
     select: { id: true },
   });
   if (owned.length !== orderedIds.length) {
-    throw new AppError("materials/errors:sectionNotFound", StatusCodes.NOT_FOUND);
+    throw new AppError(
+      "materials/errors:sectionNotFound",
+      StatusCodes.NOT_FOUND
+    );
   }
 
   await prisma.$transaction(
@@ -541,7 +578,10 @@ async function reorderSections(
 }
 
 // ── Materials ────────────────────────────────────────────────
-async function nextMaterialOrderIndex(collectionId: string, sectionId?: string | null) {
+async function nextMaterialOrderIndex(
+  collectionId: string,
+  sectionId?: string | null
+) {
   return prisma.material.count({
     where: { collectionId, sectionId: sectionId ?? null, deletedAt: null },
   });
@@ -561,7 +601,12 @@ async function createMaterial(
 
   const policy = MATERIAL_UPLOAD_POLICY[input.materialType];
   const [uploadResult] = await MediaService.upload(
-    [{ tempFilePath: file.tempFilePath, originalFileName: file.originalFileName }],
+    [
+      {
+        tempFilePath: file.tempFilePath,
+        originalFileName: file.originalFileName,
+      },
+    ],
     {
       uploadedById: ctx.userId!,
       fileCategory: policy.fileCategory,
@@ -572,7 +617,10 @@ async function createMaterial(
     }
   );
 
-  const orderIndex = await nextMaterialOrderIndex(collectionId, input.sectionId);
+  const orderIndex = await nextMaterialOrderIndex(
+    collectionId,
+    input.sectionId
+  );
 
   try {
     const material = await prisma.material.create({
@@ -596,7 +644,9 @@ async function createMaterial(
 
     return material;
   } catch (err) {
-    await MediaService.delete([uploadResult.fileId], { ownerId: ctx.userId! }).catch(() => {});
+    await MediaService.delete([uploadResult.fileId], {
+      ownerId: ctx.userId!,
+    }).catch(() => {});
     throw err;
   }
 }
@@ -613,7 +663,10 @@ async function createWrittenNote(
   }
 
   const sanitized = sanitizeTipTapContent(input.contentJson);
-  const orderIndex = await nextMaterialOrderIndex(collectionId, input.sectionId);
+  const orderIndex = await nextMaterialOrderIndex(
+    collectionId,
+    input.sectionId
+  );
 
   const material = await prisma.material.create({
     data: {
@@ -733,7 +786,10 @@ async function replaceMaterialFile(
     ];
 
   const result = await MediaService.replace(
-    { tempFilePath: file.tempFilePath, originalFileName: file.originalFileName },
+    {
+      tempFilePath: file.tempFilePath,
+      originalFileName: file.originalFileName,
+    },
     {
       fileId: existing.fileId,
       uploadedById: ctx.userId!,
@@ -822,7 +878,9 @@ async function createLessonPlan(
 ) {
   await assertCollectionOwnership(tutorProfileId, collectionId);
 
-  const existing = await prisma.lessonPlan.findUnique({ where: { collectionId } });
+  const existing = await prisma.lessonPlan.findUnique({
+    where: { collectionId },
+  });
   if (existing) {
     throw new AppError(
       "materials/errors:lessonPlanAlreadyExists",
@@ -852,7 +910,9 @@ async function createLessonPlan(
 async function getLessonPlanOrThrow(collectionId: string) {
   const lessonPlan = await prisma.lessonPlan.findUnique({
     where: { collectionId },
-    include: { topics: { where: { deletedAt: null }, orderBy: { orderIndex: "asc" } } },
+    include: {
+      topics: { where: { deletedAt: null }, orderBy: { orderIndex: "asc" } },
+    },
   });
   if (!lessonPlan) {
     throw new AppError(
@@ -870,9 +930,9 @@ async function getLessonPlanOrThrow(collectionId: string) {
  * tutor-profile lesson plan listing (getPublicLessonPlans) without either
  * one duplicating this computation.
  */
-async function attachTopicStatuses<T extends { id: string; sectionId: string | null }>(
-  topics: T[]
-): Promise<(T & { status: "coming_soon" | "available" })[]> {
+async function attachTopicStatuses<
+  T extends { id: string; sectionId: string | null }
+>(topics: T[]): Promise<(T & { status: "coming_soon" | "available" })[]> {
   const sectionIds = topics
     .map((t) => t.sectionId)
     .filter((id): id is string => !!id);
@@ -884,11 +944,14 @@ async function attachTopicStatuses<T extends { id: string; sectionId: string | n
         _count: { sectionId: true },
       })
     : [];
-  const countBySection = new Map(materialCounts.map((c) => [c.sectionId, c._count.sectionId]));
+  const countBySection = new Map(
+    materialCounts.map((c) => [c.sectionId, c._count.sectionId])
+  );
 
   return topics.map((topic) => ({
     ...topic,
-    status: (!topic.sectionId || (countBySection.get(topic.sectionId) ?? 0) === 0
+    status: (!topic.sectionId ||
+    (countBySection.get(topic.sectionId) ?? 0) === 0
       ? "coming_soon"
       : "available") as "coming_soon" | "available",
   }));
@@ -918,7 +981,7 @@ async function getPublicLessonPlans(tutorProfileId: string) {
       tutorProfileId,
       isPublished: true,
       deletedAt: null,
-      lessonPlan: { isPublished: true },
+      // lessonPlan: { isPublished: true },
       // A subject's approval can be revoked after a collection was created
       // (e.g. a supporting credential gets revoked, demoting the subject
       // claim back to PENDING) — the public profile must stop showing
@@ -940,7 +1003,10 @@ async function getPublicLessonPlans(tutorProfileId: string) {
           id: true,
           title: true,
           description: true,
-          topics: { where: { deletedAt: null }, orderBy: { orderIndex: "asc" } },
+          topics: {
+            where: { deletedAt: null },
+            orderBy: { orderIndex: "asc" },
+          },
         },
       },
     },
@@ -991,7 +1057,10 @@ async function getPublicCollectionPreview(collectionId: string) {
       subject: { select: { id: true, name: true } },
       level: { select: { id: true, name: true } },
       tutorProfile: {
-        select: { id: true, user: { select: { firstName: true, lastName: true } } },
+        select: {
+          id: true,
+          user: { select: { firstName: true, lastName: true } },
+        },
       },
       sections: {
         where: { deletedAt: null, isFreePreview: true },
@@ -1016,7 +1085,9 @@ async function getPublicCollectionPreview(collectionId: string) {
     );
   }
 
-  const resolveMaterial = async (material: (typeof collection.materials)[number]) => ({
+  const resolveMaterial = async (
+    material: (typeof collection.materials)[number]
+  ) => ({
     id: material.id,
     name: material.name,
     materialType: material.materialType,
@@ -1193,7 +1264,11 @@ async function reorderLessonPlanTopics(
   const lessonPlan = await getLessonPlanOrThrow(collectionId);
 
   const owned = await prisma.lessonPlanTopic.findMany({
-    where: { id: { in: orderedIds }, lessonPlanId: lessonPlan.id, deletedAt: null },
+    where: {
+      id: { in: orderedIds },
+      lessonPlanId: lessonPlan.id,
+      deletedAt: null,
+    },
     select: { id: true },
   });
   if (owned.length !== orderedIds.length) {
@@ -1205,7 +1280,10 @@ async function reorderLessonPlanTopics(
 
   await prisma.$transaction(
     orderedIds.map((id, index) =>
-      prisma.lessonPlanTopic.update({ where: { id }, data: { orderIndex: index } })
+      prisma.lessonPlanTopic.update({
+        where: { id },
+        data: { orderIndex: index },
+      })
     )
   );
 
