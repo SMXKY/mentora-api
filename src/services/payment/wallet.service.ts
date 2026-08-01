@@ -27,12 +27,43 @@ async function getMyWallet(userId: string, walletType: WalletType) {
   return getOrCreateWallet(userId, walletType);
 }
 
-async function topup(userId: string, walletType: WalletType, amountXaf: number, phone: string) {
+async function waitForFinalStatus(
+  transId: string,
+  { maxAttempts = 8, delayMs = 4000 } = {}
+) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const status = await FapshiService.paymentStatus(transId);
+    if (
+      status.status === "SUCCESSFUL" ||
+      status.status === "FAILED" ||
+      status.status === "EXPIRED"
+    ) {
+      return status;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  throw new AppError(
+    "payment/errors:topupTimedOut",
+    StatusCodes.GATEWAY_TIMEOUT,
+    { transId }
+  );
+}
+
+async function topup(
+  userId: string,
+  walletType: WalletType,
+  amountXaf: number,
+  phone: string
+) {
   const { walletMinTopupXaf } = await paymentConfig.getAll();
   if (amountXaf < walletMinTopupXaf) {
-    throw new AppError("payment/errors:topupBelowMinimum", StatusCodes.BAD_REQUEST, {
-      minimum: walletMinTopupXaf,
-    });
+    throw new AppError(
+      "payment/errors:topupBelowMinimum",
+      StatusCodes.BAD_REQUEST,
+      {
+        minimum: walletMinTopupXaf,
+      }
+    );
   }
 
   const result = await FapshiService.directPay({
@@ -42,7 +73,7 @@ async function topup(userId: string, walletType: WalletType, amountXaf: number, 
     externalId: `topup-${userId}-${Date.now()}`,
     message: "Mentora wallet top-up",
   });
-  const status = await FapshiService.paymentStatus(result.transId);
+  const status = await waitForFinalStatus(result.transId);
 
   if (status.status !== "SUCCESSFUL") {
     throw new AppError("payment/errors:topupFailed", StatusCodes.BAD_GATEWAY, {
@@ -83,17 +114,27 @@ async function topup(userId: string, walletType: WalletType, amountXaf: number, 
   return wallet;
 }
 
-async function assertWithdrawableAccount(userId: string, paymentAccountId: string) {
+async function assertWithdrawableAccount(
+  userId: string,
+  paymentAccountId: string
+) {
   const account = await prisma.paymentAccount.findFirst({
     where: { id: paymentAccountId, userId, deletedAt: null },
   });
   if (!account) {
-    throw new AppError("payment/errors:payoutAccountNotFound", StatusCodes.NOT_FOUND);
+    throw new AppError(
+      "payment/errors:payoutAccountNotFound",
+      StatusCodes.NOT_FOUND
+    );
   }
   if (account.coolingOffUntil && account.coolingOffUntil > new Date()) {
-    throw new AppError("payment/errors:payoutAccountCoolingOff", StatusCodes.FORBIDDEN, {
-      coolingOffUntil: account.coolingOffUntil,
-    });
+    throw new AppError(
+      "payment/errors:payoutAccountCoolingOff",
+      StatusCodes.FORBIDDEN,
+      {
+        coolingOffUntil: account.coolingOffUntil,
+      }
+    );
   }
   return account;
 }
@@ -105,20 +146,33 @@ interface WithdrawResult {
   payoutQueueId: string;
 }
 
-async function withdraw(userId: string, amountXaf: number, paymentAccountId: string): Promise<WithdrawResult> {
+async function withdraw(
+  userId: string,
+  amountXaf: number,
+  paymentAccountId: string
+): Promise<WithdrawResult> {
   const account = await assertWithdrawableAccount(userId, paymentAccountId);
 
   const wallet = await prisma.wallet.findUnique({ where: { userId } });
   if (!wallet || wallet.balanceXaf < amountXaf) {
-    throw new AppError("payment/errors:insufficientBalance", StatusCodes.BAD_REQUEST);
+    throw new AppError(
+      "payment/errors:insufficientBalance",
+      StatusCodes.BAD_REQUEST
+    );
   }
 
   const { momoWithdrawalFeePercent } = await paymentConfig.getAll();
-  const momoFeeXaf = computeMomoWithdrawalFee(amountXaf, momoWithdrawalFeePercent);
+  const momoFeeXaf = computeMomoWithdrawalFee(
+    amountXaf,
+    momoWithdrawalFeePercent
+  );
   const netAmountXaf = amountXaf - momoFeeXaf;
 
   const payoutQueue = await prisma.$transaction(async (tx) => {
-    await tx.wallet.update({ where: { userId }, data: { balanceXaf: { decrement: amountXaf } } });
+    await tx.wallet.update({
+      where: { userId },
+      data: { balanceXaf: { decrement: amountXaf } },
+    });
     return tx.payoutQueue.create({
       data: {
         userId,
@@ -144,7 +198,13 @@ async function withdraw(userId: string, amountXaf: number, paymentAccountId: str
     const status = await FapshiService.paymentStatus(payoutResult.transId);
 
     if (status.status !== "SUCCESSFUL") {
-      return handleFailedPayout(payoutQueue.id, userId, account, amountXaf, `Provider status: ${status.status}`);
+      return handleFailedPayout(
+        payoutQueue.id,
+        userId,
+        account,
+        amountXaf,
+        `Provider status: ${status.status}`
+      );
     }
 
     await prisma.$transaction(async (tx) => {
@@ -180,9 +240,20 @@ async function withdraw(userId: string, amountXaf: number, paymentAccountId: str
       resourceId: payoutQueue.id,
     });
 
-    return { status: "COMPLETED", netAmountXaf, momoFeeXaf, payoutQueueId: payoutQueue.id };
+    return {
+      status: "COMPLETED",
+      netAmountXaf,
+      momoFeeXaf,
+      payoutQueueId: payoutQueue.id,
+    };
   } catch (err: any) {
-    return handleFailedPayout(payoutQueue.id, userId, account, amountXaf, err.message);
+    return handleFailedPayout(
+      payoutQueue.id,
+      userId,
+      account,
+      amountXaf,
+      err.message
+    );
   }
 }
 
@@ -194,15 +265,24 @@ async function handleFailedPayout(
   grossAmountXaf: number,
   failureReason: string
 ): Promise<WithdrawResult> {
-  const registeredAccounts = await prisma.paymentAccount.findMany({ where: { userId, deletedAt: null } });
+  const registeredAccounts = await prisma.paymentAccount.findMany({
+    where: { userId, deletedAt: null },
+  });
 
   const { payoutQueue, ticket } = await prisma.$transaction(async (tx) => {
     // Refund the debited amount back to the wallet — it never left the platform.
-    await tx.wallet.update({ where: { userId }, data: { balanceXaf: { increment: grossAmountXaf } } });
+    await tx.wallet.update({
+      where: { userId },
+      data: { balanceXaf: { increment: grossAmountXaf } },
+    });
 
     const payoutQueue = await tx.payoutQueue.update({
       where: { id: payoutQueueId },
-      data: { status: PayoutQueueStatus.FAILED, failedAt: new Date(), failureReason },
+      data: {
+        status: PayoutQueueStatus.FAILED,
+        failedAt: new Date(),
+        failureReason,
+      },
     });
 
     const ticket = await tx.supportTicket.create({
