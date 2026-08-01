@@ -1,0 +1,11 @@
+{
+  "accessDenied": "Vous n'avez pas accès à cette séance.",
+  "sessionNotOnline": "Cette réservation n'est pas une séance en ligne.",
+  "roomNotReady": "La salle de séance n'est pas encore prête. Réessayez plus près de l'heure de début prévue.",
+  "groupSessionsDisabled": "Les séances de groupe ne sont pas encore disponibles.",
+  "observerModeDisabled": "L'observation des séances par l'administrateur n'est pas activée.",
+  "invalidWebhookSignature": "Signature de webhook invalide.",
+  "notTutor": "Seul le tuteur peut effectuer cette action.",
+  "targetNotInRoom": "Ce participant n'est pas dans cette séance.",
+  "chatContentRequired": "Le contenu du message est requis."
+}

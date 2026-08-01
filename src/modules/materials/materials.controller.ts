@@ -10,7 +10,10 @@ import { MaterialsService } from "./materials.service";
 
 function requireFile(req: Request): Express.Multer.File {
   if (!req.file) {
-    throw new AppError(MEDIA_ERROR_KEYS.noFileProvided, StatusCodes.BAD_REQUEST);
+    throw new AppError(
+      MEDIA_ERROR_KEYS.noFileProvided,
+      StatusCodes.BAD_REQUEST
+    );
   }
   return req.file;
 }
@@ -301,11 +304,52 @@ export const materialsController = {
     appResponder(StatusCodes.OK, { reordered: true }, res);
   }),
 
+  // ── Public ─────────────────────────────────────────────────
+  getPublicCollectionPreview: catchAsync(
+    async (req: Request, res: Response) => {
+      const preview = await MaterialsService.getPublicCollectionPreview(
+        req.params.collectionId
+      );
+      appResponder(StatusCodes.OK, preview, res);
+    }
+  ),
+
   // ── Storage ──────────────────────────────────────────────
   getStorageUsage: catchAsync(async (req: Request, res: Response) => {
     const ctx = buildContext(req, res);
     const usage = await MaterialsService.getStorageUsage(ctx.userId!);
     appResponder(StatusCodes.OK, usage, res);
+  }),
+
+  getCollectionForViewer: catchAsync(async (req: Request, res: Response) => {
+    const preview = await MaterialsService.getCollectionForViewer(
+      req.params.collectionId,
+      res.locals.user.id
+    );
+    appResponder(StatusCodes.OK, preview, res);
+  }),
+
+  saveCollection: catchAsync(async (req: Request, res: Response) => {
+    const saved = await MaterialsService.saveCollection(
+      res.locals.user.id,
+      req.params.collectionId
+    );
+    appResponder(StatusCodes.OK, saved, res);
+  }),
+
+  unsaveCollection: catchAsync(async (req: Request, res: Response) => {
+    await MaterialsService.unsaveCollection(
+      res.locals.user.id,
+      req.params.collectionId
+    );
+    appResponder(StatusCodes.OK, { unsaved: true }, res);
+  }),
+
+  listSavedCollections: catchAsync(async (req: Request, res: Response) => {
+    const saved = await MaterialsService.listSavedCollections(
+      res.locals.user.id
+    );
+    appResponder(StatusCodes.OK, saved, res);
   }),
 };
 

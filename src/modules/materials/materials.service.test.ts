@@ -39,6 +39,7 @@ const mockPrisma: any = {
   storageUsage: { findUnique: jest.fn() },
   subject: { findUnique: jest.fn() },
   level: { findUnique: jest.fn() },
+  tutorSubject: { findFirst: jest.fn() },
   auditLog: { create: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
   platformConfig: { findUnique: jest.fn(), upsert: jest.fn() },
   materialReview: { create: jest.fn(), findMany: jest.fn() },
@@ -75,6 +76,8 @@ jest.mock("../../services/notification/notification.service", () => ({
 
 import { MaterialsService } from "./materials.service";
 import { MaterialsAdminService } from "./materialsAdmin.service";
+import { MediaService } from "../../services/media/media.service";
+import { MaterialType } from "../../generated/prisma";
 
 const ctx = { userId: "user-1", userEmail: "tutor@example.com", requestId: "req-1" };
 
@@ -286,5 +289,99 @@ describe("MaterialsAdminService — download policy defaults", () => {
         update: expect.objectContaining({ value: result }),
       })
     );
+  });
+});
+
+describe("MaterialsService.createCollection — subject-approval guard", () => {
+  beforeEach(() => {
+    mockPrisma.subject.findUnique.mockResolvedValue({ id: "subject-1" });
+    mockPrisma.level.findUnique.mockResolvedValue({ id: "level-1" });
+    mockPrisma.collection.count.mockResolvedValue(0);
+  });
+
+  it("rejects when the tutor has no APPROVED claim for the subject", async () => {
+    mockPrisma.tutorSubject.findFirst.mockResolvedValue(null);
+
+    await expect(
+      MaterialsService.createCollection("tutor-1", ctx, {
+        name: "Algebra Basics",
+        subjectId: "subject-1",
+        levelId: "level-1",
+      })
+    ).rejects.toMatchObject(new AppError("materials/errors:subjectNotApproved", 403));
+
+    expect(mockPrisma.collection.create).not.toHaveBeenCalled();
+  });
+
+  it("proceeds when the tutor has an APPROVED claim for the subject", async () => {
+    mockPrisma.tutorSubject.findFirst.mockResolvedValue({ id: "ts-1", levels: [{ id: "level-1" }] });
+    mockPrisma.collection.create.mockResolvedValue({ id: "collection-1" });
+
+    const collection = await MaterialsService.createCollection("tutor-1", ctx, {
+      name: "Algebra Basics",
+      subjectId: "subject-1",
+      levelId: "level-1",
+    });
+
+    expect(collection.id).toBe("collection-1");
+    expect(mockPrisma.tutorSubject.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tutorProfileId: "tutor-1",
+          subjectId: "subject-1",
+        }),
+      })
+    );
+  });
+});
+
+describe("MaterialsService.getPublicCollectionPreview", () => {
+  it("404s when the collection isn't published or the tutor isn't publicly visible", async () => {
+    mockPrisma.collection.findFirst.mockResolvedValue(null);
+
+    await expect(
+      MaterialsService.getPublicCollectionPreview("collection-1")
+    ).rejects.toMatchObject(new AppError("materials/errors:collectionNotFound", 404));
+  });
+
+  it("only returns free-preview sections/materials, resolving file URLs and written-note content", async () => {
+    mockPrisma.collection.findFirst.mockResolvedValue({
+      id: "collection-1",
+      name: "Algebra Basics",
+      description: "Intro to algebra",
+      subject: { id: "subject-1", name: "Mathematics" },
+      level: { id: "level-1", name: "Form 3" },
+      tutorProfile: { id: "tutor-1", user: { firstName: "Ada", lastName: "L." } },
+      sections: [
+        {
+          id: "section-1",
+          name: "Chapter 1",
+          description: null,
+          materials: [
+            { id: "m1", name: "Video 1", materialType: MaterialType.VIDEO, fileId: "file-1", contentJson: null },
+          ],
+        },
+      ],
+      materials: [
+        {
+          id: "m2",
+          name: "Note 1",
+          materialType: MaterialType.WRITTEN_NOTE,
+          fileId: null,
+          contentJson: { type: "doc", content: [] },
+        },
+      ],
+    });
+    (MediaService.getFileUrl as jest.Mock).mockResolvedValue("https://cdn.example/file-1");
+
+    const preview = await MaterialsService.getPublicCollectionPreview("collection-1");
+
+    expect(preview.sections[0].materials[0]).toEqual(
+      expect.objectContaining({ id: "m1", fileUrl: "https://cdn.example/file-1", content: null })
+    );
+    expect(preview.materials[0]).toEqual(
+      expect.objectContaining({ id: "m2", content: { type: "doc", content: [] }, fileUrl: null })
+    );
+    expect(preview.tutor).toEqual({ tutorProfileId: "tutor-1", firstName: "Ada", lastName: "L." });
   });
 });

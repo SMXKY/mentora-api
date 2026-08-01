@@ -26,5 +26,11 @@
   "statusHistoryNotFound": "This status change record was not found.",
   "declarationRequired": "You must confirm the declaration before submitting.",
   "credentialNeedsSubject": "Please select at least one subject this credential covers.",
-  "additionalSubjectSingle": "An additional-subject submission covers exactly one subject at a time."
+  "additionalSubjectSingle": "An additional-subject submission covers exactly one subject at a time.",
+  "subjectDescriptionTooShort": "Please describe the subject in at least 10 characters.",
+  "levelRequired": "Please select at least one level.",
+  "invalidLevel": "One or more selected levels do not exist.",
+  "subjectXorNewSubject": "Select an existing subject or propose a new one, not both.",
+  "invalidSubjectDomain": "Please select a valid subject domain.",
+  "subjectAlreadyClaimed": "You have already applied for this subject."
 }

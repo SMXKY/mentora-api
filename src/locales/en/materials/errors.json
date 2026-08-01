@@ -15,5 +15,7 @@
   "notAWrittenNote": "This material is not a written note.",
   "materialHasNoFile": "This material has no file to replace.",
   "reorderListEmpty": "Please provide at least one item to reorder.",
-  "downloadPolicyInvalidType": "This is not a valid material content type."
+  "downloadPolicyInvalidType": "This is not a valid material content type.",
+  "subjectNotApproved": "You can only create materials for a subject you have been approved to teach.",
+  "levelNotApproved": "You can only create materials for a level you have been approved to teach this subject at."
 }

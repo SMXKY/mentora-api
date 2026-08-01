@@ -38,12 +38,16 @@ registry.registerPath({
   path: `${basePath}/collections`,
   tags,
   summary: "Create a collection",
-  description: GATE_DESCRIPTION,
+  description:
+    GATE_DESCRIPTION +
+    " Additionally requires an APPROVED TutorSubject for the given " +
+    "subjectId — a tutor can only build materials for a subject an admin " +
+    "has verified them for.",
   ...bearer,
   request: { body: { content: { "application/json": { schema: CollectionCreateSchema } } } },
   responses: {
     201: { description: "Collection created" },
-    403: { description: "Account incomplete or KYC not approved" },
+    403: { description: "Account incomplete, KYC not approved, or subject not approved for this tutor" },
   },
 });
 
@@ -384,4 +388,75 @@ registry.registerPath({
   summary: "My storage usage and quota (across all Learning Materials files)",
   ...bearer,
   responses: { 200: { description: "Usage snapshot" } },
+});
+
+// ── Public ─────────────────────────────────────────────────
+registry.registerPath({
+  method: "get",
+  path: "/api/v1/materials/collections/{collectionId}/preview",
+  tags: ["Materials — Public"],
+  summary: "Consume a collection's free-preview materials",
+  description:
+    "Public, unauthenticated. Returns only the sections/materials flagged " +
+    "isFreePreview from a published collection belonging to a publicly " +
+    "visible (KYC ACTIVE) tutor — everything else 404s the same as a " +
+    "private collection would. WRITTEN_NOTE materials return their " +
+    "sanitized contentJson directly; file-backed materials (VIDEO, AUDIO, " +
+    "DOCUMENT, IMAGE) return a resolved fileUrl the client can render " +
+    "directly (image/video/audio element, or a webview for documents).",
+  request: { params: z.object({ collectionId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Collection metadata plus its free-preview content" },
+    404: { description: "Not found, unpublished, or tutor not publicly visible" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/v1/materials/collections/{collectionId}/viewer",
+  tags: ["Materials — Public"],
+  summary: "Get a collection for the in-app viewer, scoped to the caller's access level",
+  description:
+    "Authenticated. Returns the full collection (sections, materials, lesson plan) " +
+    "for the owning tutor or a student/parent with a valid booking against that " +
+    "tutor; everyone else gets the same free-preview-only content as the " +
+    "unauthenticated preview endpoint.",
+  ...bearer,
+  request: { params: z.object({ collectionId: z.string().uuid() }) },
+  responses: { 200: { description: "Collection view, scoped to FULL or PREVIEW_ONLY access" } },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/v1/materials/collections/{collectionId}/save",
+  tags: ["Materials — Public"],
+  summary: "Save a published collection for later",
+  ...bearer,
+  request: { params: z.object({ collectionId: z.string().uuid() }) },
+  responses: {
+    200: { description: "{ id, userId, collectionId, createdAt }" },
+    404: { description: "Collection not found, unpublished, or deleted" },
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/v1/materials/collections/{collectionId}/save",
+  tags: ["Materials — Public"],
+  summary: "Remove a collection from the caller's saved list",
+  ...bearer,
+  request: { params: z.object({ collectionId: z.string().uuid() }) },
+  responses: { 200: { description: "{ unsaved: true }" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/v1/materials/saved-collections",
+  tags: ["Materials — Public"],
+  summary: "List the caller's saved collections",
+  description:
+    "A saved collection that was later unpublished or soft-deleted by its " +
+    "tutor is still returned, flagged as unavailable, rather than silently dropped.",
+  ...bearer,
+  responses: { 200: { description: "Saved collections, each with an availability flag" } },
 });

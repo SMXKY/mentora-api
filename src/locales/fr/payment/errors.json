@@ -1,0 +1,26 @@
+{
+  "fapshi": {
+    "invalidAmount": "Le montant doit être un nombre entier d'au moins 100 XAF.",
+    "invalidPhone": "Entrez un numéro de mobile camerounais valide (ex. 670000000).",
+    "invalidTransId": "Référence de transaction invalide.",
+    "serviceUnavailable": "Le service de paiement est temporairement indisponible. Veuillez réessayer sous peu.",
+    "transactionNotFound": "Aucune transaction trouvée pour cette référence.",
+    "upstreamError": "Le fournisseur de paiement n'a pas pu traiter cette demande."
+  },
+  "escrowNotFound": "Dépôt sous séquestre introuvable.",
+  "escrowNotHeld": "Ce dépôt sous séquestre n'est plus actif.",
+  "topupBelowMinimum": "Le montant minimum de recharge est {{minimum}} XAF.",
+  "topupFailed": "Votre recharge n'a pas pu être effectuée.",
+  "topupTimedOut": "Nous n'avons pas pu confirmer votre recharge (réf. {{transId}}) à temps. Si votre compte a été débité, il sera rapproché automatiquement.",
+  "payoutAccountNotFound": "Compte de paiement introuvable.",
+  "payoutAccountCoolingOff": "Ce compte de paiement a été ajouté récemment et ne peut pas recevoir de fonds avant {{coolingOffUntil}}.",
+  "insufficientBalance": "Solde du portefeuille insuffisant.",
+  "paymentWindowExpired": "La fenêtre de paiement pour cette réservation a expiré.",
+  "bookingHasNoAgreedRate": "Cette réservation n'a pas de tarif convenu à facturer.",
+  "directPayFailed": "Le paiement mobile n'a pas pu être effectué.",
+  "reconciliationNotFound": "Enregistrement de rapprochement introuvable.",
+  "reconciliationAlreadyResolved": "Ce rapprochement a déjà été résolu.",
+  "receiptNotFound": "Reçu introuvable.",
+  "notYourWallet": "Ce portefeuille ne vous appartient pas.",
+  "insufficientCommissionBalance": "Le solde de commission de la plateforme est insuffisant pour ce retrait."
+}

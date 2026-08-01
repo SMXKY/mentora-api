@@ -55,6 +55,18 @@
     "title": "Nouvelle vérification requise",
     "body": "Vous devez vérifier à nouveau votre identité pour garder votre compte actif."
   },
+  "intro_video_required": {
+    "title": "Ajoutez votre vidéo de présentation",
+    "body": "Téléversez une courte vidéo de présentation, sinon vous ne serez pas visible dans la recherche ni sur votre profil."
+  },
+  "subject_application_approved": {
+    "title": "Matière approuvée",
+    "body": "Votre demande pour enseigner cette matière a été approuvée."
+  },
+  "subject_application_rejected": {
+    "title": "Demande de matière rejetée",
+    "body": "Votre demande pour enseigner cette matière n'a pas été approuvée."
+  },
   "booking_requested": {
     "title": "Nouvelle demande de réservation",
     "body": "Vous avez une nouvelle demande de réservation en attente de réponse."
@@ -115,9 +127,29 @@
     "title": "Tuteur déconnecté",
     "body": "Votre tuteur a perdu la connexion pendant la séance. Il devrait revenir sous peu."
   },
+  "session_tutor_not_joined": {
+    "title": "Votre tuteur n'a pas encore rejoint",
+    "body": "Votre tuteur n'a pas encore rejoint la séance. Veuillez patienter ou contacter le support."
+  },
   "session_no_show": {
     "title": "Séance marquée comme absence",
     "body": "Un participant ne s'est pas présenté à la séance prévue."
+  },
+  "session_room_creation_failed": {
+    "title": "Problème avec la salle de séance",
+    "body": "Nous avons rencontré un problème lors de la création de votre salle de séance. Notre équipe a été alertée — la séance pourrait être retardée."
+  },
+  "session_incoming_call": {
+    "title": "Appel de séance entrant",
+    "body": "{{callerName}} démarre votre séance maintenant."
+  },
+  "session_call_missed": {
+    "title": "Appel de séance manqué",
+    "body": "Vous avez manqué un appel de {{callerName}} pour votre séance."
+  },
+  "session_empty_timeout_closed": {
+    "title": "Séance fermée — personne ne s'est connecté",
+    "body": "Votre salle de séance s'est fermée car personne ne s'est connecté dans les 30 minutes suivant l'heure prévue."
   },
   "payment_confirmed": {
     "title": "Paiement confirmé",
@@ -162,6 +194,10 @@
   "lesson_awaiting_confirmation": {
     "title": "Confirmez votre leçon",
     "body": "Une leçon terminée attend votre confirmation."
+  },
+  "lesson_confirmation_reminder": {
+    "title": "La fenêtre de confirmation se termine bientôt",
+    "body": "Une leçon attend toujours votre confirmation — elle sera confirmée automatiquement bientôt si vous ne répondez pas."
   },
   "lesson_confirmed": {
     "title": "Leçon confirmée",

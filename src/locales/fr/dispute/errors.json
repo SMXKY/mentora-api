@@ -1,0 +1,10 @@
+{
+  "invalidStatusTransition": "Ce litige ne peut pas passer de {{from}} à {{to}}.",
+  "disputeWindowClosed": "Cette réservation n'est plus dans un état permettant d'ouvrir un litige.",
+  "disputeAlreadyExists": "Un litige a déjà été ouvert pour cette réservation.",
+  "descriptionTooShort": "Veuillez fournir au moins {{minimum}} caractères décrivant le problème.",
+  "descriptionTooLong": "La description doit contenir moins de {{maximum}} caractères.",
+  "disputeNotFound": "Litige introuvable.",
+  "notYourDispute": "Ce litige ne vous appartient pas.",
+  "evidenceNotFound": "Dossier de preuves introuvable."
+}

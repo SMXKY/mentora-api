@@ -23,6 +23,7 @@ import { permissions } from "../../data/permission.data";
 import AdminUserService from "../adminUser/adminUser.service";
 import { MediaService } from "../../services/media/media.service";
 import { getStorageAdapter, resolveStorageUrl } from "../../services/media";
+import { addWatBusinessDays } from "../availability/availability.logic";
 import {
   KycChecklistInput,
   KycRejectInput,
@@ -32,7 +33,15 @@ import {
   KycSlaConfigInput,
   KycQueueQueryInput,
   KycSubjectQueueQueryInput,
+  IntroVideoConfigInput,
 } from "./kyc.types";
+import {
+  getIntroVideoMinDurationSeconds,
+  updateIntroVideoMinDurationSeconds,
+} from "../../services/tutor/introVideoPolicy.service";
+import { queueScoreRecompute } from "../../services/search/searchScore.processor";
+import { TutorService } from "../tutor/tutor.service";
+import { getNewTutorBoostConfig } from "../../services/search/searchConfig";
 
 const REVIEW_OPEN_KEY_PREFIX = "kyc:review:opened:";
 const REVIEW_OPEN_TTL_SECONDS = 60 * 60; // an admin has an hour to act after opening
@@ -45,16 +54,7 @@ const SLA_MAX_BUSINESS_DAYS_KEY = "kyc.sla_max_business_days";
 const DEFAULT_SLA_TARGET_HOURS = 48;
 const DEFAULT_SLA_MAX_BUSINESS_DAYS = 5;
 
-function addBusinessDays(from: Date, days: number): Date {
-  const result = new Date(from);
-  let added = 0;
-  while (added < days) {
-    result.setDate(result.getDate() + 1);
-    const day = result.getDay();
-    if (day !== 0 && day !== 6) added++;
-  }
-  return result;
-}
+const addBusinessDays = addWatBusinessDays;
 
 async function getSlaConfig(): Promise<{ targetHours: number; maxBusinessDays: number }> {
   const rows = await prisma.platformConfig.findMany({
@@ -837,7 +837,10 @@ export const KycAdminService = {
   ) {
     const tutorSubject = await prisma.tutorSubject.findUnique({
       where: { id: tutorSubjectId },
-      include: { tutorProfile: { select: { id: true, userId: true, kycStatus: true } } },
+      include: {
+        tutorProfile: { select: { id: true, userId: true, kycStatus: true } },
+        subject: { select: { id: true, status: true } },
+      },
     });
     if (!tutorSubject) {
       throw new AppError("kyc/errors:subjectNotFound", StatusCodes.NOT_FOUND);
@@ -851,6 +854,16 @@ export const KycAdminService = {
         approvedAt: new Date(),
       },
     });
+
+    // A tutor-proposed subject that was still PENDING joins the public
+    // taxonomy the moment its first claim is approved — every other tutor
+    // benefits from it going forward, not just this claimant.
+    if (tutorSubject.subject.status === SubjectVerificationStatus.PENDING) {
+      await prisma.subject.update({
+        where: { id: tutorSubject.subject.id },
+        data: { status: SubjectVerificationStatus.APPROVED, isActive: true },
+      });
+    }
 
     // Train the inference engine when an admin approves a below-threshold
     // (or previously-untrained) match — this is what teaches the scoring
@@ -897,9 +910,15 @@ export const KycAdminService = {
     // the tutor — subject approvals never affect an already-ACTIVE tutor.
     if (tutorSubject.tutorProfile.kycStatus === KycStatus.IDENTITY_APPROVED) {
       assertValidTransition(KycStatus.IDENTITY_APPROVED, KycStatus.ACTIVE);
+      const boostConfig = await getNewTutorBoostConfig();
       await prisma.tutorProfile.update({
         where: { id: tutorSubject.tutorProfileId },
-        data: { kycStatus: KycStatus.ACTIVE },
+        data: {
+          kycStatus: KycStatus.ACTIVE,
+          newTutorBoostExpiresAt: new Date(
+            Date.now() + boostConfig.boostDurationDays * 24 * 60 * 60 * 1000
+          ),
+        },
       });
       await NotificationService.send({
         type: NotificationType.KYC_APPROVED,
@@ -907,6 +926,8 @@ export const KycAdminService = {
         resourceType: NotificationResourceType.KYC,
       }).catch(() => {});
     }
+
+    queueScoreRecompute(tutorSubject.tutorProfileId).catch(() => {});
 
     AuditService.record(ctx, "tutor_subjects", {
       operation: LogOperation.APPROVE,
@@ -916,6 +937,13 @@ export const KycAdminService = {
       changedFields: ["status"],
       eventType: "kyc.subject_approved",
     });
+
+    await NotificationService.send({
+      type: NotificationType.SUBJECT_APPLICATION_APPROVED,
+      target: { kind: "user", userId: tutorSubject.tutorProfile.userId },
+      resourceType: NotificationResourceType.TUTOR_SUBJECT,
+      resourceId: tutorSubjectId,
+    }).catch(() => {});
 
     return prisma.tutorSubject.findUniqueOrThrow({ where: { id: tutorSubjectId } });
   },
@@ -928,18 +956,35 @@ export const KycAdminService = {
   ) {
     const tutorSubject = await prisma.tutorSubject.findUnique({
       where: { id: tutorSubjectId },
-      include: { tutorProfile: { select: { userId: true } } },
+      include: {
+        tutorProfile: { select: { userId: true } },
+        subject: { select: { id: true, status: true } },
+      },
     });
     if (!tutorSubject) {
       throw new AppError("kyc/errors:subjectNotFound", StatusCodes.NOT_FOUND);
     }
 
     // Rejecting one subject never touches any other subject's status —
-    // this is a single-row update, no cascading changes to siblings.
+    // this is a single-row update, no cascading changes to siblings. It
+    // also can't stay open for booking once it's no longer approved.
     await prisma.tutorSubject.update({
       where: { id: tutorSubjectId },
-      data: { status: SubjectVerificationStatus.REJECTED, rejectedReason: reason },
+      data: {
+        status: SubjectVerificationStatus.REJECTED,
+        rejectedReason: reason,
+        isOpenForBooking: false,
+      },
     });
+
+    // A tutor-proposed subject only this tutor ever claimed is rejected
+    // outright, not left dangling as an orphaned PENDING taxonomy row.
+    if (tutorSubject.subject.status === SubjectVerificationStatus.PENDING) {
+      await prisma.subject.update({
+        where: { id: tutorSubject.subject.id },
+        data: { status: SubjectVerificationStatus.REJECTED, isActive: false },
+      });
+    }
 
     AuditService.record(ctx, "tutor_subjects", {
       operation: LogOperation.REJECT,
@@ -951,11 +996,15 @@ export const KycAdminService = {
     });
 
     await NotificationService.send({
-      type: NotificationType.KYC_REJECTED,
+      type: NotificationType.SUBJECT_APPLICATION_REJECTED,
       target: { kind: "user", userId: tutorSubject.tutorProfile.userId },
-      resourceType: NotificationResourceType.KYC,
-      data: { subjectRejection: true, reason },
+      resourceType: NotificationResourceType.TUTOR_SUBJECT,
+      resourceId: tutorSubjectId,
+      data: { reason },
     }).catch(() => {});
+
+    queueScoreRecompute(tutorSubject.tutorProfileId).catch(() => {});
+    TutorService.recomputeTutorRateRange(tutorSubject.tutorProfileId).catch(() => {});
 
     return tutorSubject;
   },
@@ -1003,14 +1052,18 @@ export const KycAdminService = {
           },
         });
         if (!stillCovered) {
+          // Demoted back to PENDING, so it can't stay open for booking —
+          // isOpenForBooking:true is only ever valid on an APPROVED subject.
           await prisma.tutorSubject.updateMany({
             where: { tutorProfileId: credential.tutorProfileId, subjectId: link.subjectId },
             data: {
               status: SubjectVerificationStatus.PENDING,
               approvedById: null,
               approvedAt: null,
+              isOpenForBooking: false,
             },
           });
+          TutorService.recomputeTutorRateRange(credential.tutorProfileId).catch(() => {});
         }
       }
     }
@@ -1139,6 +1192,8 @@ export const KycAdminService = {
       changedFields: ["kycStatus"],
       eventType: "kyc.unsuspended",
     });
+
+    queueScoreRecompute(tutorProfileId).catch(() => {});
   },
 
   // ── Governance ───────────────────────────────────────────────
@@ -1254,6 +1309,20 @@ export const KycAdminService = {
       }),
     ]);
     return getSlaConfig();
+  },
+
+  // ── Intro video policy ──────────────────────────────────────
+
+  async getIntroVideoConfig() {
+    return { minDurationSeconds: await getIntroVideoMinDurationSeconds() };
+  },
+
+  async updateIntroVideoConfig(input: IntroVideoConfigInput, ctx: ServiceContext) {
+    const minDurationSeconds = await updateIntroVideoMinDurationSeconds(
+      input.minDurationSeconds,
+      ctx
+    );
+    return { minDurationSeconds };
   },
 };
 

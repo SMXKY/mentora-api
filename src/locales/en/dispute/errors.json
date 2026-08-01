@@ -1,0 +1,10 @@
+{
+  "invalidStatusTransition": "This dispute can't move from {{from}} to {{to}}.",
+  "disputeWindowClosed": "This booking is no longer in a state where a dispute can be opened.",
+  "disputeAlreadyExists": "A dispute has already been opened for this booking.",
+  "descriptionTooShort": "Please provide at least {{minimum}} characters describing the issue.",
+  "descriptionTooLong": "Description must be under {{maximum}} characters.",
+  "disputeNotFound": "Dispute not found.",
+  "notYourDispute": "This dispute doesn't belong to you.",
+  "evidenceNotFound": "Evidence package not found."
+}

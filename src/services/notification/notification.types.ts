@@ -173,6 +173,24 @@ export const notificationRegistry: Record<
     isTransactional: true,
     defaultChannels: inAppEmail,
   },
+  INTRO_VIDEO_REQUIRED: {
+    titleCode: "notifications/messages:intro_video_required.title",
+    bodyCode: "notifications/messages:intro_video_required.body",
+    isTransactional: false,
+    defaultChannels: inAppEmail,
+  },
+  SUBJECT_APPLICATION_APPROVED: {
+    titleCode: "notifications/messages:subject_application_approved.title",
+    bodyCode: "notifications/messages:subject_application_approved.body",
+    isTransactional: false,
+    defaultChannels: on,
+  },
+  SUBJECT_APPLICATION_REJECTED: {
+    titleCode: "notifications/messages:subject_application_rejected.title",
+    bodyCode: "notifications/messages:subject_application_rejected.body",
+    isTransactional: false,
+    defaultChannels: on,
+  },
 
   BOOKING_REQUESTED: {
     titleCode: "notifications/messages:booking_requested.title",
@@ -265,9 +283,39 @@ export const notificationRegistry: Record<
     isTransactional: false,
     defaultChannels: inAppPush,
   },
+  SESSION_TUTOR_NOT_JOINED: {
+    titleCode: "notifications/messages:session_tutor_not_joined.title",
+    bodyCode: "notifications/messages:session_tutor_not_joined.body",
+    isTransactional: false,
+    defaultChannels: inAppPush,
+  },
   SESSION_NO_SHOW: {
     titleCode: "notifications/messages:session_no_show.title",
     bodyCode: "notifications/messages:session_no_show.body",
+    isTransactional: false,
+    defaultChannels: inAppPush,
+  },
+  SESSION_ROOM_CREATION_FAILED: {
+    titleCode: "notifications/messages:session_room_creation_failed.title",
+    bodyCode: "notifications/messages:session_room_creation_failed.body",
+    isTransactional: true,
+    defaultChannels: inAppPush,
+  },
+  SESSION_INCOMING_CALL: {
+    titleCode: "notifications/messages:session_incoming_call.title",
+    bodyCode: "notifications/messages:session_incoming_call.body",
+    isTransactional: true,
+    defaultChannels: inAppPush,
+  },
+  SESSION_CALL_MISSED: {
+    titleCode: "notifications/messages:session_call_missed.title",
+    bodyCode: "notifications/messages:session_call_missed.body",
+    isTransactional: false,
+    defaultChannels: inAppPush,
+  },
+  SESSION_EMPTY_TIMEOUT_CLOSED: {
+    titleCode: "notifications/messages:session_empty_timeout_closed.title",
+    bodyCode: "notifications/messages:session_empty_timeout_closed.body",
     isTransactional: false,
     defaultChannels: inAppPush,
   },
@@ -336,6 +384,12 @@ export const notificationRegistry: Record<
   LESSON_AWAITING_CONFIRMATION: {
     titleCode: "notifications/messages:lesson_awaiting_confirmation.title",
     bodyCode: "notifications/messages:lesson_awaiting_confirmation.body",
+    isTransactional: false,
+    defaultChannels: inAppPush,
+  },
+  LESSON_CONFIRMATION_REMINDER: {
+    titleCode: "notifications/messages:lesson_confirmation_reminder.title",
+    bodyCode: "notifications/messages:lesson_confirmation_reminder.body",
     isTransactional: false,
     defaultChannels: inAppPush,
   },

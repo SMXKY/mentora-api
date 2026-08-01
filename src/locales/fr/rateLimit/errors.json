@@ -1,0 +1,5 @@
+{
+  "missingIdentifier": "Impossible d'identifier cette requête pour la limitation de débit.",
+  "serviceUnavailable": "Le service de limitation de débit est temporairement indisponible. Veuillez réessayer sous peu.",
+  "tooManyRequests": "Trop de requêtes. Veuillez réessayer plus tard."
+}

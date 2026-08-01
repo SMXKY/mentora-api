@@ -1,0 +1,7 @@
+{
+  "messageRemovedByPlatform": "This message was removed by the platform.",
+  "inquiryRemainingMessages": "{{remaining}} of {{limit}} messages left before you need to book a lesson.",
+  "reconnecting": "Reconnecting...",
+  "typing": "typing...",
+  "conversationWarningIssued": "A moderator has issued a warning in this conversation: {{note}}"
+}

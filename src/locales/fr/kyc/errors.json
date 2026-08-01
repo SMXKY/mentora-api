@@ -26,5 +26,11 @@
   "statusHistoryNotFound": "Cet enregistrement de changement de statut est introuvable.",
   "declarationRequired": "Vous devez confirmer la déclaration avant de soumettre.",
   "credentialNeedsSubject": "Veuillez sélectionner au moins une matière couverte par ce diplôme.",
-  "additionalSubjectSingle": "Une soumission de matière supplémentaire couvre exactement une matière à la fois."
+  "additionalSubjectSingle": "Une soumission de matière supplémentaire couvre exactement une matière à la fois.",
+  "subjectDescriptionTooShort": "Veuillez décrire la matière en au moins 10 caractères.",
+  "levelRequired": "Veuillez sélectionner au moins un niveau.",
+  "invalidLevel": "Un ou plusieurs niveaux sélectionnés n'existent pas.",
+  "subjectXorNewSubject": "Sélectionnez une matière existante ou proposez-en une nouvelle, pas les deux.",
+  "invalidSubjectDomain": "Veuillez sélectionner un domaine de matière valide.",
+  "subjectAlreadyClaimed": "Vous avez déjà postulé pour cette matière."
 }

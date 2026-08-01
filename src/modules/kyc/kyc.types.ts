@@ -93,12 +93,49 @@ export const KycDeclarationSchema = z
 export type KycDeclarationInput = z.infer<typeof KycDeclarationSchema>;
 
 // ── Additional-subject (post-approval lighter flow) ─────────
-export const AdditionalSubjectSchema = CredentialInputSchema.extend({
-  subjectIds: z
-    .array(z.string().uuid())
-    .length(1, "kyc/errors:additionalSubjectSingle"),
-}).openapi("AdditionalSubject");
+// A tutor applying for a subject that isn't in the taxonomy yet proposes it
+// here (name/description/domain) instead of picking an existing subjectId —
+// it's created PENDING and inactive until an admin reviews it alongside the
+// subject-verification queue (see kycAdmin.service's approveSubject/
+// rejectSubject).
+export const NewSubjectProposalSchema = z
+  .object({
+    name: z.string().min(2, "kyc/errors:fieldRequired").max(100),
+    description: z
+      .string()
+      .min(10, "kyc/errors:subjectDescriptionTooShort")
+      .max(1000),
+    domainId: z.string().uuid("kyc/errors:fieldRequired"),
+  })
+  .openapi("NewSubjectProposal");
+export type NewSubjectProposalInput = z.infer<typeof NewSubjectProposalSchema>;
+
+export const AdditionalSubjectSchema = z
+  .object({
+    institutionName: z.string().min(1, "kyc/errors:fieldRequired"),
+    qualificationType: QualificationTypeEnum,
+    fieldOfStudy: z.string().min(1, "kyc/errors:fieldRequired"),
+    gradeOrClassification: z.string().optional(),
+    yearAwarded: z.number().int().min(1950).max(new Date().getFullYear()),
+    subjectId: z.string().uuid().optional(),
+    newSubject: NewSubjectProposalSchema.optional(),
+    levelIds: z.array(z.string().uuid()).min(1, "kyc/errors:levelRequired"),
+  })
+  .refine((d) => Boolean(d.subjectId) !== Boolean(d.newSubject), {
+    message: "kyc/errors:subjectXorNewSubject",
+    path: ["subjectId"],
+  })
+  .openapi("AdditionalSubject");
 export type AdditionalSubjectInput = z.infer<typeof AdditionalSubjectSchema>;
+
+export const UpdateSubjectLevelsSchema = z
+  .object({
+    levelIds: z.array(z.string().uuid()).min(1, "kyc/errors:levelRequired"),
+  })
+  .openapi("UpdateSubjectLevels");
+export type UpdateSubjectLevelsInput = z.infer<
+  typeof UpdateSubjectLevelsSchema
+>;
 
 // ── Admin: checklist + identity decision ────────────────────
 export const KycChecklistSchema = z
@@ -179,6 +216,13 @@ export const KycSlaConfigSchema = z
   })
   .openapi("KycSlaConfig");
 export type KycSlaConfigInput = z.infer<typeof KycSlaConfigSchema>;
+
+export const IntroVideoConfigSchema = z
+  .object({
+    minDurationSeconds: z.number().int().min(1),
+  })
+  .openapi("IntroVideoConfig");
+export type IntroVideoConfigInput = z.infer<typeof IntroVideoConfigSchema>;
 
 // ── Admin: queue search / filter / sort ─────────────────────
 const KycQueueStatusEnum = z.enum([

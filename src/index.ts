@@ -43,6 +43,25 @@ async function bootstrap() {
   await import("./services/notification/notification.queue");
   await import("./services/account/accountAnonymisation.processor");
   await import("./services/kyc/kycSlaEscalation.processor");
+  await import("./services/search/searchScore.processor");
+  const { startPaymentWindowWorker } = await import("./services/booking/paymentWindow.processor");
+  startPaymentWindowWorker();
+  const { startGroupSessionCutoffWorker } = await import("./services/booking/groupSessionCutoff.processor");
+  startGroupSessionCutoffWorker();
+  const { startConfirmationWindowWorker } = await import("./services/dispute/confirmationWindow.processor");
+  startConfirmationWindowWorker();
+  const { startNoShowSweep } = await import("./modules/booking/checkin.service");
+  startNoShowSweep();
+  const { startDisputeSlaWorker } = await import("./services/dispute/disputeSla.processor");
+  startDisputeSlaWorker();
+  const { startReconciliationWorker } = await import("./services/payment/reconciliation.processor");
+  startReconciliationWorker();
+  const { startMonthlyFeeWorker } = await import("./services/payment/monthlyFee.processor");
+  startMonthlyFeeWorker();
+  const { startReviewWindowSweep } = await import("./services/review/reviewWindow.processor");
+  startReviewWindowSweep();
+  const { startRoomLifecycleWorker } = await import("./services/liveSession/roomLifecycle.processor");
+  startRoomLifecycleWorker();
   console.log("Background jobs initialised. ✅");
 
   httpServer.listen(port, () => {

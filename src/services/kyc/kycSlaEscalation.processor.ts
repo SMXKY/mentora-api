@@ -5,6 +5,7 @@ import { KycStatus, NotificationType, NotificationResourceType } from "../../gen
 import NotificationService from "../notification/notification.service";
 import { KycAdminService } from "../../modules/kyc/kycAdmin.service";
 import { permissions } from "../../data/permission.data";
+import { addWatBusinessDays } from "../../modules/availability/availability.logic";
 
 const connection = {
   host: process.env.REDIS_HOST || "127.0.0.1",
@@ -32,16 +33,7 @@ slaQueue
     });
   });
 
-function addBusinessDays(from: Date, days: number): Date {
-  const result = new Date(from);
-  let added = 0;
-  while (added < days) {
-    result.setDate(result.getDate() + 1);
-    const day = result.getDay();
-    if (day !== 0 && day !== 6) added++;
-  }
-  return result;
-}
+const addBusinessDays = addWatBusinessDays;
 
 export async function checkKycSlaBreaches(): Promise<{ notified48h: number; escalated: number }> {
   const { targetHours, maxBusinessDays } = await KycAdminService.getSlaConfig();

@@ -1,0 +1,5 @@
+{
+  "missingIdentifier": "Unable to identify this request for rate limiting.",
+  "serviceUnavailable": "The rate limiting service is temporarily unavailable. Please try again shortly.",
+  "tooManyRequests": "Too many requests. Please try again later."
+}

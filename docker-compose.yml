@@ -45,6 +45,17 @@ services:
     depends_on:
       - postgres
 
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: mentora_livekit
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./docker/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880" # HTTP/WebSocket signaling
+      - "7881:7881" # TCP fallback for restrictive networks
+      - "50000-50100:50000-50100/udp" # RTC media
+
 volumes:
   postgres_data:
   redis_data:

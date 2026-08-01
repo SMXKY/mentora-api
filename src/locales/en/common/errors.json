@@ -33,6 +33,7 @@
   },
   "server": {
     "unknown": "An unexpected error occurred. Please try again",
+    "unkwon": "An unexpected error occurred. Please try again",
     "ftpConfigMissing": "File storage is not configured correctly. Please try again later"
   }
 }

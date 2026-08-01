@@ -1,0 +1,10 @@
+{
+  "zeroResults": {
+    "nearbyCity": "Aucun tuteur vérifié en {{subject}} trouvé à {{city}}. Affichage des tuteurs des villes voisines.",
+    "noTutorsForSubject": "Aucun tuteur vérifié trouvé pour {{subject}} pour le moment. Nous développons notre réseau de tuteurs — revenez bientôt.",
+    "restrictiveFilters": "Aucun tuteur ne correspond à tous vos filtres. Essayez de retirer « {{filter}} » pour voir plus de résultats."
+  },
+  "notifyMe": {
+    "confirmation": "Merci ! Nous vous informerons dès qu'un tuteur correspondant rejoindra la plateforme."
+  }
+}

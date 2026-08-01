@@ -1,0 +1,11 @@
+{
+  "accessDenied": "You don't have access to this session.",
+  "sessionNotOnline": "This booking isn't an online session.",
+  "roomNotReady": "The session room isn't ready yet. Try again closer to the scheduled start time.",
+  "groupSessionsDisabled": "Group sessions aren't available yet.",
+  "observerModeDisabled": "Admin session observation isn't enabled.",
+  "invalidWebhookSignature": "Invalid webhook signature.",
+  "notTutor": "Only the tutor can perform this action.",
+  "targetNotInRoom": "That participant isn't in this session.",
+  "chatContentRequired": "Message content is required."
+}

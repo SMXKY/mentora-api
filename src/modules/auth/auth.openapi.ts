@@ -586,6 +586,35 @@ registry.registerPath({
   },
 });
 
+// ── Dev/staging-only ──────────────────────────────────────────────────────────
+
+registry.registerPath({
+  method: "get",
+  path: `${basePath}/dev/otp`,
+  tags,
+  summary: "Peek the current OTP for an identity (dev/staging only)",
+  description:
+    "Not registered at all when NODE_ENV=production (see auth.route.ts), and " +
+    "returns 404 there as defense in depth. Lets local/staging clients read " +
+    "the last OTP issued to a phone number or email without needing SMS/email " +
+    "delivery, so registration/login flows can be tested end-to-end.",
+  request: { query: z.object({ identity: z.string() }) },
+  responses: {
+    200: {
+      description: "Current OTP code for the identity",
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.boolean(),
+            data: z.object({ code: z.string().nullable() }),
+          }),
+        },
+      },
+    },
+    404: { description: "Not found — always returned in production" },
+  },
+});
+
 registry.registerPath({
   method: "post",
   path: `${basePath}/me/reactivate`,

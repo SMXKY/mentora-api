@@ -88,6 +88,58 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
+  path: `${basePath}/deleted`,
+  tags,
+  summary: "Get all soft-deleted users (offset paginated)",
+  request: {
+    query: z.object({
+      page: z.string().optional(),
+      limit: z.string().optional(),
+      sortBy: z.string().optional(),
+      sortOrder: z.enum(["asc", "desc"]).optional(),
+      search: z.string().optional(),
+    }),
+  },
+  responses: {
+    200: {
+      description: "List of soft-deleted users",
+      content: {
+        "application/json": {
+          schema: z.object({
+            success: z.boolean(),
+            data: z.array(UserResponseSchema),
+            meta: z.object({
+              total: z.number(),
+              page: z.number(),
+              limit: z.number(),
+              totalPages: z.number(),
+              hasNextPage: z.boolean(),
+              hasPrevPage: z.boolean(),
+            }),
+          }),
+        },
+      },
+    },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: `${basePath}/deleted/{id}`,
+  tags,
+  summary: "Get a soft-deleted user by ID",
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Soft-deleted user found",
+      content: { "application/json": { schema: UserResponseSchema } },
+    },
+    404: { description: "User not found among soft-deleted records" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
   path: `${basePath}/{id}`,
   tags,
   summary: "Get user by ID",
@@ -118,6 +170,21 @@ registry.registerPath({
       content: { "application/json": { schema: UserResponseSchema } },
     },
     404: { description: "User not found" },
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: `${basePath}/{id}/restore`,
+  tags,
+  summary: "Restore a soft-deleted user",
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "User restored",
+      content: { "application/json": { schema: UserResponseSchema } },
+    },
+    404: { description: "User not found among soft-deleted records" },
   },
 });
 

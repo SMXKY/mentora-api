@@ -1,0 +1,35 @@
+# Self-hosted LiveKit server config — this is the SAME file (and the same
+# docker-compose service) that runs on the VPS at launch (ADR-005: "Docker
+# container on the same VPS"). Only the `keys` secret and `webhook.urls`
+# host should change between environments; everything else is shared.
+
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  # Single-node dev/VPS-at-launch setup — no external TURN/STUN needed for
+  # same-network or same-machine testing. When the VPS gets a public IP,
+  # set use_external_ip: true so ICE candidates advertise it correctly.
+  use_external_ip: false
+
+# Rooms are ONLY ever created by the backend's RoomServiceClient (the
+# scheduled 15-minutes-before-start job) — never implicitly by a client
+# connecting with a token. This is what makes room names non-guessable in
+# practice: a token alone can't summon a room into existence.
+room:
+  auto_create: false
+  empty_timeout: 1800 # 30 min — matches REQ-014 empty-room auto-close
+  departure_timeout: 900 # 15 min — matches REQ-014 departure timeout
+
+keys:
+  LKAPI3edf5ed959038b9a1b2b: Kd8SWWybRNsJTu5gxgB38qe072NGxCfk4SjBXNA
+
+webhook:
+  api_key: LKAPI3edf5ed959038b9a1b2b
+  urls:
+    - http://host.docker.internal:8080/api/v1/live-sessions/webhooks/livekit
+
+logging:
+  level: info

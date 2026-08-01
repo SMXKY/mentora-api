@@ -6,6 +6,20 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 8080
+    },
+    {
+      "name": "admin-test-ui",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5501", "--bind", "127.0.0.1", "--directory", "C:\\mentora\\mentor-admin-test-ui"],
+      "port": 5501,
+      "url": "http://127.0.0.1:5501"
+    },
+    {
+      "name": "expo-web",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd /d C:\\mentora\\mentora-ui && npx expo start --web --port %PORT%"],
+      "port": 8081,
+      "autoPort": true
     }
   ]
 }

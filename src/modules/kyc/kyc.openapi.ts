@@ -16,6 +16,9 @@ import {
   KycStatusResponseSchema,
   KycQueueQuerySchema,
   KycSubjectQueueQuerySchema,
+  UpdateSubjectLevelsSchema,
+  QualificationTypeEnum,
+  IntroVideoConfigSchema,
 } from "./kyc.types";
 
 // ============================================================
@@ -236,15 +239,78 @@ registry.registerPath({
   method: "post",
   path: `${basePath}/me/additional-subject`,
   tags: tutorTags,
-  summary: "Claim an additional subject after already going ACTIVE",
+  summary: "Apply for an additional subject after already going ACTIVE",
   description:
-    "The lighter post-approval flow — reuses the same credential submission " +
-    "path, but only reachable once KYC status is ACTIVE, and lands in the " +
-    "dedicated additional-subject admin queue rather than the full KYC queue.",
+    "Multipart: institutionName, qualificationType, fieldOfStudy, " +
+    "gradeOrClassification, yearAwarded, levelIds (JSON array, min 1), a " +
+    "document file, and exactly one of subjectId (an existing, approved " +
+    "subject) or newSubject ({ name, description, domainId }) when the " +
+    "subject the tutor teaches isn't in the taxonomy yet. A proposed new " +
+    "subject is created PENDING and inactive — invisible in search/catalog " +
+    "— until an admin approves it via the subject-verification queue, at " +
+    "which point it also becomes available to every other tutor. Only " +
+    "reachable once KYC status is ACTIVE.",
   ...bearer,
+  request: {
+    body: {
+      content: {
+        // Built as a standalone object rather than AdditionalSubjectSchema.extend(...)
+        // — Zod doesn't allow .extend() on a schema carrying a .refine(),
+        // which AdditionalSubjectSchema does (the subjectId-xor-newSubject check).
+        "multipart/form-data": {
+          schema: z.object({
+            institutionName: z.string(),
+            qualificationType: QualificationTypeEnum,
+            fieldOfStudy: z.string(),
+            gradeOrClassification: z.string().optional(),
+            yearAwarded: z.number().int(),
+            subjectId: z.string().uuid().optional(),
+            newSubject: z
+              .string()
+              .optional()
+              .openapi({ description: "JSON-encoded { name, description, domainId }" }),
+            levelIds: z
+              .string()
+              .openapi({ description: "JSON-encoded array of level UUIDs" }),
+            document: z.string().openapi({ type: "string", format: "binary" }),
+          }),
+        },
+      },
+    },
+  },
   responses: {
     201: { description: "Additional subject credential submitted" },
+    400: { description: "Invalid level, invalid subject, or subject already claimed" },
     409: { description: "Tutor is not currently ACTIVE" },
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: `${basePath}/me/subjects`,
+  tags: tutorTags,
+  summary: "List my subjects with status and levels",
+  description:
+    "Every subject the tutor has ever claimed (PENDING, APPROVED, or " +
+    "REJECTED) with the levels they've selected for it — backs the tutor " +
+    "subject-application settings screen.",
+  ...bearer,
+  responses: { 200: { description: "Tutor's subjects with levels" } },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: `${basePath}/me/subjects/{tutorSubjectId}/levels`,
+  tags: tutorTags,
+  summary: "Update the levels taught for one of my subjects",
+  ...bearer,
+  request: {
+    params: z.object({ tutorSubjectId: z.string().uuid() }),
+    body: { content: { "application/json": { schema: UpdateSubjectLevelsSchema } } },
+  },
+  responses: {
+    200: { description: "Updated levels" },
+    404: { description: "Subject claim not found" },
   },
 });
 
@@ -411,8 +477,11 @@ registry.registerPath({
     "newDocumentationRequired. Each entry carries a 0-100 score, a " +
     "one-sentence explanation, the matched/candidate credentials, and an " +
     "embedded tutor summary (name, email, avatar) so the queue table needs " +
-    "no per-row re-fetch. Optional ?search matches the subject name or the " +
-    "claiming tutor's name/email.",
+    "no per-row re-fetch. Each entry's nested subject carries status " +
+    "(PENDING/APPROVED/REJECTED), description, and submittedById — a " +
+    "tutor-proposed subject not yet in the taxonomy shows status PENDING " +
+    "here. Optional ?search matches the subject name or the claiming " +
+    "tutor's name/email.",
   ...bearer,
   request: { query: KycSubjectQueueQuerySchema },
   responses: { 200: { description: "Sectioned queue with meta.total" } },
@@ -427,7 +496,10 @@ registry.registerPath({
     "Optionally pass trainWeight (0-100) to teach the inference engine — " +
     "upserts the (qualificationType, fieldOfStudy, subject) relationship " +
     "weight future claims are scored against. If this is the tutor's first " +
-    "approved subject and identity is already approved, the tutor goes ACTIVE.",
+    "approved subject and identity is already approved, the tutor goes ACTIVE. " +
+    "If the underlying subject was a tutor-proposed PENDING taxonomy entry, " +
+    "approving this claim also promotes it to APPROVED/active — available to " +
+    "every tutor and visible in search/catalog from then on, not just this one.",
   ...bearer,
   request: {
     body: { content: { "application/json": { schema: ApproveSubjectSchema } } },
@@ -530,6 +602,31 @@ registry.registerPath({
   ...bearer,
   request: {
     body: { content: { "application/json": { schema: KycSlaConfigSchema } } },
+  },
+  responses: { 200: { description: "Updated config" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: `${adminBasePath}/intro-video-config`,
+  tags: adminTags,
+  summary: "Get the minimum required intro-video duration",
+  ...bearer,
+  responses: { 200: { description: "{ minDurationSeconds }" } },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: `${adminBasePath}/intro-video-config`,
+  tags: adminTags,
+  summary: "Update the minimum required intro-video duration",
+  description:
+    "Default is 60 seconds — persisted in PlatformConfig under " +
+    "tutor.intro_video_min_duration_seconds. Only future uploads are " +
+    "checked against a new value; already-verified tutors are not retroactively re-checked.",
+  ...bearer,
+  request: {
+    body: { content: { "application/json": { schema: IntroVideoConfigSchema } } },
   },
   responses: { 200: { description: "Updated config" } },
 });

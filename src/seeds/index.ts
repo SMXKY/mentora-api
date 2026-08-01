@@ -7,6 +7,8 @@ import seedRegions from "./regions.seed";
 import seedCities from "./cities.seed";
 import { seedSubjectDomains, seedSubjects } from "./subjects.seed";
 import seedLevels from "./levels.seed";
+import seedPlatformCommission from "./platformCommission.seed";
+import seedFilterKeywords from "./filterKeywords.seed";
 
 export const runSeeds = async () => {
   console.log("🌱 Starting database seed...");
@@ -24,6 +26,8 @@ export const runSeeds = async () => {
   await seedSubjectDomains();
   await seedSubjects();
   await seedLevels();
+  await seedPlatformCommission();
+  await seedFilterKeywords();
 
   console.log("✅ All seeds completed");
 };

@@ -15,7 +15,11 @@ export const UpdateMyTutorProfileSchema = z
     exactAddress: z.string().optional(),
     yearsOfExperience: z.number().int().min(0).optional(),
     languages: z.array(z.enum(["EN", "FR"])).optional(),
-    introVideoUrl: z.string().url().optional(),
+    // introVideoUrl is deliberately NOT settable here — it can only be set
+    // via POST /tutors/me/intro-video, which probes the uploaded file's
+    // actual duration server-side before accepting it (see
+    // tutor.service.ts's uploadIntroVideo). Accepting an arbitrary
+    // client-supplied URL here would bypass that check entirely.
     minRateXaf: z.number().int().min(0).optional(),
     maxRateXaf: z.number().int().min(0).optional(),
   })
@@ -30,9 +34,16 @@ export const UpdateSubjectPricingSchema = z
   .object({
     ratePerOnlineSessionXaf: z.number().int().min(0).optional(),
     ratePerHomeSessionXaf: z.number().int().min(0).optional(),
+    ratePerHourXaf: z.number().int().min(0).optional(),
+    isOpenForBooking: z.boolean().optional(),
   })
-  .refine((d) => d.ratePerOnlineSessionXaf !== undefined || d.ratePerHomeSessionXaf !== undefined, {
-    message: "tutor/errors:atLeastOneRateRequired",
-  })
+  .refine(
+    (d) =>
+      d.ratePerOnlineSessionXaf !== undefined ||
+      d.ratePerHomeSessionXaf !== undefined ||
+      d.ratePerHourXaf !== undefined ||
+      d.isOpenForBooking !== undefined,
+    { message: "tutor/errors:atLeastOneRateRequired" }
+  )
   .openapi("UpdateSubjectPricing");
 export type UpdateSubjectPricingInput = z.infer<typeof UpdateSubjectPricingSchema>;

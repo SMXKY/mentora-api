@@ -2,6 +2,9 @@ import prisma from "../config/database.config";
 
 // Domain -> subjects, aligned with what's actually examined in the
 // Cameroonian GCE O/A-Level and university-prep curriculum.
+// Aligned with the official Cameroon GCE Board O-Level/A-Level subject
+// lists and the Baccalauréat séries (A/C/D/TI/G) subjects, so tutors and
+// search filters map onto what students actually sit exams in.
 export const defaultSubjectsByDomain: Record<string, string[]> = {
   Sciences: [
     "Mathematics",
@@ -15,6 +18,11 @@ export const defaultSubjectsByDomain: Record<string, string[]> = {
     "Human Biology",
     "Environmental Science",
     "General Science",
+    "Combined Science",
+    "Geology",
+    "Statistics",
+    "Health Science",
+    "Nutrition and Dietetics",
   ],
   Languages: [
     "English Language",
@@ -26,6 +34,7 @@ export const defaultSubjectsByDomain: Record<string, string[]> = {
     "Portuguese",
     "Arabic",
     "Latin",
+    "Greek",
     "Chinese",
   ],
   Humanities: [
@@ -39,18 +48,26 @@ export const defaultSubjectsByDomain: Record<string, string[]> = {
     "Philosophy",
     "Logic",
     "Moral Education",
+    "Law",
+    "History and Geography",
   ],
   Commercial: [
     "Accounting",
+    "Principles of Accounts",
     "Commerce",
     "Business Mathematics",
+    "Business Management",
     "Marketing",
     "Office Practice",
     "Typewriting",
     "Shorthand",
+    "Secretarial Duties",
     "Insurance",
     "Entrepreneurship",
     "Principles of Business",
+    "Commercial Correspondence",
+    "Data Processing",
+    "Law and Taxation",
   ],
   Arts: [
     "Fine Arts",
@@ -58,6 +75,7 @@ export const defaultSubjectsByDomain: Record<string, string[]> = {
     "Food Science and Nutrition",
     "Drama and Theatre Arts",
     "Dance",
+    "Physical Education",
   ],
   "Technical & Vocational": [
     "Technical Drawing",
@@ -66,10 +84,16 @@ export const defaultSubjectsByDomain: Record<string, string[]> = {
     "Home Economics",
     "Building Construction",
     "Electrical Installation",
+    "Electronics",
+    "Electrotechnics",
     "Automobile Engineering",
+    "Mechanical Engineering Technology",
+    "Civil Engineering Technology",
     "Agriculture",
+    "Rural Economy",
     "Textiles and Fashion Design",
     "Information and Communication Technology",
+    "Renewable Energy Technology",
   ],
 };
 

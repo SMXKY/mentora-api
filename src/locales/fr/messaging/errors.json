@@ -1,0 +1,16 @@
+{
+  "tutorNotFound": "Tuteur introuvable.",
+  "cannotMessageSelf": "Vous ne pouvez pas démarrer une conversation avec vous-même.",
+  "tutorCannotInitiate": "Les tuteurs ne peuvent pas démarrer une nouvelle conversation — le parent ou l'élève doit envoyer le premier message.",
+  "conversationNotFound": "Conversation introuvable.",
+  "notYourConversation": "Cette conversation ne vous appartient pas.",
+  "conversationFrozen": "Cette conversation est gelée en attente d'examen et ne peut pas recevoir de nouveaux messages.",
+  "conversationArchived": "Cette conversation est archivée et en lecture seule.",
+  "messageEmpty": "Le message ne peut pas être vide.",
+  "messageTooLong": "Le message doit contenir moins de 2000 caractères.",
+  "inquiryLimitReached": "Vous avez atteint la limite de {{limit}} messages pour les conversations avant réservation. Réservez un cours pour continuer à discuter.",
+  "messageBlocked": "Ce message ne peut pas être envoyé — il semble contenir des coordonnées ou un lien. Merci de garder la conversation sur Mentora.",
+  "messageNotFound": "Message introuvable.",
+  "moderationReviewNotFound": "Révision de modération introuvable.",
+  "sendFailed": "Votre message n'a pas pu être envoyé. Veuillez réessayer."
+}

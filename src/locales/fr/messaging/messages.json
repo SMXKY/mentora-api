@@ -1,0 +1,7 @@
+{
+  "messageRemovedByPlatform": "Ce message a été supprimé par la plateforme.",
+  "inquiryRemainingMessages": "{{remaining}} messages sur {{limit}} restants avant de devoir réserver un cours.",
+  "reconnecting": "Reconnexion en cours...",
+  "typing": "en train d'écrire...",
+  "conversationWarningIssued": "Un modérateur a émis un avertissement dans cette conversation : {{note}}"
+}

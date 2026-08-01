@@ -5,6 +5,7 @@ import path from "path";
 
 //module docs
 import "../src/modules/auth/auth.openapi";
+import "../src/modules/auditLog/auditLog.openapi";
 import "../src/modules/permission/permission.openapi";
 import "../src/modules/permissionOverride/permissionOverride.openapi";
 import "../src/modules/role/role.openapi";
@@ -21,6 +22,14 @@ import "../src/modules/tutor/tutor.openapi";
 import "../src/modules/dashboard/dashboard.openapi";
 import "../src/modules/materials/materials.openapi";
 import "../src/modules/materials/materialsAdmin.openapi";
+import "../src/modules/tutorSearch/tutorSearch.openapi";
+import "../src/modules/availability/availability.openapi";
+import "../src/modules/booking/booking.openapi";
+import "../src/modules/payment/payment.openapi";
+import "../src/modules/dispute/dispute.openapi";
+import "../src/modules/review/review.openapi";
+import "../src/modules/messaging/messaging.openapi";
+import "../src/modules/liveSession/liveSession.openapi";
 // testResource is a scaffold template, not a mounted module — excluded on purpose
 
 async function main() {

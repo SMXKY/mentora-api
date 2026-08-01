@@ -3,5 +3,8 @@
   "invalidRateRange": "Le tarif maximum doit être supérieur ou égal au tarif minimum.",
   "tutorProfileNotFound": "Aucun profil de tuteur n'a été trouvé.",
   "subjectNotClaimed": "Vous devez d'abord faire vérifier cette matière avant de lui fixer un prix.",
-  "atLeastOneRateRequired": "Veuillez fournir au moins un tarif à mettre à jour."
+  "atLeastOneRateRequired": "Veuillez fournir au moins un champ à mettre à jour.",
+  "introVideoTooShort": "Votre vidéo de présentation doit durer au moins {{minDurationSeconds}} secondes.",
+  "subjectMustBeApprovedToOpen": "Cette matière doit être approuvée avant de pouvoir l'ouvrir aux réservations.",
+  "subjectNeedsRateToOpen": "Définissez un tarif pour cette matière avant de l'ouvrir aux réservations."
 }
