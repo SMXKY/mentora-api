@@ -36,9 +36,8 @@ export const CreateUserSchema = z
   .openapi("CreateUser");
 
 // All fields optional for partial updates
-export const UpdateUserSchema = CreateUserSchema.partial().openapi(
-  "UpdateUser"
-);
+export const UpdateUserSchema =
+  CreateUserSchema.partial().openapi("UpdateUser");
 
 // Self-service subset — deliberately excludes fields only an admin may
 // change (email, isEmailVerified, username, status, isAccountComplete,
@@ -52,6 +51,7 @@ export const UpdateMeSchema = z
     dob: z.string().datetime().optional(),
     gender: z.enum(["MALE", "FEMALE", "PREFER_NOT_TO_SAY"]).optional(),
     address: z.string().optional(),
+    cityId: z.string().uuid().optional(),
     preferredLanguage: z.enum(["EN", "FR"]).optional(),
     notificationsMuted: z.boolean().optional(),
   })
@@ -136,6 +136,8 @@ export const MeResponseSchema = z
     gender: z.string(),
     profilePictureUrl: z.string().nullable(),
     address: z.string().nullable(),
+    cityId: z.string().uuid().nullable(),
+    city: z.object({ id: z.string().uuid(), name: z.string() }).nullable(),
     preferredLanguage: z.string(),
     notificationsMuted: z.boolean(),
     status: z.string(),

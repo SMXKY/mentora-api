@@ -132,17 +132,12 @@ export class UserService extends BaseService<
       include: {
         userRoles: { where: { isActive: true }, include: { role: true } },
         tutorProfile: true,
-        // Own self-registered profile only — a Parent's managed children
-        // (studentProfilesGuarded, userId: null) are out of scope here.
         studentProfiles: { where: { userId, deletedAt: null }, take: 1 },
+        city: { select: { id: true, name: true } }, // NEW
       },
     });
 
     if (!user || user.deletedAt) {
-      // Defensive only — protect middleware already guarantees userId
-      // resolves to a live user. Reuses auth's key: no user/errors
-      // namespace exists yet and this is the same "session outlived the
-      // account" case auth.service.ts guards against elsewhere.
       throw new AppError("auth/errors:userNotFound", StatusCodes.NOT_FOUND);
     }
 
@@ -186,6 +181,8 @@ export class UserService extends BaseService<
       gender: user.gender,
       profilePictureUrl: resolveStorageUrl(user.profilePictureUrl),
       address: user.address,
+      cityId: user.cityId, // NEW
+      city: user.city, // NEW
       preferredLanguage: user.preferredLanguage,
       notificationsMuted: user.notificationsMuted,
       status: user.status,

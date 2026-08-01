@@ -20,28 +20,62 @@ import {
 } from "./tutorSearch.types";
 
 const BIO_EXCERPT_LENGTH = 120;
-// A "page" of tutors matching a query is never remotely large enough to
-// warrant real full-text search infra — a gentle nudge appears past this,
-// per spec, without ever hard-blocking further results.
 const REFINE_NUDGE_THRESHOLD = 50;
+const FUZZY_SIMILARITY_THRESHOLD = 0.3;
+const TEXT_CANDIDATE_POOL_SIZE = 500;
 
 type TutorRow = Awaited<ReturnType<typeof fetchCandidatePage>>[number];
 
-// ── Hard, always-on visibility gate ─────────────────────────
-// Every one of these three conditions is non-negotiable: pending/rejected/
-// suspended/banned tutors, tutors without a verified intro video, and
-// tutors with zero approved subjects are never returned, full stop —
-// enforced here at the query level, not filtered after the fact.
 function hardVisibilityFilter() {
   return {
     deletedAt: null,
     kycStatus: KycStatus.ACTIVE,
     introVideoVerified: true,
-    tutorSubjects: { some: { status: SubjectVerificationStatus.APPROVED, isOpenForBooking: true } },
+    tutorSubjects: {
+      some: {
+        status: SubjectVerificationStatus.APPROVED,
+        isOpenForBooking: true,
+      },
+    },
   };
 }
 
-function buildWhere(query: SearchTutorsQueryInput) {
+function availabilityPresetRange(
+  preset: "this_week" | "this_weekend" | "next_week"
+): { from: Date; to: Date } {
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+  const dayOfWeek = startOfToday.getDay();
+
+  if (preset === "this_week") {
+    const to = new Date(startOfToday);
+    to.setDate(to.getDate() + (7 - dayOfWeek));
+    return { from: startOfToday, to };
+  }
+  if (preset === "this_weekend") {
+    const daysUntilSaturday = (6 - dayOfWeek + 7) % 7;
+    const saturday = new Date(startOfToday);
+    saturday.setDate(saturday.getDate() + daysUntilSaturday);
+    const sundayEnd = new Date(saturday);
+    sundayEnd.setDate(sundayEnd.getDate() + 2);
+    return { from: saturday, to: sundayEnd };
+  }
+  const nextMonday = new Date(startOfToday);
+  nextMonday.setDate(nextMonday.getDate() + ((8 - dayOfWeek) % 7 || 7));
+  const nextSunday = new Date(nextMonday);
+  nextSunday.setDate(nextSunday.getDate() + 7);
+  return { from: nextMonday, to: nextSunday };
+}
+
+// Structured (non-text) filters only — city, mode, price, language, gender,
+// availability, and explicit subjectId/levelId dropdown selections. Free-text
+// (`q`) is handled separately by the tiered-ranking path below, since a plain
+// `contains` OR clause can't express "exact beats prefix beats substring."
+function buildStructuredWhere(query: SearchTutorsQueryInput) {
   const where: any = hardVisibilityFilter();
 
   if (query.cityId) where.cityId = query.cityId;
@@ -56,7 +90,30 @@ function buildWhere(query: SearchTutorsQueryInput) {
   if (query.minPrice !== undefined) where.maxRateXaf = { gte: query.minPrice };
   if (query.maxPrice !== undefined) where.minRateXaf = { lte: query.maxPrice };
   if (query.language) where.languages = { has: query.language };
-  if (query.gender) where.user = { gender: query.gender };
+  if (query.gender)
+    where.user = { ...(where.user ?? {}), gender: query.gender };
+
+  if (query.availability || (query.availabilityFrom && query.availabilityTo)) {
+    const range = query.availability
+      ? availabilityPresetRange(query.availability)
+      : {
+          from: new Date(query.availabilityFrom!),
+          to: new Date(query.availabilityTo!),
+        };
+
+    where.availabilitySlots = {
+      some: {
+        isActive: true,
+        OR: [
+          { slotType: AvailabilitySlotType.RECURRING },
+          {
+            slotType: AvailabilitySlotType.SPECIFIC_DATE,
+            specificDate: { gte: range.from, lte: range.to },
+          },
+        ],
+      },
+    };
+  }
 
   if (query.subjectId || query.levelId) {
     where.tutorSubjects = {
@@ -67,25 +124,6 @@ function buildWhere(query: SearchTutorsQueryInput) {
         ...(query.levelId && { levels: { some: { levelId: query.levelId } } }),
       },
     };
-  }
-
-  if (query.q) {
-    const terms = expandSearchTerms(query.q);
-    where.OR = [
-      { user: { firstName: { contains: query.q, mode: "insensitive" } } },
-      { bio: { contains: query.q, mode: "insensitive" } },
-      { neighbourhood: { contains: query.q, mode: "insensitive" } },
-      { city: { name: { contains: query.q, mode: "insensitive" } } },
-      ...terms.map((term) => ({
-        tutorSubjects: {
-          some: {
-            status: SubjectVerificationStatus.APPROVED,
-            isOpenForBooking: true,
-            subject: { name: { contains: term, mode: "insensitive" } },
-          },
-        },
-      })),
-    ];
   }
 
   return where;
@@ -101,18 +139,24 @@ const CANDIDATE_SELECT = {
   newTutorBoostExpiresAt: true,
   completedSessionsCount: true,
   city: { select: { id: true, name: true } },
-  neighbourhood: true,
-  // TutorRatingSnapshot is keyed off User.id, not TutorProfile.id. The
-  // displayed avatar is always User.profilePictureUrl — the one photo
-  // upload flow every role shares — not TutorProfile's own (legacy,
-  // unused-for-display) column.
-  user: { select: { firstName: true, lastName: true, profilePictureUrl: true, ratingSnapshot: true } },
+  // neighbourhood intentionally not selected — never shown on any surface.
+  user: {
+    select: {
+      firstName: true,
+      lastName: true,
+      profilePictureUrl: true,
+      ratingSnapshot: true,
+    },
+  },
   availabilitySlots: {
     where: { isActive: true },
     select: { slotType: true, specificDate: true },
   },
   tutorSubjects: {
-    where: { status: SubjectVerificationStatus.APPROVED, isOpenForBooking: true },
+    where: {
+      status: SubjectVerificationStatus.APPROVED,
+      isOpenForBooking: true,
+    },
     select: {
       subject: { select: { id: true, name: true } },
       levels: { select: { level: { select: { id: true, name: true } } } },
@@ -135,42 +179,179 @@ async function fetchCandidatePage(
   });
 }
 
+interface TextMatchRank {
+  matchRank: number; // 0 exact subject, 1 prefix subject, 2 substring/synonym/level/name/bio/city, 3 fuzzy typo
+  similarity: number;
+}
+
+/**
+ * Tiered relevance for a free-text query: exact subject-name match beats
+ * prefix beats substring/synonym beats fuzzy-typo-only. Tutors matched only
+ * via name/bio/city/level text (not a subject name) land in tier 2 as well
+ * — "good enough to show, not as precise as a subject match" — so a search
+ * for "Jean" still surfaces tutors named Jean-Paul without pretending
+ * that's as strong a signal as an exact subject match.
+ */
+async function rankTextMatches(
+  rawQuery: string
+): Promise<Map<string, TextMatchRank>> {
+  const q = rawQuery.trim().toLowerCase();
+  const synonymTerms = expandSearchTerms(rawQuery);
+
+  const subjectRows = await prisma.$queryRaw<
+    { tutor_profile_id: string; match_rank: number; sim: number }[]
+  >`
+    SELECT
+      ts.tutor_profile_id,
+      MIN(
+        CASE
+          WHEN lower(s.name) = ${q} THEN 0
+          WHEN lower(s.name) LIKE ${q + "%"} THEN 1
+          WHEN lower(s.name) LIKE ${"%" + q + "%"} THEN 2
+          WHEN lower(s.name) = ANY(${synonymTerms}) THEN 2
+          WHEN similarity(s.name, ${rawQuery}) > ${FUZZY_SIMILARITY_THRESHOLD} THEN 3
+          ELSE 9
+        END
+      ) AS match_rank,
+      MAX(similarity(s.name, ${rawQuery})) AS sim
+    FROM tutor_subjects ts
+    JOIN subjects s ON s.id = ts.subject_id
+    WHERE ts.status = 'APPROVED' AND ts.is_open_for_booking = true
+      AND (
+        lower(s.name) LIKE ${"%" + q + "%"}
+        OR lower(s.name) = ANY(${synonymTerms})
+        OR similarity(s.name, ${rawQuery}) > ${FUZZY_SIMILARITY_THRESHOLD}
+      )
+    GROUP BY ts.tutor_profile_id
+  `;
+
+  const ranks = new Map<string, TextMatchRank>(
+    subjectRows.map((r) => [
+      r.tutor_profile_id,
+      { matchRank: r.match_rank, similarity: r.sim ?? 0 },
+    ])
+  );
+
+  // Build the OR clause conditionally — a language filter with `has:
+  // undefined` is rejected by Prisma outright, it must be omitted from
+  // the array entirely when the query isn't literally "EN" or "FR",
+  // not included with an undefined value.
+  const upperQuery = rawQuery.trim().toUpperCase();
+  const isLanguageCode = upperQuery === "EN" || upperQuery === "FR";
+
+  const secondaryOr: any[] = [
+    { user: { firstName: { contains: rawQuery, mode: "insensitive" } } },
+    { bio: { contains: rawQuery, mode: "insensitive" } },
+    { city: { name: { contains: rawQuery, mode: "insensitive" } } },
+    {
+      tutorSubjects: {
+        some: {
+          status: SubjectVerificationStatus.APPROVED,
+          isOpenForBooking: true,
+          levels: {
+            some: {
+              level: { name: { contains: rawQuery, mode: "insensitive" } },
+            },
+          },
+        },
+      },
+    },
+  ];
+  if (isLanguageCode) {
+    secondaryOr.push({ languages: { has: upperQuery } });
+  }
+
+  const secondaryRows = await prisma.tutorProfile.findMany({
+    where: {
+      ...hardVisibilityFilter(),
+      OR: secondaryOr,
+    },
+    select: { id: true },
+  });
+
+  for (const row of secondaryRows) {
+    if (!ranks.has(row.id)) ranks.set(row.id, { matchRank: 2, similarity: 0 });
+  }
+
+  return ranks;
+}
+
+async function fetchCandidatePageWithTextRank(
+  structuredWhere: any,
+  ranks: Map<string, TextMatchRank>,
+  cursor: string | undefined,
+  limit: number
+) {
+  const candidates = await prisma.tutorProfile.findMany({
+    where: { ...structuredWhere, id: { in: Array.from(ranks.keys()) } },
+    select: CANDIDATE_SELECT,
+    take: TEXT_CANDIDATE_POOL_SIZE,
+  });
+
+  const sorted = candidates.sort((a, b) => {
+    const ra = ranks.get(a.id)!;
+    const rb = ranks.get(b.id)!;
+    if (ra.matchRank !== rb.matchRank) return ra.matchRank - rb.matchRank;
+    if (ra.similarity !== rb.similarity) return rb.similarity - ra.similarity;
+    return (Number(b.compositeScore) || 0) - (Number(a.compositeScore) || 0);
+  });
+
+  const startIndex = cursor ? sorted.findIndex((c) => c.id === cursor) + 1 : 0;
+  return sorted.slice(startIndex, startIndex + limit + 1);
+}
+
 function computeAvailabilityStatus(
   slots: { slotType: AvailabilitySlotType; specificDate: Date | null }[]
-): { status: "available_this_week" | "next_available" | "fully_booked"; nextAvailableDate: string | null } {
+): {
+  status: "available_this_week" | "next_available" | "fully_booked";
+  nextAvailableDate: string | null;
+} {
   const now = Date.now();
   const weekFromNow = now + 7 * 24 * 60 * 60 * 1000;
 
-  // A recurring weekly slot always has an occurrence within the next 7
-  // days by definition — no per-slot date to check.
   if (slots.some((s) => s.slotType === AvailabilitySlotType.RECURRING)) {
     return { status: "available_this_week", nextAvailableDate: null };
   }
 
   const upcomingSpecificDates = slots
-    .filter((s) => s.slotType === AvailabilitySlotType.SPECIFIC_DATE && s.specificDate)
+    .filter(
+      (s) => s.slotType === AvailabilitySlotType.SPECIFIC_DATE && s.specificDate
+    )
     .map((s) => s.specificDate as Date)
     .filter((d) => d.getTime() >= now)
     .sort((a, b) => a.getTime() - b.getTime());
 
-  if (upcomingSpecificDates.length === 0) {
+  if (upcomingSpecificDates.length === 0)
     return { status: "fully_booked", nextAvailableDate: null };
-  }
-  if (upcomingSpecificDates[0].getTime() <= weekFromNow) {
+  if (upcomingSpecificDates[0].getTime() <= weekFromNow)
     return { status: "available_this_week", nextAvailableDate: null };
-  }
   return {
     status: "next_available",
     nextAvailableDate: upcomingSpecificDates[0].toISOString(),
   };
 }
 
-function isNewTutorBoosted(tutor: { newTutorBoostExpiresAt: Date | null; completedSessionsCount: number }): boolean {
+function isNewTutorBoosted(tutor: {
+  newTutorBoostExpiresAt: Date | null;
+  completedSessionsCount: number;
+}): boolean {
   return (
     !!tutor.newTutorBoostExpiresAt &&
     tutor.newTutorBoostExpiresAt.getTime() > Date.now() &&
     tutor.completedSessionsCount < 5
   );
+}
+
+// Cuts at the last full word before maxLength and appends an explicit
+// ellipsis — a raw slice() can land mid-word with no visual indication
+// the text was cut off, which is what was breaking the result card UI.
+function truncateBio(bio: string, maxLength: number): string {
+  const trimmed = bio.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  const sliced = trimmed.slice(0, maxLength);
+  const lastSpace = sliced.lastIndexOf(" ");
+  const clean = lastSpace > 0 ? sliced.slice(0, lastSpace) : sliced;
+  return `${clean}…`;
 }
 
 function toResultCard(tutor: TutorRow) {
@@ -180,7 +361,9 @@ function toResultCard(tutor: TutorRow) {
   return {
     tutorProfileId: tutor.id,
     firstName: tutor.user.firstName,
-    lastNameInitial: tutor.user.lastName ? `${tutor.user.lastName.charAt(0)}.` : "",
+    lastNameInitial: tutor.user.lastName
+      ? `${tutor.user.lastName.charAt(0)}.`
+      : "",
     profilePictureUrl: resolveStorageUrl(tutor.user.profilePictureUrl),
     isVerified: true,
     isNew: isNewTutorBoosted(tutor),
@@ -194,13 +377,15 @@ function toResultCard(tutor: TutorRow) {
       levels: ts.levels.map((l) => l.level),
     })),
     city: tutor.city,
-    neighbourhood: tutor.neighbourhood,
     teachingMode: tutor.teachingMode,
     priceMinXaf: tutor.minRateXaf,
     priceMaxXaf: tutor.maxRateXaf,
     availability: availability.status,
     nextAvailableDate: availability.nextAvailableDate,
-    bioExcerpt: tutor.bio.slice(0, BIO_EXCERPT_LENGTH),
+    bioExcerpt:
+      tutor.bio.trim().length > 0
+        ? truncateBio(tutor.bio, BIO_EXCERPT_LENGTH)
+        : null,
   };
 }
 
@@ -210,17 +395,16 @@ async function findNearbyCityFallback(originalCityId: string) {
     select: { regionId: true },
   });
   if (!city) return null;
-
-  const nearbyCity = await prisma.city.findFirst({
-    where: { regionId: city.regionId, id: { not: originalCityId }, isActive: true },
+  return prisma.city.findFirst({
+    where: {
+      regionId: city.regionId,
+      id: { not: originalCityId },
+      isActive: true,
+    },
     orderBy: { name: "asc" },
   });
-  return nearbyCity;
 }
 
-/** Re-runs the query dropping one filter at a time, reporting whichever
- * single filter's removal first recovers results — the "most restrictive
- * filter" the zero-results screen highlights. */
 async function findMostRestrictiveFilter(
   query: SearchTutorsQueryInput
 ): Promise<string | null> {
@@ -233,11 +417,14 @@ async function findMostRestrictiveFilter(
     "levelId",
     "subjectId",
     "cityId",
+    "availability",
   ];
   for (const key of droppableKeys) {
     if (query[key] === undefined) continue;
     const relaxed = { ...query, [key]: undefined };
-    const count = await prisma.tutorProfile.count({ where: buildWhere(relaxed) });
+    const count = await prisma.tutorProfile.count({
+      where: buildStructuredWhere(relaxed),
+    });
     if (count > 0) return key;
   }
   return null;
@@ -261,15 +448,6 @@ async function recordZeroResultEvent(
 }
 
 export const TutorSearchService = {
-  /**
-   * Query params drive filtering; searcherCityId (resolved by the caller
-   * from the requesting user's profile/student, when authenticated) is
-   * only used as the default city for the no-query "featured tutors" case
-   * and the empty-query default — it never overrides an explicit cityId
-   * filter. Ranking is entirely by the precomputed compositeScore column
-   * (see src/services/search/compositeScore.ts + the nightly job) — never
-   * recomputed at query time, per spec.
-   */
   async searchTutors(
     query: SearchTutorsQueryInput,
     context: { userId?: string; searcherCityId?: string | null } = {}
@@ -283,30 +461,78 @@ export const TutorSearchService = {
       query.minPrice === undefined &&
       query.maxPrice === undefined &&
       !query.language &&
-      !query.gender;
+      !query.gender &&
+      !query.availability;
 
-    // Featured tutors: no query, no filters — default to the searcher's
-    // city if we know it, across all subjects.
     if (isUnfiltered && !query.cityId && context.searcherCityId) {
       effectiveQuery.cityId = context.searcherCityId;
     }
 
-    const where = buildWhere(effectiveQuery);
-    const cacheKey = await buildSearchCacheKey(effectiveQuery.cityId ?? null, effectiveQuery as any);
+    const structuredWhere = buildStructuredWhere({
+      ...effectiveQuery,
+      q: undefined,
+    } as any);
+
+    // Text-ranked path — deliberately uncached (a ranked Map isn't cheap
+    // to serialize/rehydrate correctly, and typed queries are cheap to
+    // recompute); structured-only searches keep using Redis as before.
+    if (effectiveQuery.q) {
+      const ranks = await rankTextMatches(effectiveQuery.q);
+      if (ranks.size === 0) {
+        return this.buildZeroResultResponse(effectiveQuery, context.userId);
+      }
+
+      const candidates = await fetchCandidatePageWithTextRank(
+        structuredWhere,
+        ranks,
+        query.cursor,
+        query.limit
+      );
+      const hasNextPage = candidates.length > query.limit;
+      const page = hasNextPage ? candidates.slice(0, query.limit) : candidates;
+
+      if (page.length === 0) {
+        return this.buildZeroResultResponse(effectiveQuery, context.userId);
+      }
+
+      return {
+        data: page.map(toResultCard),
+        meta: {
+          nextCursor: hasNextPage ? page[page.length - 1].id : null,
+          hasNextPage,
+          limit: query.limit,
+          refineNudge: ranks.size > REFINE_NUDGE_THRESHOLD,
+        },
+      };
+    }
+
+    const cacheKey = await buildSearchCacheKey(
+      effectiveQuery.cityId ?? null,
+      effectiveQuery as any
+    );
     const cached = await getCachedSearchResult<any>(cacheKey);
     if (cached) return cached;
 
-    const candidates = await fetchCandidatePage(where, query.cursor, query.limit);
+    const candidates = await fetchCandidatePage(
+      structuredWhere,
+      query.cursor,
+      query.limit
+    );
     const hasNextPage = candidates.length > query.limit;
     const page = hasNextPage ? candidates.slice(0, query.limit) : candidates;
 
     if (page.length === 0) {
-      const result = await this.buildZeroResultResponse(effectiveQuery, context.userId);
+      const result = await this.buildZeroResultResponse(
+        effectiveQuery,
+        context.userId
+      );
       await setCachedSearchResult(cacheKey, result);
       return result;
     }
 
-    const totalMatching = await prisma.tutorProfile.count({ where });
+    const totalMatching = await prisma.tutorProfile.count({
+      where: structuredWhere,
+    });
 
     const result = {
       data: page.map(toResultCard),
@@ -321,20 +547,34 @@ export const TutorSearchService = {
     return result;
   },
 
-  async buildZeroResultResponse(query: SearchTutorsQueryInput, userId: string | undefined) {
+  async buildZeroResultResponse(
+    query: SearchTutorsQueryInput,
+    userId: string | undefined
+  ) {
     await recordZeroResultEvent(query, userId);
 
-    // Zero results in a specific city → try the nearest city in the same
-    // region before giving up.
     if (query.cityId) {
       const nearby = await findNearbyCityFallback(query.cityId);
       if (nearby) {
-        const nearbyWhere = buildWhere({ ...query, cityId: nearby.id });
-        const nearbyResults = await fetchCandidatePage(nearbyWhere, undefined, query.limit);
+        const nearbyWhere = buildStructuredWhere({
+          ...query,
+          cityId: nearby.id,
+          q: undefined,
+        } as any);
+        const nearbyResults = await fetchCandidatePage(
+          nearbyWhere,
+          undefined,
+          query.limit
+        );
         if (nearbyResults.length > 0) {
           return {
             data: nearbyResults.slice(0, query.limit).map(toResultCard),
-            meta: { nextCursor: null, hasNextPage: false, limit: query.limit, refineNudge: false },
+            meta: {
+              nextCursor: null,
+              hasNextPage: false,
+              limit: query.limit,
+              refineNudge: false,
+            },
             fallback: {
               type: "nearby_city" as const,
               fallbackCityId: nearby.id,
@@ -345,29 +585,45 @@ export const TutorSearchService = {
       }
     }
 
-    // Zero results for a subject with literally no approved tutors
-    // anywhere, regardless of other filters.
     if (query.subjectId) {
       const anyoneForSubject = await prisma.tutorSubject.count({
-        where: { subjectId: query.subjectId, status: SubjectVerificationStatus.APPROVED },
+        where: {
+          subjectId: query.subjectId,
+          status: SubjectVerificationStatus.APPROVED,
+        },
       });
       if (anyoneForSubject === 0) {
         return {
           data: [],
-          meta: { nextCursor: null, hasNextPage: false, limit: query.limit, refineNudge: false },
+          meta: {
+            nextCursor: null,
+            hasNextPage: false,
+            limit: query.limit,
+            refineNudge: false,
+          },
           fallback: { type: "no_tutors_for_subject" as const },
         };
       }
     }
 
-    // Otherwise, an overly restrictive filter combination.
     const restrictiveFilter = await findMostRestrictiveFilter(query);
     return {
       data: [],
-      meta: { nextCursor: null, hasNextPage: false, limit: query.limit, refineNudge: false },
+      meta: {
+        nextCursor: null,
+        hasNextPage: false,
+        limit: query.limit,
+        refineNudge: false,
+      },
       fallback: restrictiveFilter
-        ? { type: "restrictive_filters" as const, suggestedFilterToRemove: restrictiveFilter }
-        : { type: "restrictive_filters" as const, suggestedFilterToRemove: null },
+        ? {
+            type: "restrictive_filters" as const,
+            suggestedFilterToRemove: restrictiveFilter,
+          }
+        : {
+            type: "restrictive_filters" as const,
+            suggestedFilterToRemove: null,
+          },
     };
   },
 
@@ -383,7 +639,10 @@ export const TutorSearchService = {
     });
   },
 
-  async recordSearchEvent(input: RecordSearchEventInput, userId: string | undefined) {
+  async recordSearchEvent(
+    input: RecordSearchEventInput,
+    userId: string | undefined
+  ) {
     return prisma.searchAnalyticsEvent.create({
       data: {
         userId,
@@ -397,18 +656,14 @@ export const TutorSearchService = {
     });
   },
 
-  // ── Admin analytics — never exposed to Tutors or Parents ────
-
-  /** CTR per result position: impressions at position X are approximated
-   * as "a QUERY_SUBMITTED whose resultCount was large enough for position
-   * X to exist" (positions are 0-indexed within a 12-per-page result set)
-   * — there's no separate per-position impression event, so this is the
-   * closest honest signal the current event log supports. */
   async getCtrByPosition(windowDays = 30) {
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
     const [queries, clicks] = await Promise.all([
       prisma.searchAnalyticsEvent.findMany({
-        where: { eventType: SearchEventType.QUERY_SUBMITTED, createdAt: { gte: since } },
+        where: {
+          eventType: SearchEventType.QUERY_SUBMITTED,
+          createdAt: { gte: since },
+        },
         select: { resultCount: true },
       }),
       prisma.searchAnalyticsEvent.groupBy({
@@ -422,25 +677,33 @@ export const TutorSearchService = {
       }),
     ]);
 
-    const clicksByPosition = new Map(clicks.map((c) => [c.position, c._count._all]));
-    const maxPosition = Math.max(11, ...Array.from(clicksByPosition.keys()).map((p) => p ?? 0));
+    const clicksByPosition = new Map(
+      clicks.map((c) => [c.position, c._count._all])
+    );
+    const maxPosition = Math.max(
+      11,
+      ...Array.from(clicksByPosition.keys()).map((p) => p ?? 0)
+    );
 
     const rows = [];
     for (let position = 0; position <= maxPosition; position++) {
-      const impressions = queries.filter((q) => (q.resultCount ?? 0) > position).length;
+      const impressions = queries.filter(
+        (q) => (q.resultCount ?? 0) > position
+      ).length;
       const clickCount = clicksByPosition.get(position) ?? 0;
       rows.push({
         position,
         impressions,
         clicks: clickCount,
-        ctr: impressions > 0 ? Math.round((clickCount / impressions) * 10000) / 100 : 0,
+        ctr:
+          impressions > 0
+            ? Math.round((clickCount / impressions) * 10000) / 100
+            : 0,
       });
     }
     return rows;
   },
 
-  /** Queries people actually typed that never led to a booking within the
-   * window — a product-review signal, not an automatic action. */
   async getDeadEndQueries(windowDays = 30, limit = 20) {
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
     const [submitted, booked] = await Promise.all([
@@ -470,8 +733,6 @@ export const TutorSearchService = {
       .map((s) => ({ query: s.query, searchCount: s._count._all }));
   },
 
-  /** The unmet-demand dashboard — subjects/cities people asked to be
-   * notified about, most-requested first. */
   async getDemandSignals(limit = 50) {
     const signals = await prisma.demandSignal.groupBy({
       by: ["subjectId", "cityId"],
@@ -481,14 +742,24 @@ export const TutorSearchService = {
       take: limit,
     });
 
-    const subjectIds = signals.map((s) => s.subjectId).filter((id): id is string => !!id);
-    const cityIds = signals.map((s) => s.cityId).filter((id): id is string => !!id);
+    const subjectIds = signals
+      .map((s) => s.subjectId)
+      .filter((id): id is string => !!id);
+    const cityIds = signals
+      .map((s) => s.cityId)
+      .filter((id): id is string => !!id);
     const [subjects, cities] = await Promise.all([
       subjectIds.length
-        ? prisma.subject.findMany({ where: { id: { in: subjectIds } }, select: { id: true, name: true } })
+        ? prisma.subject.findMany({
+            where: { id: { in: subjectIds } },
+            select: { id: true, name: true },
+          })
         : Promise.resolve([]),
       cityIds.length
-        ? prisma.city.findMany({ where: { id: { in: cityIds } }, select: { id: true, name: true } })
+        ? prisma.city.findMany({
+            where: { id: { in: cityIds } },
+            select: { id: true, name: true },
+          })
         : Promise.resolve([]),
     ]);
     const subjectById = new Map(subjects.map((s) => [s.id, s.name]));
