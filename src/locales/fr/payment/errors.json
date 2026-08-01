@@ -11,6 +11,7 @@
   "escrowNotHeld": "Ce dépôt sous séquestre n'est plus actif.",
   "topupBelowMinimum": "Le montant minimum de recharge est {{minimum}} XAF.",
   "topupFailed": "Votre recharge n'a pas pu être effectuée.",
+  "topupTimedOut": "Nous n'avons pas pu confirmer votre recharge (réf. {{transId}}) à temps. Si votre compte a été débité, il sera rapproché automatiquement.",
   "payoutAccountNotFound": "Compte de paiement introuvable.",
   "payoutAccountCoolingOff": "Ce compte de paiement a été ajouté récemment et ne peut pas recevoir de fonds avant {{coolingOffUntil}}.",
   "insufficientBalance": "Solde du portefeuille insuffisant.",

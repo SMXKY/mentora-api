@@ -33,6 +33,7 @@
   },
   "server": {
     "unknown": "Une erreur inattendue s'est produite. Veuillez réessayer",
+    "unkwon": "Une erreur inattendue s'est produite. Veuillez réessayer",
     "ftpConfigMissing": "Le stockage de fichiers n'est pas configuré correctement. Veuillez réessayer plus tard"
   }
 }

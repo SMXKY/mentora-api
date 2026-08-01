@@ -410,3 +410,53 @@ registry.registerPath({
     404: { description: "Not found, unpublished, or tutor not publicly visible" },
   },
 });
+
+registry.registerPath({
+  method: "get",
+  path: "/api/v1/materials/collections/{collectionId}/viewer",
+  tags: ["Materials — Public"],
+  summary: "Get a collection for the in-app viewer, scoped to the caller's access level",
+  description:
+    "Authenticated. Returns the full collection (sections, materials, lesson plan) " +
+    "for the owning tutor or a student/parent with a valid booking against that " +
+    "tutor; everyone else gets the same free-preview-only content as the " +
+    "unauthenticated preview endpoint.",
+  ...bearer,
+  request: { params: z.object({ collectionId: z.string().uuid() }) },
+  responses: { 200: { description: "Collection view, scoped to FULL or PREVIEW_ONLY access" } },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/v1/materials/collections/{collectionId}/save",
+  tags: ["Materials — Public"],
+  summary: "Save a published collection for later",
+  ...bearer,
+  request: { params: z.object({ collectionId: z.string().uuid() }) },
+  responses: {
+    200: { description: "{ id, userId, collectionId, createdAt }" },
+    404: { description: "Collection not found, unpublished, or deleted" },
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/v1/materials/collections/{collectionId}/save",
+  tags: ["Materials — Public"],
+  summary: "Remove a collection from the caller's saved list",
+  ...bearer,
+  request: { params: z.object({ collectionId: z.string().uuid() }) },
+  responses: { 200: { description: "{ unsaved: true }" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/v1/materials/saved-collections",
+  tags: ["Materials — Public"],
+  summary: "List the caller's saved collections",
+  description:
+    "A saved collection that was later unpublished or soft-deleted by its " +
+    "tutor is still returned, flagged as unavailable, rather than silently dropped.",
+  ...bearer,
+  responses: { 200: { description: "Saved collections, each with an availability flag" } },
+});

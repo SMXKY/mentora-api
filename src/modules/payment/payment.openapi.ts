@@ -153,3 +153,23 @@ registry.registerPath({
   ...bearer,
   responses: { 200: { description: "{ receipt: Receipt }" } },
 });
+
+registry.registerPath({
+  method: "get",
+  path: `${adminBasePath}/payouts`,
+  tags: adminTags,
+  summary: "List the payout queue (finance oversight)",
+  description: "Requires the payments:payouts-read permission. Optionally filter by status via ?status=.",
+  ...bearer,
+  responses: { 200: { description: "{ payouts: PayoutQueue[] }" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: `${adminBasePath}/reconciliations`,
+  tags: adminTags,
+  summary: "List payment reconciliations (finance oversight)",
+  description: "Requires the payments:reconciliation-read permission. Optionally filter with ?resolved=true|false.",
+  ...bearer,
+  responses: { 200: { description: "{ reconciliations: PaymentReconciliation[] }" } },
+});

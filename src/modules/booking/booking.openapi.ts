@@ -13,8 +13,10 @@ import { DirectMomoCheckoutSchema } from "../payment/payment.types";
 
 const tags = ["Bookings"];
 const groupTags = ["Group Sessions"];
+const adminTags = ["Admin Bookings"];
 const basePath = "/api/v1/bookings";
 const groupBasePath = "/api/v1/group-sessions";
+const adminBasePath = "/api/v1/admin/bookings";
 const bearer = { security: [{ bearerAuth: [] }] };
 
 registry.registerPath({
@@ -171,6 +173,15 @@ registry.registerPath({
 });
 
 registry.registerPath({
+  method: "get",
+  path: `${basePath}/{id}/reschedule`,
+  tags,
+  summary: "Get the pending reschedule request for a booking, if any",
+  ...bearer,
+  responses: { 200: { description: "{ request: RescheduleRequest | null }" } },
+});
+
+registry.registerPath({
   method: "post",
   path: `${basePath}/reschedule/{requestId}/respond`,
   tags,
@@ -237,4 +248,26 @@ registry.registerPath({
   ...bearer,
   request: { body: { content: { "application/json": { schema: DirectMomoCheckoutSchema } } } },
   responses: { 200: { description: "{ participant, escrowHold }" } },
+});
+
+// ── Admin ───────────────────────────────────────────────────
+registry.registerPath({
+  method: "get",
+  path: adminBasePath,
+  tags: adminTags,
+  summary: "List all bookings across all users",
+  description: "Requires the bookings:read-all permission.",
+  ...bearer,
+  request: { query: ListBookingsQuerySchema },
+  responses: { 200: { description: "Cursor-paginated bookings" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: `${adminBasePath}/{id}`,
+  tags: adminTags,
+  summary: "Get any booking by ID",
+  description: "Requires the bookings:read-all permission.",
+  ...bearer,
+  responses: { 200: { description: "{ booking: Booking }" } },
 });

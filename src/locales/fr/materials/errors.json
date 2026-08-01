@@ -16,5 +16,6 @@
   "materialHasNoFile": "Ce support n'a pas de fichier à remplacer.",
   "reorderListEmpty": "Veuillez fournir au moins un élément à réordonner.",
   "downloadPolicyInvalidType": "Ce type de contenu de support n'est pas valide.",
-  "subjectNotApproved": "Vous ne pouvez créer des supports que pour une matière pour laquelle vous êtes approuvé."
+  "subjectNotApproved": "Vous ne pouvez créer des supports que pour une matière pour laquelle vous êtes approuvé.",
+  "levelNotApproved": "Vous ne pouvez créer des supports que pour un niveau pour lequel vous êtes approuvé à enseigner cette matière."
 }

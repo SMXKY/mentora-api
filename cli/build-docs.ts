@@ -5,6 +5,7 @@ import path from "path";
 
 //module docs
 import "../src/modules/auth/auth.openapi";
+import "../src/modules/auditLog/auditLog.openapi";
 import "../src/modules/permission/permission.openapi";
 import "../src/modules/permissionOverride/permissionOverride.openapi";
 import "../src/modules/role/role.openapi";

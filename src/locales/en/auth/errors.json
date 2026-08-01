@@ -51,5 +51,8 @@
   "deactivateConfirmationRequired": "Please confirm your password, or verify with the code sent to you, but not both.",
   "passwordAccountNoOtp": "This account has a password — confirm with your password instead of a code.",
   "notDeactivated": "This account is not deactivated.",
-  "reactivationWindowExpired": "The 30-day reactivation window for this account has passed. Please contact support."
+  "reactivationWindowExpired": "The 30-day reactivation window for this account has passed. Please contact support.",
+  "ipBlocked": "Too many failed login attempts from this network. Please try again in 15 minutes.",
+  "accountLocked": "Too many failed login attempts on this account. Please try again in 30 minutes.",
+  "emailAlreadyVerified": "Your email address is already verified."
 }

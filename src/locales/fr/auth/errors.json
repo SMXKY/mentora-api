@@ -51,5 +51,8 @@
   "deactivateConfirmationRequired": "Veuillez confirmer avec votre mot de passe, ou avec le code qui vous a été envoyé, mais pas les deux.",
   "passwordAccountNoOtp": "Ce compte a un mot de passe — confirmez avec votre mot de passe plutôt qu'avec un code.",
   "notDeactivated": "Ce compte n'est pas désactivé.",
-  "reactivationWindowExpired": "Le délai de 30 jours pour réactiver ce compte est dépassé. Veuillez contacter le support."
+  "reactivationWindowExpired": "Le délai de 30 jours pour réactiver ce compte est dépassé. Veuillez contacter le support.",
+  "ipBlocked": "Trop de tentatives de connexion échouées depuis ce réseau. Veuillez réessayer dans 15 minutes.",
+  "accountLocked": "Trop de tentatives de connexion échouées sur ce compte. Veuillez réessayer dans 30 minutes.",
+  "emailAlreadyVerified": "Votre adresse e-mail est déjà vérifiée."
 }

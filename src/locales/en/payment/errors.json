@@ -11,6 +11,7 @@
   "escrowNotHeld": "This escrow hold is no longer active.",
   "topupBelowMinimum": "The minimum top-up amount is {{minimum}} XAF.",
   "topupFailed": "Your top-up could not be completed.",
+  "topupTimedOut": "We could not confirm your top-up (ref {{transId}}) in time. If your account was charged, it will be reconciled automatically.",
   "payoutAccountNotFound": "Payout account not found.",
   "payoutAccountCoolingOff": "This payout account was recently added and can't receive funds until {{coolingOffUntil}}.",
   "insufficientBalance": "Insufficient wallet balance.",

@@ -26,6 +26,15 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
+  path: `${basePath}/bookings/{bookingId}/dispute`,
+  tags,
+  summary: "Get the dispute for a booking, if one exists (parties only)",
+  ...bearer,
+  responses: { 200: { description: "{ dispute: Dispute }" } },
+});
+
+registry.registerPath({
+  method: "get",
   path: `${basePath}/{id}`,
   tags,
   summary: "Get a dispute (parties only)",

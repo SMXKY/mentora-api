@@ -1,9 +1,5 @@
 import { registry } from "../../docs/openapi.registry";
-import {
-  CreateAuditLogSchema,
-  UpdateAuditLogSchema,
-  AuditLogResponseSchema,
-} from "./auditLog.schema";
+import { AuditLogResponseSchema } from "./auditLog.schema";
 import { z } from "zod";
 
 // ============================================================
@@ -11,14 +7,18 @@ import { z } from "zod";
 // Run npm run docs:build after updating this file to
 // regenerate the OpenAPI spec at docs/api/openapi.json
 // ============================================================
+// Read-only — audit log entries are written internally, never via the API,
+// so there are no create/update/delete routes to document here.
 
 const tags = ["AuditLog"];
-const basePath = "/api/v1/auditLogs";
+const basePath = "/api/v1/audit-logs";
+const bearer = { security: [{ bearerAuth: [] }] };
 
 registry.registerPath({
   method: "get",
   path: basePath,
   tags,
+  ...bearer,
   summary: "Get all auditLogs (offset paginated)",
   request: {
     query: z.object({
@@ -56,6 +56,7 @@ registry.registerPath({
   method: "get",
   path: `${basePath}/search`,
   tags,
+  ...bearer,
   summary: "Search auditLogs (cursor paginated)",
   request: {
     query: z.object({
@@ -88,6 +89,7 @@ registry.registerPath({
   method: "get",
   path: `${basePath}/{id}`,
   tags,
+  ...bearer,
   summary: "Get auditLog by ID",
   request: { params: z.object({ id: z.string().uuid() }) },
   responses: {

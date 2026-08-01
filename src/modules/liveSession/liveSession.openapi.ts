@@ -143,3 +143,21 @@ registry.registerPath({
   ...bearer,
   responses: { 200: { description: "{ token, url, roomName }" } },
 });
+
+// ── LiveKit webhook ──────────────────────────────────────────
+registry.registerPath({
+  method: "post",
+  path: "/api/v1/webhooks/livekit",
+  tags,
+  summary: "Inbound LiveKit room/participant events",
+  description:
+    "Receives room_started, participant_joined, participant_left, and " +
+    "room_finished events from LiveKit and updates the LiveRoom's session " +
+    "state accordingly. Authenticated by verifying the LiveKit-signed JWT " +
+    "(WebhookReceiver) over the raw request body; deduplicated per event ID " +
+    "via Redis for 24h.",
+  responses: {
+    200: { description: "Event processed (or already processed — deduplicated)" },
+    401: { description: "Invalid or missing webhook signature" },
+  },
+});
