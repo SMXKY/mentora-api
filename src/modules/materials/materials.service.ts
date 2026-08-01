@@ -8,7 +8,6 @@ import {
   DisputeStatus,
   LogOperation,
   LogCategory,
-  KycStatus,
   SubjectVerificationStatus,
 } from "../../generated/prisma";
 import { MediaService } from "../../services/media/media.service";
@@ -32,6 +31,7 @@ import {
   LessonPlanTopicUpdateInput,
   TipTapDocSchema,
 } from "./materials.types";
+import { BookingStatus } from "../../generated/prisma";
 
 // Statuses under which a dispute is still "active" for the purposes of
 // the "material tied to an active dispute cannot be deleted" rule.
@@ -262,8 +262,31 @@ async function listCollections(
     }),
   ]);
 
+  // Free-preview count per collection — separate groupBy rather than a
+  // second filtered relation count on `materials`, since Prisma's `_count`
+  // can only key one count per relation name; we already need the
+  // unfiltered materials count above.
+  const collectionIds = collections.map((c) => c.id);
+  const freePreviewCounts = collectionIds.length
+    ? await prisma.material.groupBy({
+        by: ["collectionId"],
+        where: {
+          collectionId: { in: collectionIds },
+          deletedAt: null,
+          isFreePreview: true,
+        },
+        _count: { collectionId: true },
+      })
+    : [];
+  const freePreviewByCollection = new Map(
+    freePreviewCounts.map((f) => [f.collectionId, f._count.collectionId])
+  );
+
   return {
-    data: collections,
+    data: collections.map((c) => ({
+      ...c,
+      freePreviewCount: freePreviewByCollection.get(c.id) ?? 0,
+    })),
     meta: {
       total,
       page: query.page,
@@ -964,170 +987,6 @@ async function getLessonPlan(tutorProfileId: string, collectionId: string) {
   return { ...lessonPlan, topics };
 }
 
-/**
- * Powers "the lesson plan is visible on the Tutor's public profile before
- * a student books" — only published collections with a published lesson
- * plan are included. No ownership check: callers are responsible for only
- * reaching this after confirming the tutor is publicly visible at all
- * (TutorService.getPublicProfile already gates on kycStatus === ACTIVE
- * before calling this, the same query-time-filter pattern used for the
- * rest of the public profile — a suspended/banned tutor's collections
- * become unreachable immediately because the profile lookup itself 404s
- * first, with no separate "hide collections" write needed).
- */
-async function getPublicLessonPlans(tutorProfileId: string) {
-  const collections = await prisma.collection.findMany({
-    where: {
-      tutorProfileId,
-      isPublished: true,
-      deletedAt: null,
-      // lessonPlan: { isPublished: true },
-      // A subject's approval can be revoked after a collection was created
-      // (e.g. a supporting credential gets revoked, demoting the subject
-      // claim back to PENDING) — the public profile must stop showing
-      // that collection immediately, not just gate future creation.
-      subject: {
-        tutorSubjects: {
-          some: { tutorProfileId, status: SubjectVerificationStatus.APPROVED },
-        },
-      },
-    },
-    orderBy: { orderIndex: "asc" },
-    select: {
-      id: true,
-      name: true,
-      subject: { select: { id: true, name: true } },
-      level: { select: { id: true, name: true } },
-      lessonPlan: {
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          topics: {
-            where: { deletedAt: null },
-            orderBy: { orderIndex: "asc" },
-          },
-        },
-      },
-    },
-  });
-
-  const allTopics = collections.flatMap((c) => c.lessonPlan!.topics);
-  const topicsWithStatus = await attachTopicStatuses(allTopics);
-  const statusById = new Map(topicsWithStatus.map((t) => [t.id, t.status]));
-
-  return collections.map((c) => ({
-    collectionId: c.id,
-    collectionName: c.name,
-    subject: c.subject,
-    level: c.level,
-    lessonPlan: {
-      id: c.lessonPlan!.id,
-      title: c.lessonPlan!.title,
-      description: c.lessonPlan!.description,
-      topics: c.lessonPlan!.topics.map((t) => ({
-        id: t.id,
-        title: t.title,
-        description: t.description,
-        orderIndex: t.orderIndex,
-        status: statusById.get(t.id)!,
-      })),
-    },
-  }));
-}
-
-/**
- * Public, unauthenticated "consume a free preview" surface — the piece that
- * was missing entirely before: search/profile only ever exposed lesson-plan
- * *metadata* (title/status), never anything a Guest/Parent/Student could
- * actually read, watch, or listen to. Only isFreePreview items are ever
- * returned, from a published collection belonging to a publicly visible
- * (ACTIVE) tutor — anything else 404s exactly like a private collection
- * would, so this never becomes a way to probe unpublished/paid content.
- */
-async function getPublicCollectionPreview(collectionId: string) {
-  const collection = await prisma.collection.findFirst({
-    where: {
-      id: collectionId,
-      isPublished: true,
-      deletedAt: null,
-      tutorProfile: { kycStatus: KycStatus.ACTIVE, deletedAt: null },
-    },
-    include: {
-      subject: { select: { id: true, name: true } },
-      level: { select: { id: true, name: true } },
-      tutorProfile: {
-        select: {
-          id: true,
-          user: { select: { firstName: true, lastName: true } },
-        },
-      },
-      sections: {
-        where: { deletedAt: null, isFreePreview: true },
-        orderBy: { orderIndex: "asc" },
-        include: {
-          materials: {
-            where: { deletedAt: null, isFreePreview: true },
-            orderBy: { orderIndex: "asc" },
-          },
-        },
-      },
-      materials: {
-        where: { deletedAt: null, sectionId: null, isFreePreview: true },
-        orderBy: { orderIndex: "asc" },
-      },
-    },
-  });
-  if (!collection) {
-    throw new AppError(
-      "materials/errors:collectionNotFound",
-      StatusCodes.NOT_FOUND
-    );
-  }
-
-  const resolveMaterial = async (
-    material: (typeof collection.materials)[number]
-  ) => ({
-    id: material.id,
-    name: material.name,
-    materialType: material.materialType,
-    content:
-      material.materialType === MaterialType.WRITTEN_NOTE
-        ? material.contentJson
-        : null,
-    fileUrl: material.fileId
-      ? await MediaService.getFileUrl(material.fileId).catch(() => null)
-      : null,
-  });
-
-  const [looseMaterials, sections] = await Promise.all([
-    Promise.all(collection.materials.map(resolveMaterial)),
-    Promise.all(
-      collection.sections.map(async (section) => ({
-        id: section.id,
-        name: section.name,
-        description: section.description,
-        materials: await Promise.all(section.materials.map(resolveMaterial)),
-      }))
-    ),
-  ]);
-
-  return {
-    id: collection.id,
-    name: collection.name,
-    description: collection.description,
-    subject: collection.subject,
-    level: collection.level,
-    tutor: {
-      tutorProfileId: collection.tutorProfile.id,
-      firstName: collection.tutorProfile.user.firstName,
-      lastName: collection.tutorProfile.user.lastName,
-    },
-    sections,
-    materials: looseMaterials,
-  };
-}
-
 async function updateLessonPlan(
   tutorProfileId: string,
   collectionId: string,
@@ -1296,6 +1155,394 @@ async function reorderLessonPlanTopics(
   });
 }
 
+/**
+ * Powers "the lesson plan is visible on the tutor's public profile" —
+ * lesson plans are optional: a published collection with no lesson plan
+ * still shows (as "materials available"), just with `lessonPlan: null`
+ * instead of a topic table of contents.
+ */
+async function getPublicLessonPlans(tutorProfileId: string) {
+  const collections = await prisma.collection.findMany({
+    where: {
+      tutorProfileId,
+      isPublished: true,
+      deletedAt: null,
+      OR: [
+        // Normal case — subject must currently be approved
+        {
+          subject: {
+            tutorSubjects: {
+              some: {
+                tutorProfileId,
+                status: SubjectVerificationStatus.APPROVED,
+              },
+            },
+          },
+        },
+        // Free-preview content stays visible for discovery even if the
+        // subject is mid re-review — collection-level flag overrides,
+        // matching the same cascade used everywhere else.
+        { isFreePreview: true },
+      ],
+    },
+    orderBy: { orderIndex: "asc" },
+    select: {
+      id: true,
+      name: true,
+      subject: { select: { id: true, name: true } },
+      level: { select: { id: true, name: true } },
+      lessonPlan: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          topics: {
+            where: { deletedAt: null },
+            orderBy: { orderIndex: "asc" },
+          },
+        },
+      },
+    },
+  });
+
+  const allTopics = collections.flatMap((c) => c.lessonPlan?.topics ?? []);
+  const topicsWithStatus = await attachTopicStatuses(allTopics);
+  const statusById = new Map(topicsWithStatus.map((t) => [t.id, t.status]));
+
+  return collections.map((c) => ({
+    collectionId: c.id,
+    collectionName: c.name,
+    subject: c.subject,
+    level: c.level,
+    lessonPlan: c.lessonPlan
+      ? {
+          id: c.lessonPlan.id,
+          title: c.lessonPlan.title,
+          description: c.lessonPlan.description,
+          topics: c.lessonPlan.topics.map((t) => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            orderIndex: t.orderIndex,
+            status: statusById.get(t.id)!,
+          })),
+        }
+      : null,
+  }));
+}
+
+/**
+ * Resolves what a given viewer is allowed to see for a collection —
+ * the single source of truth the reading UI is built around: backend
+ * decides access, frontend only renders what it's handed.
+ * - FULL: the tutor who owns the collection, or a user with a
+ *   MaterialAccess grant for it (booked access).
+ * - PREVIEW_ONLY: everyone else, including guests. Cascade-filtered to
+ *   only isFreePreview items (collection > section > material override).
+ *
+ * NOTE: this only *reads* MaterialAccess. Something else must *write* a
+ * row here once a booking reaches the right state — that grant-creation
+ * logic lives outside this file (a booking-confirmation service).
+ */
+// Statuses that represent a real, paid/completed engagement with the
+// tutor — not just a request that was never accepted, or one that fell
+// through before payment. A student/parent who reached any of these with
+// this tutor gets full access to their materials going forward.
+const VALID_ACCESS_BOOKING_STATUSES: BookingStatus[] = [
+  BookingStatus.PAID,
+  BookingStatus.IN_PROGRESS,
+  BookingStatus.AWAITING_CONFIRMATION,
+  BookingStatus.CONFIRMED,
+  BookingStatus.AUTO_CONFIRMED,
+  BookingStatus.DISPUTED,
+  BookingStatus.RESOLVED_TUTOR_FAVOR,
+  BookingStatus.RESOLVED_PARENT_FAVOR,
+];
+
+/**
+ * Resolves what a given viewer is allowed to see for a collection —
+ * the single source of truth the reading UI is built around: backend
+ * decides access, frontend only renders what it's handed.
+ * - FULL: the tutor who owns the collection, or a user who has ever had
+ *   a valid (paid-or-further) booking with that tutor — computed live
+ *   from Booking history, not a stored grant, so access can never drift
+ *   out of sync with what actually happened.
+ * - PREVIEW_ONLY: everyone else, including guests. Cascade-filtered to
+ *   only isFreePreview items (collection > section > material override).
+ */
+async function resolveViewerAccess(
+  collectionId: string,
+  viewerUserId: string
+): Promise<"FULL" | "PREVIEW_ONLY"> {
+  const collection = await prisma.collection.findFirst({
+    where: { id: collectionId, deletedAt: null },
+    select: {
+      tutorProfileId: true,
+      tutorProfile: { select: { userId: true } },
+    },
+  });
+  if (!collection) {
+    throw new AppError(
+      "materials/errors:collectionNotFound",
+      StatusCodes.NOT_FOUND
+    );
+  }
+  if (collection.tutorProfile.userId === viewerUserId) return "FULL";
+
+  const hasValidBooking = await prisma.booking.findFirst({
+    where: {
+      bookerId: viewerUserId,
+      tutorProfileId: collection.tutorProfileId,
+      status: { in: VALID_ACCESS_BOOKING_STATUSES },
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+  return hasValidBooking ? "FULL" : "PREVIEW_ONLY";
+}
+
+// Cascade: collection-level flag overrides everything in it; otherwise a
+// section's flag overrides its own materials; otherwise fall back to the
+// material's own flag. FULL access always sees everything, cascade or not.
+function isMaterialVisible(
+  collectionFree: boolean,
+  sectionFree: boolean,
+  materialFree: boolean,
+  access: "FULL" | "PREVIEW_ONLY"
+): boolean {
+  if (access === "FULL") return true;
+  return collectionFree || sectionFree || materialFree;
+}
+
+/**
+ * Shared builder behind both the guest-facing and viewer-aware collection
+ * reads — one access-aware tree, so the "book" (collection → sections →
+ * materials, plus lesson plan as table of contents) is assembled exactly
+ * once regardless of who's looking at it.
+ */
+async function buildCollectionView(
+  collectionId: string,
+  access: "FULL" | "PREVIEW_ONLY"
+) {
+  const collection = await prisma.collection.findFirst({
+    where: { id: collectionId, isPublished: true, deletedAt: null },
+    include: {
+      subject: { select: { id: true, name: true } },
+      level: { select: { id: true, name: true } },
+      tutorProfile: {
+        select: {
+          id: true,
+          user: { select: { firstName: true, lastName: true } },
+        },
+      },
+      lessonPlan: {
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          topics: {
+            where: { deletedAt: null },
+            orderBy: { orderIndex: "asc" },
+          },
+        },
+      },
+      sections: {
+        where: { deletedAt: null },
+        orderBy: { orderIndex: "asc" },
+        include: {
+          materials: {
+            where: { deletedAt: null },
+            orderBy: { orderIndex: "asc" },
+          },
+        },
+      },
+      materials: {
+        where: { deletedAt: null, sectionId: null },
+        orderBy: { orderIndex: "asc" },
+      },
+    },
+  });
+  if (!collection) {
+    throw new AppError(
+      "materials/errors:collectionNotFound",
+      StatusCodes.NOT_FOUND
+    );
+  }
+
+  const resolveMaterial = async (material: any) => ({
+    id: material.id,
+    name: material.name,
+    materialType: material.materialType,
+    isFreePreview: material.isFreePreview,
+    content:
+      material.materialType === MaterialType.WRITTEN_NOTE
+        ? material.contentJson
+        : null,
+    fileUrl: material.fileId
+      ? await MediaService.getFileUrl(material.fileId).catch(() => null)
+      : null,
+  });
+
+  const collectionFree = collection.isFreePreview;
+
+  const looseMaterials = await Promise.all(
+    collection.materials
+      .filter((m) =>
+        isMaterialVisible(collectionFree, false, m.isFreePreview, access)
+      )
+      .map(resolveMaterial)
+  );
+
+  const sections = (
+    await Promise.all(
+      collection.sections.map(async (section) => {
+        const visible = section.materials.filter((m) =>
+          isMaterialVisible(
+            collectionFree,
+            section.isFreePreview,
+            m.isFreePreview,
+            access
+          )
+        );
+        return {
+          id: section.id,
+          name: section.name,
+          description: section.description,
+          materials: await Promise.all(visible.map(resolveMaterial)),
+        };
+      })
+    )
+  ).filter((s) => access === "FULL" || s.materials.length > 0);
+  // FULL access always shows every section, even ones with zero materials
+  // yet (the tutor/booked student should see the real book structure);
+  // PREVIEW_ONLY hides sections with nothing visible in them, so a guest
+  // never sees an empty, confusing chapter heading.
+
+  const topicsWithStatus = collection.lessonPlan
+    ? await attachTopicStatuses(collection.lessonPlan.topics)
+    : [];
+  const statusById = new Map(topicsWithStatus.map((t) => [t.id, t.status]));
+
+  return {
+    id: collection.id,
+    name: collection.name,
+    description: collection.description,
+    subject: collection.subject,
+    level: collection.level,
+    tutor: {
+      tutorProfileId: collection.tutorProfile.id,
+      firstName: collection.tutorProfile.user.firstName,
+      lastName: collection.tutorProfile.user.lastName,
+    },
+    // Optional — a collection with no lesson plan still shows (materials
+    // available), just without a table-of-contents.
+    lessonPlan: collection.lessonPlan
+      ? {
+          id: collection.lessonPlan.id,
+          title: collection.lessonPlan.title,
+          description: collection.lessonPlan.description,
+          topics: collection.lessonPlan.topics.map((t) => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            orderIndex: t.orderIndex,
+            sectionId: t.sectionId,
+            status: statusById.get(t.id)!,
+          })),
+        }
+      : null,
+    sections,
+    materials: looseMaterials,
+    accessLevel: access,
+  };
+}
+
+/** Guest/unauthenticated path — always PREVIEW_ONLY, cascade-filtered. */
+async function getPublicCollectionPreview(collectionId: string) {
+  return buildCollectionView(collectionId, "PREVIEW_ONLY");
+}
+
+/** Authenticated path — owner or booked-access viewers get FULL; everyone
+ * else (including a logged-in parent/student with no grant yet) still
+ * gets the same PREVIEW_ONLY cascade a guest would see. */
+async function getCollectionForViewer(
+  collectionId: string,
+  viewerUserId: string
+) {
+  const access = await resolveViewerAccess(collectionId, viewerUserId);
+  return buildCollectionView(collectionId, access);
+}
+
+// ── Saved Collections ───────────────────────────────────────
+async function saveCollection(userId: string, collectionId: string) {
+  const collection = await prisma.collection.findFirst({
+    where: { id: collectionId, isPublished: true, deletedAt: null },
+    select: { id: true },
+  });
+  if (!collection) {
+    throw new AppError(
+      "materials/errors:collectionNotFound",
+      StatusCodes.NOT_FOUND
+    );
+  }
+  return prisma.savedCollection.upsert({
+    where: { userId_collectionId: { userId, collectionId } },
+    create: { userId, collectionId },
+    update: {},
+  });
+}
+
+async function unsaveCollection(userId: string, collectionId: string) {
+  await prisma.savedCollection.deleteMany({ where: { userId, collectionId } });
+}
+
+/** A saved collection can later be unpublished or soft-deleted by the
+ * tutor — surfaced as `available: false` rather than silently dropped,
+ * so a student understands why something they saved disappeared. */
+async function listSavedCollections(userId: string) {
+  const saved = await prisma.savedCollection.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    include: {
+      collection: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          isPublished: true,
+          deletedAt: true,
+          subject: { select: { id: true, name: true } },
+          level: { select: { id: true, name: true } },
+          tutorProfile: {
+            select: {
+              id: true,
+              user: { select: { firstName: true, lastName: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return saved.map((s) => ({
+    savedAt: s.createdAt,
+    collectionId: s.collectionId,
+    available: s.collection.isPublished && !s.collection.deletedAt,
+    collection: {
+      id: s.collection.id,
+      name: s.collection.name,
+      description: s.collection.description,
+      subject: s.collection.subject,
+      level: s.collection.level,
+      tutor: {
+        tutorProfileId: s.collection.tutorProfile.id,
+        firstName: s.collection.tutorProfile.user.firstName,
+        lastName: s.collection.tutorProfile.user.lastName,
+      },
+    },
+  }));
+}
+
 // ── Storage ──────────────────────────────────────────────────
 async function getStorageUsage(userId: string) {
   const [usage, limitBytes] = await Promise.all([
@@ -1344,8 +1591,14 @@ export const MaterialsService = {
   updateLessonPlanTopic,
   deleteLessonPlanTopic,
   reorderLessonPlanTopics,
+
   getPublicLessonPlans,
   getPublicCollectionPreview,
+  getCollectionForViewer,
+
+  saveCollection,
+  unsaveCollection,
+  listSavedCollections,
 
   getStorageUsage,
 };

@@ -51,7 +51,10 @@ function makeUpload(maxSizeMB: number) {
     storage: multer.diskStorage({
       destination: os.tmpdir(),
       filename: (_req, file, cb) =>
-        cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
+        cb(
+          null,
+          `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`
+        ),
     }),
     limits: { fileSize: maxSizeMB * 1024 * 1024, files: 1 },
   });
@@ -274,6 +277,33 @@ router.get(
   "/collections/:collectionId/preview",
   validate(CollectionIdParams, "params"),
   materialsController.getPublicCollectionPreview
+);
+
+router.get(
+  "/collections/:collectionId/viewer",
+  protect,
+  validate(CollectionIdParams, "params"),
+  materialsController.getCollectionForViewer
+);
+
+router.post(
+  "/collections/:collectionId/save",
+  protect,
+  validate(CollectionIdParams, "params"),
+  materialsController.saveCollection
+);
+
+router.delete(
+  "/collections/:collectionId/save",
+  protect,
+  validate(CollectionIdParams, "params"),
+  materialsController.unsaveCollection
+);
+
+router.get(
+  "/saved-collections",
+  protect,
+  materialsController.listSavedCollections
 );
 
 export default router;
