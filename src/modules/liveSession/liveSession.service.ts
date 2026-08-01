@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { StatusCodes } from "http-status-codes";
-import { TrackSource, TrackType } from "livekit-server-sdk";
+import { TrackSource, TrackType, ParticipantInfo, TrackInfo } from "livekit-server-sdk";
 import prisma from "../../config/database.config";
 import redis from "../../config/redis.config";
 import { AppError } from "../../utils/AppError.util";
@@ -336,11 +336,11 @@ async function getSessionParticipantOrThrow(liveRoomId: string, userId: string) 
 }
 
 async function muteAudioTracks(roomName: string, identity: string): Promise<void> {
-  const participants = await roomServiceClient.listParticipants(roomName).catch(() => []);
-  const target = participants.find((p) => p.identity === identity);
-  const audioTracks = target?.tracks.filter((t) => t.type === TrackType.AUDIO) ?? [];
+  const participants = await roomServiceClient.listParticipants(roomName).catch(() => [] as ParticipantInfo[]);
+  const target = participants.find((p: ParticipantInfo) => p.identity === identity);
+  const audioTracks = target?.tracks.filter((t: TrackInfo) => t.type === TrackType.AUDIO) ?? [];
   await Promise.all(
-    audioTracks.map((t) => roomServiceClient.mutePublishedTrack(roomName, identity, t.sid, true).catch(() => undefined))
+    audioTracks.map((t: TrackInfo) => roomServiceClient.mutePublishedTrack(roomName, identity, t.sid, true).catch(() => undefined))
   );
 }
 
@@ -426,12 +426,12 @@ async function muteAll(tutorUserId: string, bookingId: string, ctx: ServiceConte
     throw new AppError("liveSession/errors:groupSessionsDisabled", StatusCodes.BAD_REQUEST);
   }
 
-  const participants = await roomServiceClient.listParticipants(liveRoom.roomName).catch(() => []);
+  const participants = await roomServiceClient.listParticipants(liveRoom.roomName).catch(() => [] as ParticipantInfo[]);
   for (const p of participants) {
     if (p.identity === tutorUserId) continue;
-    const audioTracks = p.tracks.filter((t) => t.type === TrackType.AUDIO);
+    const audioTracks = p.tracks.filter((t: TrackInfo) => t.type === TrackType.AUDIO);
     await Promise.all(
-      audioTracks.map((t) =>
+      audioTracks.map((t: TrackInfo) =>
         roomServiceClient.mutePublishedTrack(liveRoom.roomName, p.identity, t.sid, true).catch(() => undefined)
       )
     );

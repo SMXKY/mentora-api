@@ -1,0 +1,65 @@
+name: mentora-api-prod
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mentora-api:latest
+    container_name: mentora_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Points the app's ClamAV client (src/services/media/media.virusScan.ts)
+      # at the containerized clamd below instead of a local unix socket.
+      # Remove both this override and the clamav service if you'd rather set
+      # CLAMAV_ENABLED=false in .env and skip virus scanning entirely.
+      CLAMD_HOST: clamav
+      CLAMD_PORT: "3310"
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    # Lets the container resolve "host.docker.internal" to the VPS itself.
+    # Only matters if DATABASE_URL / REDIS_URL point at "localhost" or
+    # "127.0.0.1" (i.e. Postgres/Redis run natively on this same VPS) — a
+    # container's "localhost" is itself, not the host, so in that case you
+    # must change those two values in .env to "host.docker.internal" instead.
+    # If Postgres/Redis are on a different host or a managed service, leave
+    # .env exactly as it is — this line is then simply unused.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - clamav
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-3000}/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Virus scanning backend for uploaded media. First boot downloads the virus
+  # database (freshclam) and can take a couple of minutes; budget ~1-2GB RAM
+  # once the database is loaded — drop this service on a memory-constrained
+  # VPS and set CLAMAV_ENABLED=false in .env instead.
+  clamav:
+    image: clamav/clamav:stable
+    container_name: mentora_clamav
+    restart: unless-stopped
+    expose:
+      - "3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      start_period: 3m
+      retries: 5
+
+volumes:
+  clamav_data:
