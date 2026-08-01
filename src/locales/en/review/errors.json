@@ -1,0 +1,8 @@
+{
+  "windowNotOpen": "The review window for this booking isn't open yet.",
+  "windowClosed": "The review window for this booking has already closed.",
+  "alreadySubmitted": "You've already submitted a review for this booking.",
+  "reviewNotFound": "Review not found.",
+  "notYourReview": "This review isn't about you.",
+  "alreadyResponded": "You've already responded to this review."
+}

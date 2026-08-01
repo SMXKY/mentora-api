@@ -3,7 +3,7 @@ import { catchAsync } from "../../utils/catchAsync.util";
 import { appResponder } from "../../utils/appResponder.util";
 import { StatusCodes } from "http-status-codes";
 import prisma from "../../config/database.config";
-import { SchoolType } from "../../generated/prisma";
+import { SchoolType, SubjectVerificationStatus } from "../../generated/prisma";
 
 // Reference/taxonomy tables are small and public — no auth, no pagination,
 // just a light optional filter per resource.
@@ -34,6 +34,10 @@ export const catalogController = {
     const subjects = await prisma.subject.findMany({
       where: {
         isActive: true,
+        // Tutor-proposed subjects sit in PENDING until an admin reviews them
+        // (see kycAdmin.service's approveSubject/rejectSubject) — never
+        // surfaced in the public catalog or search filters until then.
+        status: SubjectVerificationStatus.APPROVED,
         ...(domainId && { domainId }),
         ...(search && { name: { contains: search, mode: "insensitive" } }),
       },

@@ -1,0 +1,25 @@
+{
+  "fapshi": {
+    "invalidAmount": "Amount must be a whole number of at least 100 XAF.",
+    "invalidPhone": "Enter a valid Cameroon mobile number (e.g. 670000000).",
+    "invalidTransId": "Invalid transaction reference.",
+    "serviceUnavailable": "The payment service is temporarily unavailable. Please try again shortly.",
+    "transactionNotFound": "No transaction found for that reference.",
+    "upstreamError": "The payment provider could not process this request."
+  },
+  "escrowNotFound": "Escrow hold not found.",
+  "escrowNotHeld": "This escrow hold is no longer active.",
+  "topupBelowMinimum": "The minimum top-up amount is {{minimum}} XAF.",
+  "topupFailed": "Your top-up could not be completed.",
+  "payoutAccountNotFound": "Payout account not found.",
+  "payoutAccountCoolingOff": "This payout account was recently added and can't receive funds until {{coolingOffUntil}}.",
+  "insufficientBalance": "Insufficient wallet balance.",
+  "paymentWindowExpired": "The payment window for this booking has expired.",
+  "bookingHasNoAgreedRate": "This booking has no agreed rate to charge.",
+  "directPayFailed": "The mobile money payment could not be completed.",
+  "reconciliationNotFound": "Reconciliation record not found.",
+  "reconciliationAlreadyResolved": "This reconciliation has already been resolved.",
+  "receiptNotFound": "Receipt not found.",
+  "notYourWallet": "This wallet doesn't belong to you.",
+  "insufficientCommissionBalance": "The platform commission balance is insufficient for this withdrawal."
+}

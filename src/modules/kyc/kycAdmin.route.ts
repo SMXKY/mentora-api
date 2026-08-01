@@ -14,6 +14,7 @@ import {
   KycSlaConfigSchema,
   KycQueueQuerySchema,
   KycSubjectQueueQuerySchema,
+  IntroVideoConfigSchema,
 } from "./kyc.types";
 import protect from "../../middlewares/protect.middleware";
 import restrictTo from "../../middlewares/restrictTo.middleware";
@@ -146,6 +147,19 @@ router.patch(
   restrictTo(permissions.platform.configUpdate),
   validate(KycSlaConfigSchema),
   kycAdminController.updateSlaConfig
+);
+
+router.get(
+  "/intro-video-config",
+  restrictTo(permissions.platform.configRead),
+  kycAdminController.getIntroVideoConfig
+);
+
+router.patch(
+  "/intro-video-config",
+  restrictTo(permissions.platform.configUpdate),
+  validate(IntroVideoConfigSchema),
+  kycAdminController.updateIntroVideoConfig
 );
 
 export default router;

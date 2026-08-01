@@ -19,6 +19,10 @@ export const deliverEmailOtp = async (
       `[OTP Email] Delivery failed for ${email}:`,
       err instanceof Error ? err.message : err
     );
-    throw err;
+    if (process.env.NODE_ENV === "production") {
+      throw err;
+    } else {
+      console.log(`Dev code: ${code}`);
+    }
   }
 };

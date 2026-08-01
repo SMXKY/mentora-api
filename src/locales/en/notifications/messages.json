@@ -55,6 +55,18 @@
     "title": "Re-verification required",
     "body": "We need you to verify your identity again to keep your account active."
   },
+  "intro_video_required": {
+    "title": "Add your introduction video",
+    "body": "Upload a short introduction video or you won't be seen by users in search or on your profile."
+  },
+  "subject_application_approved": {
+    "title": "Subject approved",
+    "body": "Your application to teach this subject has been approved."
+  },
+  "subject_application_rejected": {
+    "title": "Subject application rejected",
+    "body": "Your application to teach this subject was not approved."
+  },
   "booking_requested": {
     "title": "New booking request",
     "body": "You have a new booking request awaiting your response."
@@ -115,9 +127,29 @@
     "title": "Tutor disconnected",
     "body": "Your tutor lost connection during the session. They may rejoin shortly."
   },
+  "session_tutor_not_joined": {
+    "title": "Your tutor has not joined yet",
+    "body": "Your tutor has not joined yet. Please wait or contact support."
+  },
   "session_no_show": {
     "title": "Session marked as no-show",
     "body": "A participant did not show up for the scheduled session."
+  },
+  "session_room_creation_failed": {
+    "title": "Session room issue",
+    "body": "We hit a problem setting up your session room. Our team has been alerted — the session may be delayed."
+  },
+  "session_incoming_call": {
+    "title": "Incoming session call",
+    "body": "{{callerName}} is starting your session now."
+  },
+  "session_call_missed": {
+    "title": "Missed session call",
+    "body": "You missed a call from {{callerName}} for your session."
+  },
+  "session_empty_timeout_closed": {
+    "title": "Session closed — no one joined",
+    "body": "Your session room closed because no one joined within 30 minutes of the scheduled start."
   },
   "payment_confirmed": {
     "title": "Payment confirmed",
@@ -162,6 +194,10 @@
   "lesson_awaiting_confirmation": {
     "title": "Confirm your lesson",
     "body": "A completed lesson is awaiting your confirmation."
+  },
+  "lesson_confirmation_reminder": {
+    "title": "Confirmation window closing soon",
+    "body": "You still have a lesson awaiting your confirmation — it will auto-confirm soon if you don't respond."
   },
   "lesson_confirmed": {
     "title": "Lesson confirmed",

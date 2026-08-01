@@ -4,6 +4,7 @@ import { evaluateCompletion } from "../../services/accountCompletion/accountComp
 import NotificationService from "../../services/notification/notification.service";
 import { KycAdminService } from "../kyc";
 import { DashboardResponse } from "./dashboard.schema";
+import { watStartOfDay, watStartOfWeek, watStartOfMonth } from "../availability/availability.logic";
 
 // Short TTL only — the spec calls stale-within-reason acceptable for
 // everything except the live-updated counters, which mobile refreshes
@@ -223,9 +224,7 @@ async function buildTutorDashboard(userId: string): Promise<DashboardResponse> {
     studentProfile: { select: { firstName: true } },
     subject: { select: { name: true } },
   };
-  const startOfMonth = new Date();
-  startOfMonth.setDate(1);
-  startOfMonth.setHours(0, 0, 0, 0);
+  const startOfMonth = watStartOfMonth();
 
   const [pending, upcoming, wallet, nextPayout, completion, monthEscrow, reviews, common, materialsUploadedCount] =
     await Promise.all([
@@ -298,12 +297,9 @@ async function buildTutorDashboard(userId: string): Promise<DashboardResponse> {
 }
 
 async function buildAdminDashboard(role: "ADMIN" | "SUPER_ADMIN"): Promise<DashboardResponse> {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const startOfWeek = new Date(startOfToday);
-  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-  const startOfMonth = new Date(startOfToday);
-  startOfMonth.setDate(1);
+  const startOfToday = watStartOfDay();
+  const startOfWeek = watStartOfWeek();
+  const startOfMonth = watStartOfMonth();
 
   const [
     kycStats,

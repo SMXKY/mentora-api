@@ -608,6 +608,7 @@ export class AuthService {
           timestamp: new Date().toLocaleString("en-GB", {
             dateStyle: "long",
             timeStyle: "short",
+            timeZone: "Africa/Douala",
           }),
         });
 
@@ -714,6 +715,7 @@ export class AuthService {
           timestamp: new Date().toLocaleString("en-GB", {
             dateStyle: "long",
             timeStyle: "short",
+            timeZone: "Africa/Douala",
           }),
         });
 
@@ -851,6 +853,7 @@ export class AuthService {
         timestamp: new Date().toLocaleString("en-GB", {
           dateStyle: "long",
           timeStyle: "short",
+          timeZone: "Africa/Douala",
         }),
       });
 
@@ -997,6 +1000,7 @@ export class AuthService {
         timestamp: new Date().toLocaleString("en-GB", {
           dateStyle: "long",
           timeStyle: "short",
+          timeZone: "Africa/Douala",
         }),
       });
 

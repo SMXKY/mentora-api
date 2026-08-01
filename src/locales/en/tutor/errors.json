@@ -3,5 +3,8 @@
   "invalidRateRange": "Maximum rate must be greater than or equal to the minimum rate.",
   "tutorProfileNotFound": "No tutor profile was found.",
   "subjectNotClaimed": "You must claim this subject through verification before setting a price for it.",
-  "atLeastOneRateRequired": "Please provide at least one rate to update."
+  "atLeastOneRateRequired": "Please provide at least one field to update.",
+  "introVideoTooShort": "Your introduction video must be at least {{minDurationSeconds}} seconds long.",
+  "subjectMustBeApprovedToOpen": "This subject must be approved before you can open it for booking.",
+  "subjectNeedsRateToOpen": "Set a price for this subject before opening it for booking."
 }

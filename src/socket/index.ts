@@ -10,12 +10,22 @@ import {
   handleNotificationReadAll,
   sendInitialNotificationState,
 } from "../services/notification/notification.socket";
+import { MessagingService } from "../modules/messaging/messaging.service";
+import { LiveSessionService } from "../modules/liveSession/liveSession.service";
+import { AppError } from "../utils/AppError.util";
 
 interface AuthedSocket extends Socket {
   data: { user: { id: string; roleId?: string } };
 }
 
 let ioInstance: Server | null = null;
+
+// Typing indicators are transient — never persisted. A start auto-clears
+// after 5s if no matching stop arrives (e.g. the sender's app crashed or
+// lost connection mid-type), keyed per conversation+user so it can't leak
+// across conversations or users.
+const typingTimers = new Map<string, NodeJS.Timeout>();
+const typingKey = (conversationId: string, userId: string) => `${conversationId}:${userId}`;
 
 // ────────────────────────────────────────────────────────────
 // Room naming — the ONLY place a room name is ever constructed.
@@ -42,9 +52,12 @@ export function initializeSocketIO(httpServer: HttpServer): Server {
   // A socket is never "connected" without a verified identity attached.
   io.use((socket: Socket, next) => {
     try {
-      const token =
+      const rawToken =
         socket.handshake.auth?.token ||
-        socket.handshake.headers.authorization?.split(" ")[1];
+        socket.handshake.headers.authorization;
+      // Clients send `Bearer <token>` (auth.token and the Authorization
+      // header alike) — strip the scheme so jwt.verify gets the raw JWT.
+      const token = rawToken?.startsWith("Bearer ") ? rawToken.slice(7) : rawToken;
 
       if (!token) return next(new Error("No token provided"));
 
@@ -118,9 +131,108 @@ export function initializeSocketIO(httpServer: HttpServer): Server {
       socket.leave(conversationRoom(payload.conversationId));
     });
 
+    // ── Messaging events ──
+    // The DB write is always the source of truth: message:send funnels into
+    // the exact same MessagingService.sendMessage() used by the REST POST
+    // endpoint (filter pipeline, persistence, notification) rather than
+    // re-implementing any of that here.
+    socket.on(
+      "message:send",
+      async (payload: { conversationId: string; content: string; tempId?: string }) => {
+        try {
+          const message = await MessagingService.sendMessage(
+            userId,
+            payload?.conversationId,
+            payload?.content,
+            { userId }
+          );
+          socket.emit("message:send:ack", { tempId: payload?.tempId, message });
+        } catch (err) {
+          const isAppError = err instanceof AppError;
+          socket.emit("message:send:error", {
+            tempId: payload?.tempId,
+            error: isAppError ? err.message : "messaging/errors:sendFailed",
+          });
+        }
+      }
+    );
+
+    socket.on(
+      "message:read",
+      async (payload: { conversationId: string; messageIds: string[] }) => {
+        try {
+          await MessagingService.markAsRead(payload?.conversationId, userId, payload?.messageIds ?? []);
+        } catch (err) {
+          console.error({ event: "socket_mark_read_error", error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+    );
+
+    socket.on("typing:start", async (payload: { conversationId: string }) => {
+      try {
+        const allowed = await userCanAccessConversation(userId, payload?.conversationId);
+        if (!allowed) return;
+
+        const key = typingKey(payload.conversationId, userId);
+        const existing = typingTimers.get(key);
+        if (existing) clearTimeout(existing);
+
+        socket.to(conversationRoom(payload.conversationId)).emit("typing:start", { conversationId: payload.conversationId, userId });
+
+        typingTimers.set(
+          key,
+          setTimeout(() => {
+            typingTimers.delete(key);
+            socket.to(conversationRoom(payload.conversationId)).emit("typing:stop", { conversationId: payload.conversationId, userId });
+          }, 5000)
+        );
+      } catch (err) {
+        console.error({ event: "socket_typing_start_error", error: err instanceof Error ? err.message : String(err) });
+      }
+    });
+
+    socket.on("typing:stop", (payload: { conversationId: string }) => {
+      const key = typingKey(payload?.conversationId, userId);
+      const existing = typingTimers.get(key);
+      if (existing) {
+        clearTimeout(existing);
+        typingTimers.delete(key);
+      }
+      socket.to(conversationRoom(payload.conversationId)).emit("typing:stop", { conversationId: payload.conversationId, userId });
+    });
+
+    // ── Live Sessions (Module 14) — WhatsApp-style call signaling ──
+    // One-on-one only. Booking/payment access is re-checked server-side on
+    // every initiate — a client can never make the server ring someone for
+    // a booking it isn't actually a paid party to.
+    socket.on("session:call:initiate", async (payload: { bookingId: string }) => {
+      try {
+        await LiveSessionService.initiateCall(userId, payload?.bookingId);
+      } catch (err) {
+        console.error({ event: "socket_call_initiate_error", error: err instanceof Error ? err.message : String(err) });
+      }
+    });
+
+    socket.on("session:call:accept", (payload: { bookingId: string; callerId: string }) => {
+      LiveSessionService.respondToCall(userId, payload?.bookingId, payload?.callerId, true);
+    });
+
+    socket.on("session:call:reject", (payload: { bookingId: string; callerId: string }) => {
+      LiveSessionService.respondToCall(userId, payload?.bookingId, payload?.callerId, false);
+    });
+
     socket.on("disconnect", () => {
-      // Rooms are cleaned up automatically by Socket.IO on disconnect —
-      // nothing to do here.
+      // Rooms are cleaned up automatically by Socket.IO on disconnect.
+      // Any typing indicator this socket had in flight must still be
+      // cleared for the other party rather than silently expiring 5s late.
+      for (const [key, timer] of typingTimers) {
+        if (key.endsWith(`:${userId}`)) {
+          clearTimeout(timer);
+          typingTimers.delete(key);
+          const conversationId = key.slice(0, -(`:${userId}`.length));
+          socket.to(conversationRoom(conversationId)).emit("typing:stop", { conversationId, userId });
+        }
+      }
     });
   });
 

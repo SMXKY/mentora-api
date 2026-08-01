@@ -1,0 +1,8 @@
+{
+  "windowNotOpen": "La fenêtre d'évaluation pour cette réservation n'est pas encore ouverte.",
+  "windowClosed": "La fenêtre d'évaluation pour cette réservation est déjà fermée.",
+  "alreadySubmitted": "Vous avez déjà soumis une évaluation pour cette réservation.",
+  "reviewNotFound": "Évaluation introuvable.",
+  "notYourReview": "Cette évaluation ne vous concerne pas.",
+  "alreadyResponded": "Vous avez déjà répondu à cette évaluation."
+}

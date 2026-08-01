@@ -131,6 +131,17 @@ export const kycAdminController = {
     const result = await KycAdminService.updateSlaConfig(req.body, ctx);
     appResponder(StatusCodes.OK, result, res);
   }),
+
+  getIntroVideoConfig: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const result = await KycAdminService.getIntroVideoConfig();
+    appResponder(StatusCodes.OK, result, res);
+  }),
+
+  updateIntroVideoConfig: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    const result = await KycAdminService.updateIntroVideoConfig(req.body, ctx);
+    appResponder(StatusCodes.OK, result, res);
+  }),
 };
 
 export default kycAdminController;

@@ -267,4 +267,13 @@ meRouter.get(
 const router = Router();
 router.use("/me", meRouter);
 
+// Public, unauthenticated — the free-preview consumption surface a Guest
+// sees from a tutor's public profile. No protect/checkKyc: same "public
+// data, no auth" convention as the catalog module.
+router.get(
+  "/collections/:collectionId/preview",
+  validate(CollectionIdParams, "params"),
+  materialsController.getPublicCollectionPreview
+);
+
 export default router;

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync.util";
 import { buildContext } from "../../utils/buildContext.util";
 import { appResponder } from "../../utils/appResponder.util";
+import { AppError } from "../../utils/AppError.util";
 import { StatusCodes } from "http-status-codes";
 import { TutorService } from "./tutor.service";
 
@@ -15,6 +16,15 @@ export const tutorController = {
   updateMe: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
     const profile = await TutorService.upsertMyProfile(ctx.userId!, req.body);
+    appResponder(StatusCodes.OK, profile as object, res);
+  }),
+
+  uploadIntroVideo: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    if (!req.file) {
+      throw new AppError("media/errors:noFileProvided", StatusCodes.BAD_REQUEST);
+    }
+    const profile = await TutorService.uploadIntroVideo(ctx.userId!, req.file);
     appResponder(StatusCodes.OK, profile as object, res);
   }),
 

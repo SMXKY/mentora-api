@@ -38,12 +38,16 @@ registry.registerPath({
   path: `${basePath}/collections`,
   tags,
   summary: "Create a collection",
-  description: GATE_DESCRIPTION,
+  description:
+    GATE_DESCRIPTION +
+    " Additionally requires an APPROVED TutorSubject for the given " +
+    "subjectId — a tutor can only build materials for a subject an admin " +
+    "has verified them for.",
   ...bearer,
   request: { body: { content: { "application/json": { schema: CollectionCreateSchema } } } },
   responses: {
     201: { description: "Collection created" },
-    403: { description: "Account incomplete or KYC not approved" },
+    403: { description: "Account incomplete, KYC not approved, or subject not approved for this tutor" },
   },
 });
 
@@ -384,4 +388,25 @@ registry.registerPath({
   summary: "My storage usage and quota (across all Learning Materials files)",
   ...bearer,
   responses: { 200: { description: "Usage snapshot" } },
+});
+
+// ── Public ─────────────────────────────────────────────────
+registry.registerPath({
+  method: "get",
+  path: "/api/v1/materials/collections/{collectionId}/preview",
+  tags: ["Materials — Public"],
+  summary: "Consume a collection's free-preview materials",
+  description:
+    "Public, unauthenticated. Returns only the sections/materials flagged " +
+    "isFreePreview from a published collection belonging to a publicly " +
+    "visible (KYC ACTIVE) tutor — everything else 404s the same as a " +
+    "private collection would. WRITTEN_NOTE materials return their " +
+    "sanitized contentJson directly; file-backed materials (VIDEO, AUDIO, " +
+    "DOCUMENT, IMAGE) return a resolved fileUrl the client can render " +
+    "directly (image/video/audio element, or a webview for documents).",
+  request: { params: z.object({ collectionId: z.string().uuid() }) },
+  responses: {
+    200: { description: "Collection metadata plus its free-preview content" },
+    404: { description: "Not found, unpublished, or tutor not publicly visible" },
+  },
 });

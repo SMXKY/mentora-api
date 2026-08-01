@@ -18,11 +18,13 @@ import {
   NotificationResourceType,
 } from "../../generated/prisma";
 import { permissions } from "../../data/permission.data";
+import { SubjectVerificationStatus } from "../../generated/prisma";
 import {
   KycStep1Input,
   KycStep2Input,
   CredentialInput,
   AdditionalSubjectInput,
+  UpdateSubjectLevelsInput,
 } from "./kyc.types";
 
 const IMAGE_TYPES: FileTypeSpec[] = [
@@ -496,10 +498,201 @@ export const KycService = {
         StatusCodes.BAD_REQUEST
       );
     }
-    // Reuses the exact same credential-creation path — the "lighter flow"
-    // is entirely about which admin queue it lands in (see kycAdmin.service),
-    // not a different tutor-facing code path.
-    return KycService.addCredential(userId, data, file);
+
+    const levels = await prisma.level.findMany({
+      where: { id: { in: data.levelIds }, isActive: true },
+      select: { id: true },
+    });
+    if (levels.length !== data.levelIds.length) {
+      throw new AppError("kyc/errors:invalidLevel", StatusCodes.BAD_REQUEST);
+    }
+
+    // Resolve the subject: either an existing, approved one, or a brand-new
+    // proposal the tutor is submitting for admin review (checked for a
+    // near-duplicate first so the taxonomy doesn't fill up with copies of
+    // the same subject under slightly different casing/domain choices).
+    let subjectId: string;
+    if (data.subjectId) {
+      const subject = await prisma.subject.findFirst({
+        where: {
+          id: data.subjectId,
+          isActive: true,
+          status: SubjectVerificationStatus.APPROVED,
+        },
+        select: { id: true },
+      });
+      if (!subject) {
+        throw new AppError("kyc/errors:invalidSubject", StatusCodes.BAD_REQUEST);
+      }
+      subjectId = subject.id;
+    } else {
+      const proposal = data.newSubject!;
+      const existingMatch = await prisma.subject.findFirst({
+        where: {
+          domainId: proposal.domainId,
+          name: { equals: proposal.name, mode: "insensitive" },
+          status: SubjectVerificationStatus.APPROVED,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      if (existingMatch) {
+        subjectId = existingMatch.id;
+      } else {
+        const domain = await prisma.subjectDomain.findUnique({
+          where: { id: proposal.domainId },
+          select: { id: true },
+        });
+        if (!domain) {
+          throw new AppError(
+            "kyc/errors:invalidSubjectDomain",
+            StatusCodes.BAD_REQUEST
+          );
+        }
+        const created = await prisma.subject.create({
+          data: {
+            name: proposal.name,
+            description: proposal.description,
+            domainId: proposal.domainId,
+            status: SubjectVerificationStatus.PENDING,
+            isActive: false,
+            submittedById: userId,
+          },
+        });
+        subjectId = created.id;
+      }
+    }
+
+    const existingClaim = await prisma.tutorSubject.findUnique({
+      where: {
+        tutorProfileId_subjectId: { tutorProfileId: profile.id, subjectId },
+      },
+      select: { id: true },
+    });
+    if (existingClaim) {
+      throw new AppError(
+        "kyc/errors:subjectAlreadyClaimed",
+        StatusCodes.CONFLICT
+      );
+    }
+
+    const [uploaded] = await MediaService.upload(
+      [{ tempFilePath: file.path, originalFileName: file.originalname }],
+      {
+        uploadedById: userId,
+        fileCategory: FileCategory.KYC_DOCUMENT,
+        fileType:
+          file.mimetype === "application/pdf"
+            ? FileType.DOCUMENT
+            : FileType.IMAGE,
+        allowedTypes: [...IMAGE_TYPES, ...PDF_TYPES],
+        maxSizeMB: 10,
+      }
+    );
+
+    const { credential, tutorSubject } = await prisma.$transaction(
+      async (tx) => {
+        const credential = await tx.tutorCredential.create({
+          data: {
+            tutorProfileId: profile.id,
+            institutionName: data.institutionName,
+            qualificationType: data.qualificationType,
+            fieldOfStudy: data.fieldOfStudy,
+            gradeOrClassification: data.gradeOrClassification,
+            yearAwarded: data.yearAwarded,
+            documentUrl: uploaded.storagePath,
+            status: CredentialStatus.PENDING,
+          },
+        });
+
+        await tx.credentialSubjectLink.create({
+          data: { credentialId: credential.id, subjectId },
+        });
+
+        const tutorSubject = await tx.tutorSubject.upsert({
+          where: {
+            tutorProfileId_subjectId: {
+              tutorProfileId: profile.id,
+              subjectId,
+            },
+          },
+          create: { tutorProfileId: profile.id, subjectId },
+          update: {},
+        });
+
+        await tx.tutorSubjectLevel.createMany({
+          data: data.levelIds.map((levelId) => ({
+            tutorSubjectId: tutorSubject.id,
+            levelId,
+          })),
+          skipDuplicates: true,
+        });
+
+        return { credential, tutorSubject };
+      }
+    );
+
+    await NotificationService.send({
+      type: NotificationType.ADMIN_REVIEW_REQUIRED,
+      target: { kind: "permission", permissionCode: permissions.kyc.queueRead },
+      resourceType: NotificationResourceType.TUTOR_SUBJECT,
+      resourceId: tutorSubject.id,
+      data: {
+        reviewReason: data.subjectId
+          ? "additional_subject_claim"
+          : "new_subject_proposal",
+        tutorProfileId: profile.id,
+      },
+    }).catch(() => {});
+
+    return { credential, tutorSubject };
+  },
+
+  async getMySubjects(userId: string) {
+    const profile = await getTutorProfileOrThrow(userId);
+    return prisma.tutorSubject.findMany({
+      where: { tutorProfileId: profile.id },
+      include: {
+        subject: { select: { id: true, name: true, status: true } },
+        levels: { include: { level: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  },
+
+  async updateSubjectLevels(
+    userId: string,
+    tutorSubjectId: string,
+    data: UpdateSubjectLevelsInput
+  ) {
+    const profile = await getTutorProfileOrThrow(userId);
+    const tutorSubject = await prisma.tutorSubject.findFirst({
+      where: { id: tutorSubjectId, tutorProfileId: profile.id },
+    });
+    if (!tutorSubject) {
+      throw new AppError("kyc/errors:subjectNotFound", StatusCodes.NOT_FOUND);
+    }
+
+    const levels = await prisma.level.findMany({
+      where: { id: { in: data.levelIds }, isActive: true },
+      select: { id: true },
+    });
+    if (levels.length !== data.levelIds.length) {
+      throw new AppError("kyc/errors:invalidLevel", StatusCodes.BAD_REQUEST);
+    }
+
+    await prisma.$transaction([
+      prisma.tutorSubjectLevel.deleteMany({ where: { tutorSubjectId } }),
+      prisma.tutorSubjectLevel.createMany({
+        data: data.levelIds.map((levelId) => ({ tutorSubjectId, levelId })),
+        skipDuplicates: true,
+      }),
+    ]);
+
+    return prisma.tutorSubject.findUniqueOrThrow({
+      where: { id: tutorSubjectId },
+      include: { levels: { include: { level: true } } },
+    });
   },
 
   // kyc.service.ts — add to KycService

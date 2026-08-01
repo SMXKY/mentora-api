@@ -29,6 +29,17 @@ import parentRouter from "./modules/parent";
 import tutorRouter from "./modules/tutor";
 import dashboardRouter from "./modules/dashboard";
 import { materialsRouter, materialsAdminRouter } from "./modules/materials";
+import { tutorSearchAdminRouter } from "./modules/tutorSearch";
+import tutorSearchRouter from "./modules/tutorSearch";
+import availabilityRouter from "./modules/availability/availability.route";
+import bookingRouter, { bookingAdminRouter } from "./modules/booking/booking.route";
+import paymentRouter, { paymentAdminRouter } from "./modules/payment/payment.route";
+import groupSessionRouter from "./modules/booking/groupSession.route";
+import disputeRouter, { disputeAdminRouter } from "./modules/dispute/dispute.route";
+import reviewRouter from "./modules/review/review.route";
+import messagingRouter, { messagingAdminRouter } from "./modules/messaging/messaging.route";
+import liveSessionRouter, { liveSessionAdminRouter } from "./modules/liveSession/liveSession.route";
+import liveSessionWebhookRouter from "./modules/liveSession/liveSession.webhook.route";
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -65,6 +76,7 @@ app.use(
       "X-Request-ID",
       "X-Lang",
       "Accept-Language",
+      "Idempotency-Key",
     ],
   })
 );
@@ -76,6 +88,10 @@ app.use(resolveLocale());
 // the raw request bytes, so its body must never be parsed by the global
 // JSON middleware first.
 app.use("/api/v1", notificationWebhookRouter);
+
+// Same reasoning — LiveKit's WebhookReceiver verifies a JWT signed over the
+// exact raw body bytes.
+app.use("/api/v1", liveSessionWebhookRouter);
 
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
@@ -156,9 +172,24 @@ app.use("/api/v1/levels", levelsRouter);
 app.use("/api/v1/students", studentRouter);
 app.use("/api/v1/parents", parentRouter);
 app.use("/api/v1/tutors", tutorRouter);
+app.use("/api/v1/tutors", availabilityRouter);
+app.use("/api/v1/bookings", bookingRouter);
+app.use("/api/v1/admin/bookings", bookingAdminRouter);
+app.use("/api/v1/payments", paymentRouter);
+app.use("/api/v1/admin/payments", paymentAdminRouter);
+app.use("/api/v1/group-sessions", groupSessionRouter);
+app.use("/api/v1/disputes", disputeRouter);
+app.use("/api/v1/admin/disputes", disputeAdminRouter);
+app.use("/api/v1/reviews", reviewRouter);
+app.use("/api/v1/messaging", messagingRouter);
+app.use("/api/v1/admin/messaging", messagingAdminRouter);
+app.use("/api/v1/live-sessions", liveSessionRouter);
+app.use("/api/v1/admin/live-sessions", liveSessionAdminRouter);
 app.use("/api/v1/dashboards", dashboardRouter);
 app.use("/api/v1/materials", materialsRouter);
 app.use("/api/v1/admin/materials", materialsAdminRouter);
+app.use("/api/v1/search", tutorSearchRouter);
+app.use("/api/v1/admin/search", tutorSearchAdminRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(

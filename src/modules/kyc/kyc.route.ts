@@ -5,7 +5,11 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { kycController } from "./kyc.controller";
 import { validate, ParamsId } from "../../middlewares/validate.middleware";
-import { KycStep1Schema, KycStep2Schema } from "./kyc.types";
+import {
+  KycStep1Schema,
+  KycStep2Schema,
+  UpdateSubjectLevelsSchema,
+} from "./kyc.types";
 import protect from "../../middlewares/protect.middleware";
 import { z } from "zod";
 
@@ -72,6 +76,15 @@ router.post(
   "/me/additional-subject",
   credentialUpload.single("document"),
   kycController.addAdditionalSubject
+);
+
+router.get("/me/subjects", kycController.getMySubjects);
+
+router.patch(
+  "/me/subjects/:tutorSubjectId/levels",
+  validate(z.object({ tutorSubjectId: z.string().uuid() }), "params"),
+  validate(UpdateSubjectLevelsSchema),
+  kycController.updateSubjectLevels
 );
 
 export default router;

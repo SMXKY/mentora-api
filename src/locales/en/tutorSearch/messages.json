@@ -1,0 +1,10 @@
+{
+  "zeroResults": {
+    "nearbyCity": "No verified {{subject}} tutors found in {{city}}. Showing tutors in nearby cities.",
+    "noTutorsForSubject": "No verified tutors found for {{subject}} yet. We are growing our tutor network — check back soon.",
+    "restrictiveFilters": "No tutors match all of your filters. Try removing \"{{filter}}\" to see more results."
+  },
+  "notifyMe": {
+    "confirmation": "Thanks! We'll notify you as soon as a matching tutor joins."
+  }
+}

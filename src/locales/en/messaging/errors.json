@@ -1,0 +1,16 @@
+{
+  "tutorNotFound": "Tutor not found.",
+  "cannotMessageSelf": "You can't start a conversation with yourself.",
+  "tutorCannotInitiate": "Tutors can't start a new conversation — the Parent or Student has to send the first message.",
+  "conversationNotFound": "Conversation not found.",
+  "notYourConversation": "This conversation doesn't belong to you.",
+  "conversationFrozen": "This conversation is frozen pending review and can't receive new messages.",
+  "conversationArchived": "This conversation is archived and read-only.",
+  "messageEmpty": "Message can't be empty.",
+  "messageTooLong": "Message must be under 2000 characters.",
+  "inquiryLimitReached": "You've reached the {{limit}}-message limit for pre-booking conversations. Book a lesson to keep chatting.",
+  "messageBlocked": "This message can't be sent — it looks like it contains contact details or a link. Please keep the conversation on Mentora.",
+  "messageNotFound": "Message not found.",
+  "moderationReviewNotFound": "Moderation review not found.",
+  "sendFailed": "Your message couldn't be sent. Please try again."
+}

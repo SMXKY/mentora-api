@@ -301,6 +301,14 @@ export const materialsController = {
     appResponder(StatusCodes.OK, { reordered: true }, res);
   }),
 
+  // ── Public ─────────────────────────────────────────────────
+  getPublicCollectionPreview: catchAsync(async (req: Request, res: Response) => {
+    const preview = await MaterialsService.getPublicCollectionPreview(
+      req.params.collectionId
+    );
+    appResponder(StatusCodes.OK, preview, res);
+  }),
+
   // ── Storage ──────────────────────────────────────────────
   getStorageUsage: catchAsync(async (req: Request, res: Response) => {
     const ctx = buildContext(req, res);

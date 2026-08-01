@@ -17,7 +17,9 @@ const DELIVERY_JOB_OPTS = {
   removeOnFail: { count: 5000 }, // keep recent failures for inspection, never grow unbounded
 };
 
-export async function queueChannelDelivery(notificationId: string): Promise<void> {
+export async function queueChannelDelivery(
+  notificationId: string
+): Promise<void> {
   await notificationQueue.add("deliver", { notificationId }, DELIVERY_JOB_OPTS);
 }
 
@@ -38,7 +40,9 @@ const worker = new Worker(
   QUEUE_NAME,
   async (job: Job) => {
     const { notificationId } = job.data as { notificationId: string };
-    await dispatchAllChannels(notificationId, job.attemptsMade + 1);
+    if (process.env.NODE_ENV === "production") {
+      await dispatchAllChannels(notificationId, job.attemptsMade + 1);
+    }
   },
   { connection }
 );

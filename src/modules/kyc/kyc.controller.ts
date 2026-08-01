@@ -31,6 +31,39 @@ function parseCredentialBody(body: Record<string, any>) {
   };
 }
 
+/** Same multipart-coercion problem as parseCredentialBody, but this body
+ * shape has a singular subjectId XOR a nested newSubject object, plus a
+ * levelIds array. */
+function parseAdditionalSubjectBody(body: Record<string, any>) {
+  let newSubject: Record<string, any> | undefined;
+  let levelIds: string[];
+  try {
+    newSubject = body.newSubject
+      ? typeof body.newSubject === "string"
+        ? JSON.parse(body.newSubject)
+        : body.newSubject
+      : undefined;
+    levelIds = Array.isArray(body.levelIds)
+      ? body.levelIds
+      : JSON.parse(body.levelIds ?? "[]");
+  } catch {
+    throw new AppError(
+      "kyc/errors:invalidSubjectIdsFormat",
+      StatusCodes.BAD_REQUEST
+    );
+  }
+  return {
+    institutionName: body.institutionName,
+    qualificationType: body.qualificationType,
+    fieldOfStudy: body.fieldOfStudy,
+    gradeOrClassification: body.gradeOrClassification || undefined,
+    yearAwarded: Number(body.yearAwarded),
+    subjectId: body.subjectId || undefined,
+    newSubject,
+    levelIds,
+  };
+}
+
 const filesFrom = (req: Request) =>
   req.files as Record<string, Express.Multer.File[]>;
 
@@ -112,7 +145,7 @@ export const kycController = {
     async (req: Request, res: Response): Promise<void> => {
       const ctx = buildContext(req, res);
       const parsed = AdditionalSubjectSchema.parse(
-        parseCredentialBody(req.body)
+        parseAdditionalSubjectBody(req.body)
       );
       const result = await KycService.addAdditionalSubject(
         ctx.userId!,
@@ -128,6 +161,26 @@ export const kycController = {
     const result = await KycService.getStatus(ctx.userId!);
     appResponder(StatusCodes.OK, result, res);
   }),
+
+  getMySubjects: catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const result = await KycService.getMySubjects(ctx.userId!);
+      appResponder(StatusCodes.OK, result, res);
+    }
+  ),
+
+  updateSubjectLevels: catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const result = await KycService.updateSubjectLevels(
+        ctx.userId!,
+        req.params.tutorSubjectId,
+        req.body
+      );
+      appResponder(StatusCodes.OK, result, res);
+    }
+  ),
 };
 
 export default kycController;

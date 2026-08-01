@@ -8,6 +8,8 @@ import {
   DisputeStatus,
   LogOperation,
   LogCategory,
+  KycStatus,
+  SubjectVerificationStatus,
 } from "../../generated/prisma";
 import { MediaService } from "../../services/media/media.service";
 import { fileTypes, FileTypeSpec } from "../../services/media/media.types";
@@ -122,6 +124,37 @@ async function assertMaterialOwnership(collectionId: string, materialId: string)
   return material;
 }
 
+/** A tutor may only build materials for a subject an admin has approved
+ * them for, and only at a level they've been approved to teach that
+ * subject at — mirrors the same TutorSubject/TutorSubjectLevel checks the
+ * search module uses to decide whether a tutor is discoverable at all. */
+async function assertTutorApprovedForSubject(
+  tutorProfileId: string,
+  subjectId: string,
+  levelId: string
+) {
+  const approved = await prisma.tutorSubject.findFirst({
+    where: {
+      tutorProfileId,
+      subjectId,
+      status: SubjectVerificationStatus.APPROVED,
+    },
+    select: { id: true, levels: { where: { levelId }, select: { id: true } } },
+  });
+  if (!approved) {
+    throw new AppError(
+      "materials/errors:subjectNotApproved",
+      StatusCodes.FORBIDDEN
+    );
+  }
+  if (approved.levels.length === 0) {
+    throw new AppError(
+      "materials/errors:levelNotApproved",
+      StatusCodes.FORBIDDEN
+    );
+  }
+}
+
 /** Blocks deletion of a material whose underlying file is evidence on an unresolved dispute. */
 async function assertNotDisputeLocked(fileId: string | null) {
   if (!fileId) return;
@@ -161,6 +194,7 @@ async function createCollection(
   if (!level) {
     throw new AppError("materials/errors:levelNotFound", StatusCodes.NOT_FOUND);
   }
+  await assertTutorApprovedForSubject(tutorProfileId, input.subjectId, input.levelId);
 
   const count = await prisma.collection.count({ where: { tutorProfileId, deletedAt: null } });
 
@@ -885,6 +919,15 @@ async function getPublicLessonPlans(tutorProfileId: string) {
       isPublished: true,
       deletedAt: null,
       lessonPlan: { isPublished: true },
+      // A subject's approval can be revoked after a collection was created
+      // (e.g. a supporting credential gets revoked, demoting the subject
+      // claim back to PENDING) — the public profile must stop showing
+      // that collection immediately, not just gate future creation.
+      subject: {
+        tutorSubjects: {
+          some: { tutorProfileId, status: SubjectVerificationStatus.APPROVED },
+        },
+      },
     },
     orderBy: { orderIndex: "asc" },
     select: {
@@ -925,6 +968,93 @@ async function getPublicLessonPlans(tutorProfileId: string) {
       })),
     },
   }));
+}
+
+/**
+ * Public, unauthenticated "consume a free preview" surface — the piece that
+ * was missing entirely before: search/profile only ever exposed lesson-plan
+ * *metadata* (title/status), never anything a Guest/Parent/Student could
+ * actually read, watch, or listen to. Only isFreePreview items are ever
+ * returned, from a published collection belonging to a publicly visible
+ * (ACTIVE) tutor — anything else 404s exactly like a private collection
+ * would, so this never becomes a way to probe unpublished/paid content.
+ */
+async function getPublicCollectionPreview(collectionId: string) {
+  const collection = await prisma.collection.findFirst({
+    where: {
+      id: collectionId,
+      isPublished: true,
+      deletedAt: null,
+      tutorProfile: { kycStatus: KycStatus.ACTIVE, deletedAt: null },
+    },
+    include: {
+      subject: { select: { id: true, name: true } },
+      level: { select: { id: true, name: true } },
+      tutorProfile: {
+        select: { id: true, user: { select: { firstName: true, lastName: true } } },
+      },
+      sections: {
+        where: { deletedAt: null, isFreePreview: true },
+        orderBy: { orderIndex: "asc" },
+        include: {
+          materials: {
+            where: { deletedAt: null, isFreePreview: true },
+            orderBy: { orderIndex: "asc" },
+          },
+        },
+      },
+      materials: {
+        where: { deletedAt: null, sectionId: null, isFreePreview: true },
+        orderBy: { orderIndex: "asc" },
+      },
+    },
+  });
+  if (!collection) {
+    throw new AppError(
+      "materials/errors:collectionNotFound",
+      StatusCodes.NOT_FOUND
+    );
+  }
+
+  const resolveMaterial = async (material: (typeof collection.materials)[number]) => ({
+    id: material.id,
+    name: material.name,
+    materialType: material.materialType,
+    content:
+      material.materialType === MaterialType.WRITTEN_NOTE
+        ? material.contentJson
+        : null,
+    fileUrl: material.fileId
+      ? await MediaService.getFileUrl(material.fileId).catch(() => null)
+      : null,
+  });
+
+  const [looseMaterials, sections] = await Promise.all([
+    Promise.all(collection.materials.map(resolveMaterial)),
+    Promise.all(
+      collection.sections.map(async (section) => ({
+        id: section.id,
+        name: section.name,
+        description: section.description,
+        materials: await Promise.all(section.materials.map(resolveMaterial)),
+      }))
+    ),
+  ]);
+
+  return {
+    id: collection.id,
+    name: collection.name,
+    description: collection.description,
+    subject: collection.subject,
+    level: collection.level,
+    tutor: {
+      tutorProfileId: collection.tutorProfile.id,
+      firstName: collection.tutorProfile.user.firstName,
+      lastName: collection.tutorProfile.user.lastName,
+    },
+    sections,
+    materials: looseMaterials,
+  };
 }
 
 async function updateLessonPlan(
@@ -1137,6 +1267,7 @@ export const MaterialsService = {
   deleteLessonPlanTopic,
   reorderLessonPlanTopics,
   getPublicLessonPlans,
+  getPublicCollectionPreview,
 
   getStorageUsage,
 };
