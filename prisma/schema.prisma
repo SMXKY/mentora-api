@@ -513,6 +513,7 @@ model User {
   learningSnapshots       LearningAnalyticsSnapshot[]
   platformConfigsUpdated  PlatformConfig[]
   monthlyFeeCharges       MonthlyFeeCharge[]
+  savedCollections SavedCollection[]
 
   @@index([status])
   @@index([isAccountComplete])
@@ -1267,6 +1268,7 @@ model Collection {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
+  isFreePreview  Boolean   @default(false) @map("is_free_preview")
 
   tutorProfile TutorProfile     @relation(fields: [tutorProfileId], references: [id])
   subject      Subject          @relation(fields: [subjectId], references: [id])
@@ -1276,6 +1278,7 @@ model Collection {
   lessonPlan   LessonPlan?
   accessGrants MaterialAccess[]
   reviews      MaterialReview[]
+  savedBy SavedCollection[]
 
   @@index([tutorProfileId])
   @@index([subjectId])
@@ -1285,6 +1288,7 @@ model Collection {
   @@index([tutorProfileId, orderIndex], map: "idx_collection_tutor_order")
   @@index([deletedAt])
   @@map("collections")
+  @@index([isFreePreview])
 }
 
 model Section {
@@ -4034,4 +4038,19 @@ model PlatformConfig {
 
   @@index([category])
   @@map("platform_configs")
+}
+
+model SavedCollection {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  collectionId String   @map("collection_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user       User       @relation(fields: [userId], references: [id])
+  collection Collection @relation(fields: [collectionId], references: [id])
+
+  @@unique([userId, collectionId], map: "idx_saved_collection_unique")
+  @@index([userId])
+  @@index([collectionId])
+  @@map("saved_collections")
 }
