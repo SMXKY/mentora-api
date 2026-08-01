@@ -16,20 +16,49 @@ import {
   ReviewModerationSchema,
   ListModerationQueueQuerySchema,
 } from "./messaging.types";
+import checkAccountCompletion from "../../middlewares/checkAccountCompletion.middleware";
+import checkKyc from "../../middlewares/checkKyc.middleware";
 
 const router = Router();
-router.use(protect);
+router.use(protect, checkAccountCompletion, checkKyc);
 
 const ParamsConversationId = z.object({ id: z.string().uuid() });
 
-router.post("/start", validate(StartConversationSchema), messagingController.start);
+router.post(
+  "/start",
+  validate(StartConversationSchema),
+  messagingController.start
+);
 router.get("/unread-count", messagingController.getUnreadCount);
-router.get("/", validate(ListConversationsQuerySchema, "query"), messagingController.listConversations);
+router.get(
+  "/",
+  validate(ListConversationsQuerySchema, "query"),
+  messagingController.listConversations
+);
 
-router.get("/:id/summary", validate(ParamsConversationId, "params"), messagingController.getSummary);
-router.get("/:id/messages", validate(ParamsConversationId, "params"), validate(ListMessagesQuerySchema, "query"), messagingController.listMessages);
-router.post("/:id/messages", validate(ParamsConversationId, "params"), validate(SendMessageSchema), messagingController.sendMessage);
-router.post("/:id/read", validate(ParamsConversationId, "params"), validate(MarkAsReadSchema), messagingController.markAsRead);
+router.get(
+  "/:id/summary",
+  validate(ParamsConversationId, "params"),
+  messagingController.getSummary
+);
+router.get(
+  "/:id/messages",
+  validate(ParamsConversationId, "params"),
+  validate(ListMessagesQuerySchema, "query"),
+  messagingController.listMessages
+);
+router.post(
+  "/:id/messages",
+  validate(ParamsConversationId, "params"),
+  validate(SendMessageSchema),
+  messagingController.sendMessage
+);
+router.post(
+  "/:id/read",
+  validate(ParamsConversationId, "params"),
+  validate(MarkAsReadSchema),
+  messagingController.markAsRead
+);
 
 // ── Admin/Moderator ──
 router.post(

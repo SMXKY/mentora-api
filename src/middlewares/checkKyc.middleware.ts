@@ -4,6 +4,7 @@ import { StatusCodes } from "http-status-codes";
 import prisma from "../config/database.config";
 import { KycStatus } from "../generated/prisma";
 import { catchAsync } from "../utils/catchAsync.util";
+import { defaultRoleNames, defaultRoles } from "../seeds/roles.seed";
 
 /**
  * Gates a route behind an approved KYC application. Must run after
@@ -24,6 +25,47 @@ import { catchAsync } from "../utils/catchAsync.util";
 const checkKyc = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const userId = res.locals.user?.id;
+
+    if (!userId) {
+      return next(
+        new AppError(
+          "common/errors:server.unkwon",
+          StatusCodes.INTERNAL_SERVER_ERROR
+        )
+      );
+    }
+
+    const userRoles = await prisma.userRole.findMany({
+      where: { userId },
+      include: { role: true },
+    });
+
+    if (!userRoles.length) {
+      return next(
+        new AppError(
+          "common/errors:server.unkwon",
+          StatusCodes.INTERNAL_SERVER_ERROR
+        )
+      );
+    }
+
+    if (
+      userRoles.length > 1 &&
+      userRoles.some((ur) => ur.role.name === defaultRoleNames.tutor)
+    ) {
+      return next(
+        new AppError(
+          "common/errors:server.unkwon",
+          StatusCodes.INTERNAL_SERVER_ERROR
+        )
+      );
+    }
+
+    const userRole = userRoles[0];
+
+    if (userRole.role.name !== defaultRoleNames.tutor) {
+      return next();
+    }
 
     const profile = await prisma.tutorProfile.findFirst({
       where: { userId, deletedAt: null },

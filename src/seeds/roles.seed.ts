@@ -1,50 +1,63 @@
 import prisma from "../config/database.config";
 
+export const defaultRoleNames = {
+  superAdmin: "Super Admin",
+  admin: "Admin",
+  moderator: "Moderator",
+  tutor: "Tutor",
+  parent: "Parent",
+  student: "Student",
+  supportAgent: "Support Agent",
+} as const;
+
+export type DefaultRoleName =
+  (typeof defaultRoleNames)[keyof typeof defaultRoleNames];
+
 export const defaultRoles = [
   {
-    name: "Super Admin",
+    name: defaultRoleNames.superAdmin,
     description:
       "Full system access - Platform configuration, roles, permissions, and all administrative functions",
     isSystem: true,
     allowsMultiple: false,
   },
   {
-    name: "Admin",
+    name: defaultRoleNames.admin,
     description:
       "Platform administration - User management, content oversight, and operational configuration",
     isSystem: true,
     allowsMultiple: true,
   },
   {
-    name: "Moderator",
+    name: defaultRoleNames.moderator,
     description:
       "Content and conduct moderation - Reviews flagged content, handles disputes between tutors and students",
     isSystem: true,
     allowsMultiple: true,
   },
   {
-    name: "Tutor",
+    name: defaultRoleNames.tutor,
     description:
       "Tutoring service provider - Manages profile, availability, bookings, and learning materials",
     isSystem: true,
     allowsMultiple: false,
   },
   {
-    name: "Parent",
+    name: defaultRoleNames.parent,
     description:
       "Guardian account - Manages child accounts, bookings, payments, and progress tracking",
     isSystem: true,
     allowsMultiple: false,
   },
   {
-    name: "Student",
+    name: defaultRoleNames.student,
     description:
       "Learner account - Books sessions, accesses learning materials, and communicates with tutors",
     isSystem: true,
     allowsMultiple: false,
   },
   {
-    name: "Support Agent",
+    name: defaultRoleNames.supportAgent,
     description:
       "Customer support - Handles tickets and assists users with account and platform issues",
     isSystem: true,

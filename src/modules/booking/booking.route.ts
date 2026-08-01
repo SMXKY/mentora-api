@@ -14,27 +14,53 @@ import {
   RespondToRescheduleSchema,
   ListBookingsQuerySchema,
 } from "./booking.types";
+import checkAccountCompletion from "../../middlewares/checkAccountCompletion.middleware";
+import checkKyc from "../../middlewares/checkKyc.middleware";
 
 const router = Router();
-router.use(protect);
+router.use(protect, checkAccountCompletion, checkKyc);
 
 const ParamsBookingId = z.object({ id: z.string().uuid() });
 
-router.post("/", validate(CreateBookingRequestSchema), bookingController.create);
+router.post(
+  "/",
+  validate(CreateBookingRequestSchema),
+  bookingController.create
+);
 
-router.get("/mine", validate(ListBookingsQuerySchema, "query"), bookingController.listAsBooker);
-router.get("/tutor-mine", validate(ListBookingsQuerySchema, "query"), bookingController.listAsTutor);
+router.get(
+  "/mine",
+  validate(ListBookingsQuerySchema, "query"),
+  bookingController.listAsBooker
+);
+router.get(
+  "/tutor-mine",
+  validate(ListBookingsQuerySchema, "query"),
+  bookingController.listAsTutor
+);
 
-router.get("/:id", validate(ParamsBookingId, "params"), bookingController.getOne);
+router.get(
+  "/:id",
+  validate(ParamsBookingId, "params"),
+  bookingController.getOne
+);
 
-router.post("/:id/accept", validate(ParamsBookingId, "params"), bookingController.accept);
+router.post(
+  "/:id/accept",
+  validate(ParamsBookingId, "params"),
+  bookingController.accept
+);
 router.post(
   "/:id/reject",
   validate(ParamsBookingId, "params"),
   validate(RejectBookingSchema),
   bookingController.reject
 );
-router.post("/:id/withdraw", validate(ParamsBookingId, "params"), bookingController.withdraw);
+router.post(
+  "/:id/withdraw",
+  validate(ParamsBookingId, "params"),
+  bookingController.withdraw
+);
 router.post(
   "/:id/cancel-by-tutor",
   validate(ParamsBookingId, "params"),
@@ -48,16 +74,32 @@ router.post(
   bookingController.cancelByParent
 );
 
-router.post("/recurring", validate(CreateRecurringBookingSchema), bookingController.createRecurring);
+router.post(
+  "/recurring",
+  validate(CreateRecurringBookingSchema),
+  bookingController.createRecurring
+);
 router.get(
   "/series/:seriesId",
   validate(z.object({ seriesId: z.string().uuid() }), "params"),
   bookingController.getSeries
 );
 
-router.post("/:id/check-in", validate(ParamsBookingId, "params"), bookingController.checkIn);
-router.post("/:id/check-out", validate(ParamsBookingId, "params"), bookingController.checkOut);
-router.post("/:id/confirm", validate(ParamsBookingId, "params"), bookingController.confirm);
+router.post(
+  "/:id/check-in",
+  validate(ParamsBookingId, "params"),
+  bookingController.checkIn
+);
+router.post(
+  "/:id/check-out",
+  validate(ParamsBookingId, "params"),
+  bookingController.checkOut
+);
+router.post(
+  "/:id/confirm",
+  validate(ParamsBookingId, "params"),
+  bookingController.confirm
+);
 
 router.post(
   "/:id/reschedule",

@@ -18,17 +18,23 @@ import {
   ListChatQuerySchema,
   RecordConnectionQualitySchema,
 } from "./liveSession.types";
+import checkAccountCompletion from "../../middlewares/checkAccountCompletion.middleware";
+import checkKyc from "../../middlewares/checkKyc.middleware";
 
 const upload = multer({
   storage: multer.diskStorage({
     destination: os.tmpdir(),
-    filename: (_req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`),
+    filename: (_req, file, cb) =>
+      cb(
+        null,
+        `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`
+      ),
   }),
   limits: { fileSize: 20 * 1024 * 1024, files: 1 },
 });
 
 const router = Router();
-router.use(protect);
+router.use(protect, checkAccountCompletion, checkKyc);
 
 const bookingIdParams = validate(ParamsBookingId, "params");
 
@@ -40,11 +46,25 @@ router.post(
   liveSessionController.generateToken
 );
 
-router.post("/:bookingId/mute", bookingIdParams, validate(MuteParticipantSchema), liveSessionController.mute);
-router.post("/:bookingId/remove", bookingIdParams, validate(RemoveParticipantSchema), liveSessionController.remove);
+router.post(
+  "/:bookingId/mute",
+  bookingIdParams,
+  validate(MuteParticipantSchema),
+  liveSessionController.mute
+);
+router.post(
+  "/:bookingId/remove",
+  bookingIdParams,
+  validate(RemoveParticipantSchema),
+  liveSessionController.remove
+);
 router.post("/:bookingId/lock", bookingIdParams, liveSessionController.lock);
 router.post("/:bookingId/end", bookingIdParams, liveSessionController.end);
-router.post("/:bookingId/mute-all", bookingIdParams, liveSessionController.muteAll);
+router.post(
+  "/:bookingId/mute-all",
+  bookingIdParams,
+  liveSessionController.muteAll
+);
 router.post(
   "/:bookingId/grant-screen-share",
   bookingIdParams,

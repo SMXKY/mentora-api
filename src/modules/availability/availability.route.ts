@@ -8,17 +8,27 @@ import {
   UpdateAvailabilitySlotSchema,
   AvailableWindowsQuerySchema,
 } from "./availability.types";
+import checkKyc from "../../middlewares/checkKyc.middleware";
+import checkAccountCompletion from "../../middlewares/checkAccountCompletion.middleware";
 
 const router = Router();
 
 // Self-service — a tutor manages their own availability; ownership is
 // enforced in the service layer, matching the rest of this app's "/me"
 // routes (no RBAC permission gate needed for one's own resource).
-router.get("/me/availability", protect, availabilityController.listMine);
+router.get(
+  "/me/availability",
+  protect,
+  checkAccountCompletion,
+  checkKyc,
+  availabilityController.listMine
+);
 
 router.post(
   "/me/availability",
   protect,
+  checkAccountCompletion,
+  checkKyc,
   validate(CreateAvailabilitySlotSchema),
   availabilityController.create
 );
@@ -26,6 +36,8 @@ router.post(
 router.patch(
   "/me/availability/:id",
   protect,
+  checkAccountCompletion,
+  checkKyc,
   validate(z.object({ id: z.string().uuid() }), "params"),
   validate(UpdateAvailabilitySlotSchema),
   availabilityController.update
@@ -34,6 +46,8 @@ router.patch(
 router.delete(
   "/me/availability/:id",
   protect,
+  checkAccountCompletion,
+  checkKyc,
   validate(z.object({ id: z.string().uuid() }), "params"),
   availabilityController.remove
 );
