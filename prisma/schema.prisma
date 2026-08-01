@@ -355,6 +355,8 @@ model User {
   status            UserStatus @default(ACTIVE)
   isSystem          Boolean    @default(false) @map("is_system")
   isAccountComplete Boolean    @default(false) @map("is_account_complete")
+  cityId String? @map("city_id") @db.Uuid
+  city   City?   @relation(fields: [cityId], references: [id])
 
   // Self-deactivation: deletedAt doubles as the 30-day grace-period start.
   // anonymisedAt marks PII already scrubbed by the nightly job — once set,
@@ -519,6 +521,7 @@ model User {
   @@index([isAccountComplete])
   @@index([email, status], map: "idx_users_email_status")
   @@index([firstName, lastName], map: "idx_users_name")
+  @@index([cityId])
   @@map("users")
 }
 
@@ -740,6 +743,7 @@ model City {
   tutorProfiles   TutorProfile[]
   kycApplications KycApplication[]
   demandSignals   DemandSignal[]
+  users User[]
 
   @@unique([name, regionId], map: "idx_city_name_region")
   @@index([regionId])
