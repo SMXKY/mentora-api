@@ -3,6 +3,7 @@ import { REDIS_URL } from "../utils/enviromentVariablesCheck.util";
 
 const redis = createClient({
   url: REDIS_URL ?? "redis://localhost:6379",
+  RESP: 2,
 });
 
 redis.on("error", (err) => {
