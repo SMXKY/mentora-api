@@ -67,14 +67,11 @@ services:
     container_name: mentora_livekit
     restart: unless-stopped
     command: --config /etc/livekit.yaml
+    network_mode: host
     env_file:
       - .env
     volumes:
       - ./docker/livekit/livekit.yaml:/etc/livekit.yaml:ro
-    ports:
-      - "7880:7880"
-      - "7881:7881"
-      - "50000-51000:50000-51000/udp"
 
 volumes:
   clamav_data:
