@@ -8,11 +8,11 @@ port: 7880
 rtc:
   tcp_port: 7881
   port_range_start: 50000
-  port_range_end: 50100
+  port_range_end: 51000
   # Single-node dev/VPS-at-launch setup — no external TURN/STUN needed for
   # same-network or same-machine testing. When the VPS gets a public IP,
   # set use_external_ip: true so ICE candidates advertise it correctly.
-  use_external_ip: false
+  use_external_ip: true
 
 # Rooms are ONLY ever created by the backend's RoomServiceClient (the
 # scheduled 15-minutes-before-start job) — never implicitly by a client

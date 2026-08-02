@@ -5,3 +5,5 @@ $env:SUPER_ADMIN_PASSWORD="Reset@123"
 $env:BASE_URL="https://mentora.api.tallamichael.online"
 
 k6 run permissionModule.k6.js
+
+statr app: git pull && docker compose -f docker-compose.prod.yml up -d --build

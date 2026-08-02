@@ -11,16 +11,14 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 # ── build ────────────────────────────────────────────────────────────────────
+# ── build ────────────────────────────────────────────────────────────────────
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# prisma generate reads the schema only (no live DB needed) but prisma.config.ts
-# loads DATABASE_URL via dotenv — a placeholder keeps generate from complaining
-# about an unset var; the real value is injected at runtime, never baked in here.
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db?schema=public"
 RUN npm run docs:build && npm run build
-
+RUN rm -rf ./dist/src/generated && cp -r ./src/generated ./dist/src/
 # ── runtime ──────────────────────────────────────────────────────────────────
 FROM node:20-bookworm-slim AS runtime
 WORKDIR /app
@@ -47,7 +45,7 @@ RUN groupadd --system --gid 1001 nodejs \
   && chown -R mentora:nodejs /app
 USER mentora
 
-EXPOSE 3000
+EXPOSE 8003
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -f "http://localhost:${PORT:-3000}/health" || exit 1
 
