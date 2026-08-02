@@ -31,6 +31,7 @@ services:
     depends_on:
       - clamav
       - livekit
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${PORT:-3000}/health"]
       interval: 30s
@@ -72,6 +73,14 @@ services:
       - .env
     volumes:
       - ./docker/livekit/livekit.yaml:/etc/livekit.yaml:ro
+  redis:
+    image: redis:7.2-alpine
+    container_name: mentora_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
 
 volumes:
   clamav_data:
+  redis_data:
