@@ -62,6 +62,11 @@ async function bootstrap() {
   startReviewWindowSweep();
   const { startRoomLifecycleWorker } = await import("./services/liveSession/roomLifecycle.processor");
   startRoomLifecycleWorker();
+  // Independent of the worker above on purpose — a setInterval, not a BullMQ
+  // job on the same queue, so it still runs and can alert even if the
+  // room-lifecycle queue/worker itself is the thing that's broken.
+  const { startRoomLifecycleWatchdog } = await import("./services/liveSession/roomLifecycleWatchdog");
+  startRoomLifecycleWatchdog();
   console.log("Background jobs initialised. ✅");
 
   httpServer.listen(port, () => {

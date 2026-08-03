@@ -1,7 +1,9 @@
-# Self-hosted LiveKit server config — this is the SAME file (and the same
-# docker-compose service) that runs on the VPS at launch (ADR-005: "Docker
-# container on the same VPS"). Only the `keys` secret and `webhook.urls`
-# host should change between environments; everything else is shared.
+# Self-hosted LiveKit server config for LOCAL DEV ONLY (docker-compose.yml).
+# Production uses docker/livekit/livekit.prod.yaml instead (docker-compose.prod.yml)
+# — that file adds TURN over TLS and keeps use_external_ip: true, which is
+# only correct for a server with a real public IP that clients reach over
+# the internet. Keep the two files' shared settings (rtc port range, room,
+# keys structure) in sync by hand — LiveKit's config has no templating.
 
 port: 7880
 
@@ -9,10 +11,14 @@ rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 51000
-  # Single-node dev/VPS-at-launch setup — no external TURN/STUN needed for
-  # same-network or same-machine testing. When the VPS gets a public IP,
-  # set use_external_ip: true so ICE candidates advertise it correctly.
-  use_external_ip: true
+  # false for local dev: true here would advertise this machine's public IP
+  # as the ICE candidate even for same-machine/same-LAN testing, which then
+  # fails to connect (NAT hairpinning — most routers won't loop outbound
+  # traffic back to the same machine that sent it). Confirmed by reproducing
+  # this exact failure and fixing it. Production's livekit.prod.yaml
+  # correctly keeps this true, since it has a real public IP clients
+  # actually connect to over the internet.
+  use_external_ip: false
 
 # Rooms are ONLY ever created by the backend's RoomServiceClient (the
 # scheduled 15-minutes-before-start job) — never implicitly by a client
@@ -29,7 +35,7 @@ keys:
 webhook:
   api_key: LKAPI3edf5ed959038b9a1b2b
   urls:
-    - http://host.docker.internal:8080/api/v1/live-sessions/webhooks/livekit
+    - http://host.docker.internal:8080/api/v1/webhooks/livekit
 
 logging:
   level: info

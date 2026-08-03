@@ -1,0 +1,50 @@
+# Production LiveKit config for the VPS (ADR-005). Split out from the shared
+# docker/livekit/livekit.yaml because TURN over TLS needs a real domain + cert
+# that only exist on the VPS — enabling it in the shared dev file would break
+# `docker compose up` on a local machine with no cert on disk.
+#
+# Anything NOT related to TURN/webhook-host should be kept in sync with
+# docker/livekit/livekit.yaml by hand (no templating in LiveKit's config).
+
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 51000
+  use_external_ip: true
+
+room:
+  auto_create: false
+  empty_timeout: 1800 # 30 min — matches REQ-014 empty-room auto-close
+  departure_timeout: 900 # 15 min — matches REQ-014 departure timeout
+
+keys:
+  LKAPI3edf5ed959038b9a1b2b: Kd8SWWybRNsJTu5gxgB38qe072NGxCfk4SjBXNA
+
+webhook:
+  api_key: LKAPI3edf5ed959038b9a1b2b
+  urls:
+    - https://mentora.api.tallamichael.online/api/v1/webhooks/livekit
+
+# TURN over TLS on 443 — required for clients on carrier NAT (MTN/Orange
+# mobile data, symmetric NAT) where direct/srflx ICE candidates can't
+# traverse and the call would otherwise never connect or drop immediately.
+# https://docs.livekit.io/home/self-hosting/deployment/#turn-server
+turn:
+  enabled: true
+  domain: turn.tallamichael.online
+  tls_port: 443
+  udp_port: 3478
+  # Issued via certbot on the host (see HOSTING.md) — LiveKit terminates TLS
+  # itself here since nothing else owns 443 on this VPS, so external_tls is
+  # left unset/false.
+  cert_file: /etc/letsencrypt/live/turn.tallamichael.online/fullchain.pem
+  key_file: /etc/letsencrypt/live/turn.tallamichael.online/privkey.pem
+  # Reuses the same UDP range as rtc.port_range above so there's only one
+  # UDP range to open in the VPS firewall, not two.
+  relay_range_start: 50000
+  relay_range_end: 51000
+
+logging:
+  level: info

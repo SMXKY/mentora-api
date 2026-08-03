@@ -1,0 +1,139 @@
+name: Live Session E2E
+
+# Real WebRTC media flow can't be validated by unit/type checks — this runs
+# the actual LiveKit CLI + Playwright harnesses described in
+# docs/services/live-session-hosting.doc.md and the README's "Live session
+# test harness" section. No CI existed in either repo before this workflow.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/modules/liveSession/**"
+      - "src/services/liveSession/**"
+      - "src/config/livekit.config.ts"
+      - "docker/livekit/**"
+      - "k6/support/seed-live-session-fixtures.ts"
+      - "tools/live-session-harness/**"
+  pull_request:
+    paths:
+      - "src/modules/liveSession/**"
+      - "src/services/liveSession/**"
+      - "src/config/livekit.config.ts"
+      - "docker/livekit/**"
+      - "k6/support/seed-live-session-fixtures.ts"
+      - "tools/live-session-harness/**"
+  workflow_dispatch: {}
+
+jobs:
+  live-session-e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: mentora_dev
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+      livekit:
+        image: livekit/livekit-server:latest
+        ports: ["7880:7880", "7881:7881"]
+        # LiveKit needs its config file (has no env-var-only equivalent for
+        # the full config), so it's started manually below via docker run
+        # with the repo's docker/livekit/livekit.yaml mounted, not this
+        # services block (services: containers can't mount repo files that
+        # haven't been checked out yet at container-creation time).
+        options: --entrypoint /bin/true
+
+    env:
+      DATABASE_URL: postgresql://postgres:password@localhost:5432/mentora_dev
+      REDIS_URL: redis://localhost:6379
+      LIVEKIT_URL: ws://localhost:7880
+      LIVEKIT_API_KEY: LKAPI3edf5ed959038b9a1b2b
+      LIVEKIT_API_SECRET: Kd8SWWybRNsJTu5gxgB38qe072NGxCfk4SjBXNA
+      PORT: 8080
+      SUPER_ADMIN_EMAIL: admin@mentora.com
+      SUPER_ADMIN_PASSWORD: Reset@123
+      NODE_ENV: development
+
+    steps:
+      - name: Checkout mentora-api
+        uses: actions/checkout@v4
+        with:
+          path: mentora-api
+
+      - name: Checkout mentora-ui (sibling checkout — harness scripts assume ../mentora-api)
+        uses: actions/checkout@v4
+        with:
+          repository: SMXKY/mentora-mobile-ui
+          path: mentora-ui
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Start LiveKit (real container, config from this checkout)
+        run: |
+          docker run -d --name livekit --network host \
+            -v ${{ github.workspace }}/mentora-api/docker/livekit/livekit.yaml:/etc/livekit.yaml:ro \
+            livekit/livekit-server:latest --config /etc/livekit.yaml
+
+      - name: Install mentora-api deps
+        working-directory: mentora-api
+        run: npm ci
+
+      - name: Prisma migrate + seed roles
+        working-directory: mentora-api
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
+
+      - name: Start API server
+        working-directory: mentora-api
+        run: |
+          npm run build
+          nohup npm start > api.log 2>&1 &
+          npx wait-on http://localhost:8080/health -t 60000
+
+      - name: Install lk CLI
+        working-directory: mentora-api
+        run: |
+          mkdir -p tools/lk
+          curl -sL -o /tmp/lk.tar.gz https://github.com/livekit/livekit-cli/releases/latest/download/lk_$(uname -s)_$(uname -m).tar.gz || \
+          curl -sL -o /tmp/lk.tar.gz https://github.com/livekit/livekit-cli/releases/download/v2.18.2/lk_2.18.2_linux_amd64.tar.gz
+          tar -xzf /tmp/lk.tar.gz -C tools/lk
+          chmod +x tools/lk/lk
+
+      - name: Run LiveKit CLI harness (real auth + real media flow)
+        working-directory: mentora-api
+        run: npx ts-node k6/support/seed-live-session-fixtures.ts && npx ts-node tools/live-session-harness/run.ts
+
+      - name: Install mentora-ui deps
+        working-directory: mentora-ui
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: mentora-ui
+        run: npx playwright install --with-deps chromium
+
+      - name: Start Expo web
+        working-directory: mentora-ui
+        run: |
+          nohup npx expo start --web > expo.log 2>&1 &
+          npx wait-on http://localhost:8081 -t 60000
+
+      - name: Run Playwright live-session E2E
+        working-directory: mentora-ui
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: mentora-ui/test-results

@@ -12,7 +12,10 @@ import {
 import { ServiceContext } from "../../base/base.types";
 import { AuditService } from "../../utils/logUserActivity.util";
 import { NotificationService } from "../../services/notification/notification.service";
-import { assertValidTransition, OCCUPYING_STATUSES } from "../../services/booking/bookingStateMachine";
+import {
+  assertValidTransition,
+  OCCUPYING_STATUSES,
+} from "../../services/booking/bookingStateMachine";
 import { bookingConfig } from "../../services/booking/bookingConfig";
 import { AvailabilityService } from "../availability/availability.service";
 import {
@@ -22,11 +25,15 @@ import {
   minutesToDbTime,
   sessionStartAt,
 } from "../availability/availability.logic";
-import { schedulePaymentWindowJobs, cancelScheduledJobsForBooking } from "../../services/booking/paymentWindow.processor";
+import {
+  schedulePaymentWindowJobs,
+  cancelScheduledJobsForBooking,
+} from "../../services/booking/paymentWindow.processor";
 import { computeParentCancellationOutcome } from "../../services/booking/cancellationPolicy";
 import { MessagingService } from "../messaging/messaging.service";
 import { EscrowService } from "../../services/payment/escrow.service";
 import { CreateBookingRequestInput } from "./booking.types";
+import { resolveStorageUrl } from "../../services/media";
 
 const TUTOR_CANCELLATION_SIGNAL = "TUTOR_CANCELLED_PAID_BOOKING";
 
@@ -37,19 +44,43 @@ const DISPLAY_INCLUDE = {
   subject: { select: { id: true, name: true } },
   level: { select: { id: true, name: true } },
   tutorProfile: {
-    select: { userId: true, user: { select: { id: true, firstName: true, lastName: true, profilePictureUrl: true } } },
+    select: {
+      userId: true,
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          profilePictureUrl: true,
+        },
+      },
+    },
   },
-  booker: { select: { id: true, firstName: true, lastName: true, profilePictureUrl: true } },
+  booker: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      profilePictureUrl: true,
+    },
+  },
 } as const;
 
 /** Tracks a paid-booking cancellation against the tutor's risk record and
  * flags them for admin review once they hit 3 in the trailing 30 days.
  * Deliberately scoring-neutral (pointsApplied 0) — the full risk-scoring
  * engine (Module 18) isn't built yet; this only feeds the count-based flag. */
-async function recordTutorCancellationSignal(tutorUserId: string, bookingId: string) {
-  let riskScore = await prisma.riskScore.findUnique({ where: { userId: tutorUserId } });
+async function recordTutorCancellationSignal(
+  tutorUserId: string,
+  bookingId: string
+) {
+  let riskScore = await prisma.riskScore.findUnique({
+    where: { userId: tutorUserId },
+  });
   if (!riskScore) {
-    riskScore = await prisma.riskScore.create({ data: { userId: tutorUserId } });
+    riskScore = await prisma.riskScore.create({
+      data: { userId: tutorUserId },
+    });
   }
 
   await prisma.riskSignal.create({
@@ -70,31 +101,52 @@ async function recordTutorCancellationSignal(tutorUserId: string, bookingId: str
 
   const windowStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const recentCount = await prisma.riskSignal.count({
-    where: { userId: tutorUserId, signalType: TUTOR_CANCELLATION_SIGNAL, createdAt: { gte: windowStart } },
+    where: {
+      userId: tutorUserId,
+      signalType: TUTOR_CANCELLATION_SIGNAL,
+      createdAt: { gte: windowStart },
+    },
   });
 
   if (recentCount >= 3 && !riskScore.humanReviewDueAt) {
-    await prisma.riskScore.update({ where: { id: riskScore.id }, data: { humanReviewDueAt: new Date() } });
+    await prisma.riskScore.update({
+      where: { id: riskScore.id },
+      data: { humanReviewDueAt: new Date() },
+    });
   }
 }
 
-async function resolveStudentProfile(userId: string, studentProfileId?: string) {
+async function resolveStudentProfile(
+  userId: string,
+  studentProfileId?: string
+) {
   if (studentProfileId) {
     const profile = await prisma.studentProfile.findFirst({
       where: { id: studentProfileId, deletedAt: null },
     });
     if (!profile) {
-      throw new AppError("booking/errors:studentProfileNotFound", StatusCodes.NOT_FOUND);
+      throw new AppError(
+        "booking/errors:studentProfileNotFound",
+        StatusCodes.NOT_FOUND
+      );
     }
     if (profile.userId !== userId && profile.guardianId !== userId) {
-      throw new AppError("booking/errors:notYourStudent", StatusCodes.FORBIDDEN);
+      throw new AppError(
+        "booking/errors:notYourStudent",
+        StatusCodes.FORBIDDEN
+      );
     }
     return profile;
   }
   // No explicit studentProfileId — the caller must be booking for themselves.
-  const own = await prisma.studentProfile.findFirst({ where: { userId, deletedAt: null } });
+  const own = await prisma.studentProfile.findFirst({
+    where: { userId, deletedAt: null },
+  });
   if (!own) {
-    throw new AppError("booking/errors:studentProfileRequired", StatusCodes.BAD_REQUEST);
+    throw new AppError(
+      "booking/errors:studentProfileRequired",
+      StatusCodes.BAD_REQUEST
+    );
   }
   return own;
 }
@@ -109,7 +161,10 @@ async function assertBookableTutor(tutorProfileId: string) {
     !tutor.introVideoVerified ||
     tutor.isPaymentOverdue
   ) {
-    throw new AppError("booking/errors:tutorNotBookable", StatusCodes.NOT_FOUND);
+    throw new AppError(
+      "booking/errors:tutorNotBookable",
+      StatusCodes.NOT_FOUND
+    );
   }
   return tutor;
 }
@@ -120,7 +175,11 @@ async function assertApprovedSubjectLevel(
   levelId: string
 ) {
   const tutorSubject = await prisma.tutorSubject.findFirst({
-    where: { tutorProfileId, subjectId, status: SubjectVerificationStatus.APPROVED },
+    where: {
+      tutorProfileId,
+      subjectId,
+      status: SubjectVerificationStatus.APPROVED,
+    },
     select: {
       id: true,
       ratePerOnlineSessionXaf: true,
@@ -131,13 +190,19 @@ async function assertApprovedSubjectLevel(
     },
   });
   if (!tutorSubject || tutorSubject.levels.length === 0) {
-    throw new AppError("booking/errors:subjectLevelNotApproved", StatusCodes.BAD_REQUEST);
+    throw new AppError(
+      "booking/errors:subjectLevelNotApproved",
+      StatusCodes.BAD_REQUEST
+    );
   }
   // Separate from the lookup above so a closed-but-approved subject gets an
   // accurate "not currently accepting bookings" message instead of the
   // generic "not approved" one.
   if (!tutorSubject.isOpenForBooking) {
-    throw new AppError("booking/errors:subjectNotOpenForBooking", StatusCodes.BAD_REQUEST);
+    throw new AppError(
+      "booking/errors:subjectNotOpenForBooking",
+      StatusCodes.BAD_REQUEST
+    );
   }
   return tutorSubject;
 }
@@ -145,23 +210,35 @@ async function assertApprovedSubjectLevel(
 /** Hourly billing takes priority when the tutor has set a per-hour rate —
  * otherwise falls back to the flat per-session fee for the chosen type. */
 function computeAgreedRateXaf(
-  tutorSubject: { ratePerHourXaf: number | null; ratePerOnlineSessionXaf: number | null; ratePerHomeSessionXaf: number | null },
+  tutorSubject: {
+    ratePerHourXaf: number | null;
+    ratePerOnlineSessionXaf: number | null;
+    ratePerHomeSessionXaf: number | null;
+  },
   sessionType: SessionType,
   durationMinutes: number
 ) {
   if (tutorSubject.ratePerHourXaf != null) {
     return Math.round((tutorSubject.ratePerHourXaf * durationMinutes) / 60);
   }
-  return sessionType === "ONLINE" ? tutorSubject.ratePerOnlineSessionXaf : tutorSubject.ratePerHomeSessionXaf;
+  return sessionType === "ONLINE"
+    ? tutorSubject.ratePerOnlineSessionXaf
+    : tutorSubject.ratePerHomeSessionXaf;
 }
 
-function assertSessionTypeAllowed(teachingMode: TeachingMode, sessionType: SessionType) {
+function assertSessionTypeAllowed(
+  teachingMode: TeachingMode,
+  sessionType: SessionType
+) {
   const allowed =
     teachingMode === "BOTH" ||
     (teachingMode === "ONLINE_ONLY" && sessionType === "ONLINE") ||
     (teachingMode === "HOME_ONLY" && sessionType === "HOME");
   if (!allowed) {
-    throw new AppError("booking/errors:sessionTypeNotOffered", StatusCodes.BAD_REQUEST);
+    throw new AppError(
+      "booking/errors:sessionTypeNotOffered",
+      StatusCodes.BAD_REQUEST
+    );
   }
 }
 
@@ -178,8 +255,12 @@ function serializeBooking(booking: any) {
     durationMinutes: booking.durationMinutes,
     messageToTutor: booking.messageToTutor,
     sessionDate: booking.sessionDate.toISOString().slice(0, 10),
-    sessionStartTime: minutesToTimeString(dbTimeToMinutes(booking.sessionStartTime)),
-    sessionEndTime: minutesToTimeString(dbTimeToMinutes(booking.sessionEndTime)),
+    sessionStartTime: minutesToTimeString(
+      dbTimeToMinutes(booking.sessionStartTime)
+    ),
+    sessionEndTime: minutesToTimeString(
+      dbTimeToMinutes(booking.sessionEndTime)
+    ),
     paymentWindowExpiresAt: booking.paymentWindowExpiresAt,
     agreedRateXaf: booking.agreedRateXaf,
     commissionRatePercent: booking.commissionRatePercent,
@@ -200,15 +281,21 @@ function serializeBooking(booking: any) {
     // Only present when the caller's query included these relations (detail/list
     // reads) — display-only, so absent-on-write-paths is an acceptable trade-off
     // rather than adding these joins to every mutation's return query.
-    subject: booking.subject ? { id: booking.subject.id, name: booking.subject.name } : undefined,
-    level: booking.level ? { id: booking.level.id, name: booking.level.name } : undefined,
+    subject: booking.subject
+      ? { id: booking.subject.id, name: booking.subject.name }
+      : undefined,
+    level: booking.level
+      ? { id: booking.level.id, name: booking.level.name }
+      : undefined,
     tutor: booking.tutorProfile?.user
       ? {
           tutorProfileId: booking.tutorProfileId,
           userId: booking.tutorProfile.user.id,
           firstName: booking.tutorProfile.user.firstName,
           lastName: booking.tutorProfile.user.lastName,
-          profilePictureUrl: booking.tutorProfile.user.profilePictureUrl,
+          profilePictureUrl: resolveStorageUrl(
+            booking.tutorProfile.user.profilePictureUrl
+          ),
         }
       : undefined,
     booker: booking.booker
@@ -216,13 +303,19 @@ function serializeBooking(booking: any) {
           id: booking.booker.id,
           firstName: booking.booker.firstName,
           lastName: booking.booker.lastName,
-          profilePictureUrl: booking.booker.profilePictureUrl,
+          profilePictureUrl: resolveStorageUrl(
+            booking.booker.profilePictureUrl
+          ),
         }
       : undefined,
   };
 }
 
-async function createBookingRequest(userId: string, input: CreateBookingRequestInput, ctx: ServiceContext) {
+async function createBookingRequest(
+  userId: string,
+  input: CreateBookingRequestInput,
+  ctx: ServiceContext
+) {
   const [tutor, studentProfile] = await Promise.all([
     assertBookableTutor(input.tutorProfileId),
     resolveStudentProfile(userId, input.studentProfileId),
@@ -230,16 +323,30 @@ async function createBookingRequest(userId: string, input: CreateBookingRequestI
 
   assertSessionTypeAllowed(tutor.teachingMode, input.sessionType);
 
-  const tutorSubject = await assertApprovedSubjectLevel(input.tutorProfileId, input.subjectId, input.levelId);
-  const agreedRateXaf = computeAgreedRateXaf(tutorSubject, input.sessionType, input.durationMinutes);
+  const tutorSubject = await assertApprovedSubjectLevel(
+    input.tutorProfileId,
+    input.subjectId,
+    input.levelId
+  );
+  const agreedRateXaf = computeAgreedRateXaf(
+    tutorSubject,
+    input.sessionType,
+    input.durationMinutes
+  );
   if (!agreedRateXaf) {
-    throw new AppError("booking/errors:tutorRateNotSet", StatusCodes.BAD_REQUEST);
+    throw new AppError(
+      "booking/errors:tutorRateNotSet",
+      StatusCodes.BAD_REQUEST
+    );
   }
 
   const startMinutes = timeStringToMinutes(input.sessionStartTime);
   const endMinutes = startMinutes + input.durationMinutes;
   if (endMinutes > 24 * 60) {
-    throw new AppError("booking/errors:sessionCrossesMidnight", StatusCodes.BAD_REQUEST);
+    throw new AppError(
+      "booking/errors:sessionCrossesMidnight",
+      StatusCodes.BAD_REQUEST
+    );
   }
   const sessionEndTime = minutesToTimeString(endMinutes);
 
@@ -305,13 +412,20 @@ async function getBookingForUser(bookingId: string, userId: string) {
   return { booking, isBooker, isTutor };
 }
 
-async function acceptBooking(tutorUserId: string, bookingId: string, ctx: ServiceContext) {
+async function acceptBooking(
+  tutorUserId: string,
+  bookingId: string,
+  ctx: ServiceContext
+) {
   const { booking, isTutor } = await getBookingForUser(bookingId, tutorUserId);
-  if (!isTutor) throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
+  if (!isTutor)
+    throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
   assertValidTransition(booking.status, BookingStatus.ACCEPTED);
 
   const { paymentWindowHours } = await bookingConfig.getAll();
-  const paymentWindowExpiresAt = new Date(Date.now() + paymentWindowHours * 60 * 60 * 1000);
+  const paymentWindowExpiresAt = new Date(
+    Date.now() + paymentWindowHours * 60 * 60 * 1000
+  );
 
   const updated = await prisma.booking.update({
     where: { id: bookingId },
@@ -341,9 +455,15 @@ async function acceptBooking(tutorUserId: string, bookingId: string, ctx: Servic
   return serializeBooking(updated);
 }
 
-async function rejectBooking(tutorUserId: string, bookingId: string, reason: string, ctx: ServiceContext) {
+async function rejectBooking(
+  tutorUserId: string,
+  bookingId: string,
+  reason: string,
+  ctx: ServiceContext
+) {
   const { booking, isTutor } = await getBookingForUser(bookingId, tutorUserId);
-  if (!isTutor) throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
+  if (!isTutor)
+    throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
   assertValidTransition(booking.status, BookingStatus.REJECTED);
 
   const updated = await prisma.booking.update({
@@ -372,9 +492,14 @@ async function rejectBooking(tutorUserId: string, bookingId: string, reason: str
   return serializeBooking(updated);
 }
 
-async function withdrawBooking(bookerId: string, bookingId: string, ctx: ServiceContext) {
+async function withdrawBooking(
+  bookerId: string,
+  bookingId: string,
+  ctx: ServiceContext
+) {
   const { booking, isBooker } = await getBookingForUser(bookingId, bookerId);
-  if (!isBooker) throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
+  if (!isBooker)
+    throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
   assertValidTransition(booking.status, BookingStatus.CANCELLED_UNPAID);
 
   const updated = await prisma.booking.update({
@@ -402,12 +527,20 @@ async function withdrawBooking(bookerId: string, bookingId: string, ctx: Service
 }
 
 /** Tutor cancels a confirmed PAID booking: full refund to the parent, plus a tracked cancellation signal (3-in-30-days -> admin review flag). */
-async function cancelByTutor(tutorUserId: string, bookingId: string, reason: string, ctx: ServiceContext) {
+async function cancelByTutor(
+  tutorUserId: string,
+  bookingId: string,
+  reason: string,
+  ctx: ServiceContext
+) {
   const { booking, isTutor } = await getBookingForUser(bookingId, tutorUserId);
-  if (!isTutor) throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
+  if (!isTutor)
+    throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
   assertValidTransition(booking.status, BookingStatus.CANCELLED_BY_TUTOR);
 
-  const escrowHold = await prisma.escrowHold.findFirst({ where: { bookingId, status: "HELD" } });
+  const escrowHold = await prisma.escrowHold.findFirst({
+    where: { bookingId, status: "HELD" },
+  });
   if (!escrowHold) {
     throw new AppError("payment/errors:escrowNotFound", StatusCodes.CONFLICT);
   }
@@ -444,7 +577,11 @@ async function cancelByTutor(tutorUserId: string, bookingId: string, reason: str
   }
 
   await MessagingService.archiveForBooking(booking.id).catch((err) =>
-    console.error({ event: "conversation_archive_failed", bookingId: booking.id, error: err.message })
+    console.error({
+      event: "conversation_archive_failed",
+      bookingId: booking.id,
+      error: err.message,
+    })
   );
 
   return serializeBooking(updated);
@@ -453,18 +590,30 @@ async function cancelByTutor(tutorUserId: string, bookingId: string, reason: str
 /** Parent cancels a PAID booking. 12h-threshold policy: full refund if
  * still ≥ threshold hours before the session, otherwise the funds release
  * to the tutor as if the session had happened. */
-async function cancelByParent(bookerId: string, bookingId: string, reason: string, ctx: ServiceContext) {
+async function cancelByParent(
+  bookerId: string,
+  bookingId: string,
+  reason: string,
+  ctx: ServiceContext
+) {
   const { booking, isBooker } = await getBookingForUser(bookingId, bookerId);
-  if (!isBooker) throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
+  if (!isBooker)
+    throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
   assertValidTransition(booking.status, BookingStatus.CANCELLED_BY_PARENT);
 
-  const escrowHold = await prisma.escrowHold.findFirst({ where: { bookingId, status: "HELD" } });
+  const escrowHold = await prisma.escrowHold.findFirst({
+    where: { bookingId, status: "HELD" },
+  });
   if (!escrowHold) {
     throw new AppError("payment/errors:escrowNotFound", StatusCodes.CONFLICT);
   }
 
   const { cancellationThresholdHours } = await bookingConfig.getAll();
-  const outcome = computeParentCancellationOutcome(sessionStartAt(booking), new Date(), cancellationThresholdHours);
+  const outcome = computeParentCancellationOutcome(
+    sessionStartAt(booking),
+    new Date(),
+    cancellationThresholdHours
+  );
 
   if (outcome === "FULL_REFUND") {
     await EscrowService.refundEscrowToPayer(escrowHold.id);
@@ -499,7 +648,11 @@ async function cancelByParent(bookerId: string, bookingId: string, reason: strin
   });
 
   await MessagingService.archiveForBooking(booking.id).catch((err) =>
-    console.error({ event: "conversation_archive_failed", bookingId: booking.id, error: err.message })
+    console.error({
+      event: "conversation_archive_failed",
+      bookingId: booking.id,
+      error: err.message,
+    })
   );
 
   return { ...serializeBooking(updated), refundOutcome: outcome };
@@ -508,7 +661,13 @@ async function cancelByParent(bookerId: string, bookingId: string, reason: strin
 async function listMyBookings(
   userId: string,
   role: "BOOKER" | "TUTOR",
-  filters: { status?: string; cursor?: string; limit: number; dateFrom?: string; dateTo?: string }
+  filters: {
+    status?: string;
+    cursor?: string;
+    limit: number;
+    dateFrom?: string;
+    dateTo?: string;
+  }
 ) {
   const where: any =
     role === "TUTOR" ? { tutorProfile: { userId } } : { bookerId: userId };
@@ -516,8 +675,12 @@ async function listMyBookings(
   if (filters.status) where.status = filters.status;
   if (filters.dateFrom || filters.dateTo) {
     where.sessionDate = {
-      ...(filters.dateFrom && { gte: new Date(`${filters.dateFrom}T00:00:00.000Z`) }),
-      ...(filters.dateTo && { lte: new Date(`${filters.dateTo}T00:00:00.000Z`) }),
+      ...(filters.dateFrom && {
+        gte: new Date(`${filters.dateFrom}T00:00:00.000Z`),
+      }),
+      ...(filters.dateTo && {
+        lte: new Date(`${filters.dateTo}T00:00:00.000Z`),
+      }),
     };
   }
 
@@ -535,12 +698,20 @@ async function listMyBookings(
 
   return {
     data: page.map(serializeBooking),
-    meta: { nextCursor: hasNextPage ? nextCursor : null, hasNextPage, limit: filters.limit },
+    meta: {
+      nextCursor: hasNextPage ? nextCursor : null,
+      hasNextPage,
+      limit: filters.limit,
+    },
   };
 }
 
 /** Admin oversight — no ownership check, gated by bookings.read_all at the route level instead. */
-async function listAdminBookings(filters: { status?: string; cursor?: string; limit: number }) {
+async function listAdminBookings(filters: {
+  status?: string;
+  cursor?: string;
+  limit: number;
+}) {
   const where: any = { deletedAt: null };
   if (filters.status) where.status = filters.status;
 
@@ -557,13 +728,21 @@ async function listAdminBookings(filters: { status?: string; cursor?: string; li
 
   return {
     data: page.map(serializeBooking),
-    meta: { nextCursor: hasNextPage ? page[page.length - 1].id : null, hasNextPage, limit: filters.limit },
+    meta: {
+      nextCursor: hasNextPage ? page[page.length - 1].id : null,
+      hasNextPage,
+      limit: filters.limit,
+    },
   };
 }
 
 async function getAdminBooking(bookingId: string) {
-  const booking = await prisma.booking.findFirst({ where: { id: bookingId, deletedAt: null }, include: DISPLAY_INCLUDE });
-  if (!booking) throw new AppError("booking/errors:bookingNotFound", StatusCodes.NOT_FOUND);
+  const booking = await prisma.booking.findFirst({
+    where: { id: bookingId, deletedAt: null },
+    include: DISPLAY_INCLUDE,
+  });
+  if (!booking)
+    throw new AppError("booking/errors:bookingNotFound", StatusCodes.NOT_FOUND);
   return serializeBooking(booking);
 }
 

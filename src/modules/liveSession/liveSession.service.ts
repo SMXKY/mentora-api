@@ -16,6 +16,7 @@ import {
   SessionAttendanceInput,
 } from "../../services/dispute/autoResolution.util";
 import { roomServiceClient, createAccessToken, VideoGrant } from "../../config/livekit.config";
+import { ensureLiveKitRoomExists } from "../../services/liveSession/roomProvisioning";
 import { LIVEKIT_URL } from "../../utils/enviromentVariablesCheck.util";
 import { MediaService } from "../../services/media/media.service";
 import { fileTypes } from "../../services/media/media.types";
@@ -125,7 +126,12 @@ function buildGrant(role: AccessRole, roomName: string, isGroup: boolean): Video
   const base: VideoGrant = { room: roomName, roomJoin: true, canSubscribe: true, canPublishData: true };
 
   if (role === "TUTOR") {
-    return { ...base, canPublish: true, roomAdmin: true };
+    // No roomAdmin here — every admin action (mute/remove/lock/end) is
+    // proxied through our backend's roomServiceClient (server API key), the
+    // tutor's own client token never calls LiveKit admin APIs directly. A
+    // leaked tutor token with roomAdmin could otherwise call LiveKit's HTTP
+    // Twirp API directly, bypassing our own auth/audit trail entirely.
+    return { ...base, canPublish: true };
   }
   if (isGroup) {
     // Screen share off by default in group sessions — the tutor grants it
@@ -157,6 +163,21 @@ async function generateToken(
   if (liveRoom.status !== LiveRoomStatus.CREATED && liveRoom.status !== LiveRoomStatus.ACTIVE) {
     throw new AppError("liveSession/errors:roomNotReady", StatusCodes.NOT_FOUND);
   }
+
+  // Self-hosted LiveKit holds room state in memory only — a server
+  // restart silently drops every room with no webhook fired, leaving this
+  // row saying CREATED/ACTIVE while the room itself is gone. Checked here,
+  // on the join hot path, rather than only in the periodic sweep, so a
+  // user hitting "join" doesn't get "room does not exist" and have to wait
+  // for the next sweep tick to self-heal.
+  await ensureLiveKitRoomExists({
+    roomName: liveRoom.roomName,
+    bookingId,
+    isGroupSession: access.booking.isGroupSession,
+    maxStudents: access.booking.groupSession?.maxStudents ?? null,
+    scheduledStartAt: liveRoom.scheduledStartAt,
+    scheduledEndAt: liveRoom.scheduledEndAt,
+  });
 
   const existingParticipant = await prisma.sessionParticipant.findUnique({
     where: { liveRoomId_userId: { liveRoomId: liveRoom.id, userId } },

@@ -30,6 +30,10 @@ const DEPARTURE_TIMEOUT_MINUTES = 15;
 const TUTOR_GRACE_MINUTES = 10;
 const MAX_ROOM_CREATION_ATTEMPTS = 8;
 const ROOM_CREATE_WINDOW_MINUTES = 15;
+// Grace after scheduledEndAt before we even consider polling — the real
+// room_finished webhook normally arrives within seconds of the room closing,
+// so this only fires once that window has clearly passed.
+const STALE_ACTIVE_GRACE_MINUTES = 15;
 
 const queue = new Queue(QUEUE_NAME, { connection });
 
@@ -313,6 +317,36 @@ export async function flagTutorNotJoined(): Promise<{ flagged: number }> {
   return { flagged };
 }
 
+/**
+ * Fallback for a missed/delayed `room_finished` webhook (LiveKit's own docs:
+ * "there are no guarantees around delivery" — a periodic poll of room state
+ * is the documented mitigation). Only finalizes a room once LiveKit itself
+ * confirms it no longer exists — a session legitimately running long past
+ * its scheduled end is left alone, never force-closed by this sweep.
+ */
+export async function finalizeOrphanedActiveRooms(): Promise<{ finalized: number }> {
+  const cutoff = new Date(Date.now() - STALE_ACTIVE_GRACE_MINUTES * 60 * 1000);
+  const staleActiveRooms = await prisma.liveRoom.findMany({
+    where: { status: LiveRoomStatus.ACTIVE, scheduledEndAt: { lte: cutoff } },
+  });
+
+  let finalized = 0;
+  for (const room of staleActiveRooms) {
+    const stillExists = await roomServiceClient.listRooms([room.roomName]).catch(() => null);
+    if (stillExists === null || stillExists.length > 0) continue; // LiveKit unreachable, or session genuinely still live
+
+    console.warn({
+      event: "live_session_room_finished_webhook_missed",
+      bookingId: room.bookingId,
+      roomName: room.roomName,
+    });
+    await LiveSessionService.finalizeSession(room.id, SessionEndReason.TIMEOUT);
+    finalized++;
+  }
+
+  return { finalized };
+}
+
 async function writeHeartbeat(): Promise<void> {
   const systemActor = await prisma.user.findFirst({
     where: { email: process.env.SUPER_ADMIN_EMAIL },
@@ -356,6 +390,7 @@ export function startRoomLifecycleWorker(): void {
       await retryFailedRoomCreations();
       await closeEmptyRooms();
       await flagTutorNotJoined();
+      await finalizeOrphanedActiveRooms();
       await writeHeartbeat();
     },
     { connection }

@@ -1,0 +1,8 @@
+{
+  "tutorEmail": "harness.livesession.tutor@mentora.test",
+  "studentEmail": "harness.livesession.student@mentora.test",
+  "password": "HarnessLiveSession#12345",
+  "bookingId": "d6aeb820-14e2-45ef-891d-f8c8d64a7eeb",
+  "scheduledStartAt": "2026-08-03T18:02:00.000Z",
+  "scheduledEndAt": "2026-08-03T18:32:00.000Z"
+}

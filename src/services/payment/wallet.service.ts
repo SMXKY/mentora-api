@@ -73,7 +73,14 @@ async function topup(
     externalId: `topup-${userId}-${Date.now()}`,
     message: "Mentora wallet top-up",
   });
-  const status = await waitForFinalStatus(result.transId);
+  const status = await FapshiService.waitForFinalStatus(result.transId);
+  if (!status) {
+    throw new AppError(
+      "payment/errors:topupTimedOut",
+      StatusCodes.GATEWAY_TIMEOUT,
+      { transId: result.transId }
+    );
+  }
 
   if (status.status !== "SUCCESSFUL") {
     throw new AppError("payment/errors:topupFailed", StatusCodes.BAD_GATEWAY, {

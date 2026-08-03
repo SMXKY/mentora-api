@@ -19,7 +19,8 @@ import { StatusCodes } from "http-status-codes";
 //   payment service is functional".
 // ============================================================
 
-const BASE_URL = process.env.FAPSHI_SANDBOX_BASE_URL || "https://sandbox.fapshi.com";
+const BASE_URL =
+  process.env.FAPSHI_SANDBOX_BASE_URL || "https://sandbox.fapshi.com";
 const API_USER = process.env.FAPSHI_API_USER || "";
 const API_KEY = process.env.FAPSHI_API_KEY || "";
 
@@ -30,7 +31,11 @@ function isLive(): boolean {
 const client = axios.create({
   baseURL: BASE_URL,
   timeout: 15000,
-  headers: { apiuser: API_USER, apikey: API_KEY, "Content-Type": "application/json" },
+  headers: {
+    apiuser: API_USER,
+    apikey: API_KEY,
+    "Content-Type": "application/json",
+  },
 });
 
 export type FapshiMedium = "mobile money" | "orange money";
@@ -68,6 +73,11 @@ export interface FapshiStatusResult {
   dateConfirmed?: string | null;
 }
 
+export interface WaitForFinalStatusOptions {
+  maxAttempts?: number;
+  delayMs?: number;
+}
+
 const AMOUNT_ERROR = "payment/errors:fapshi.invalidAmount";
 const PHONE_ERROR = "payment/errors:fapshi.invalidPhone";
 const TRANS_ID_ERROR = "payment/errors:fapshi.invalidTransId";
@@ -94,7 +104,10 @@ function assertValidPhone(phone: string) {
 function detectMedium(phone: string): FapshiMedium {
   const prefix3 = phone.slice(0, 3);
   const prefix2 = phone.slice(0, 2);
-  if (prefix2 === "69" || ["655", "656", "657", "658", "659"].includes(prefix3)) {
+  if (
+    prefix2 === "69" ||
+    ["655", "656", "657", "658", "659"].includes(prefix3)
+  ) {
     return "orange money";
   }
   return "mobile money";
@@ -130,7 +143,8 @@ const mockLedger = new Map<string, MockTransaction>();
 function generateMockTransId(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let id = "";
-  for (let i = 0; i < 9; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 9; i++)
+    id += chars[Math.floor(Math.random() * chars.length)];
   return id;
 }
 
@@ -140,7 +154,9 @@ function decideMockOutcome(phone: string): FapshiTransStatus {
   return Math.random() < 0.8 ? "SUCCESSFUL" : "FAILED";
 }
 
-async function mockDirectPay(params: FapshiDirectPayParams): Promise<FapshiDirectPayResult> {
+async function mockDirectPay(
+  params: FapshiDirectPayParams
+): Promise<FapshiDirectPayResult> {
   const transId = generateMockTransId();
   const now = new Date().toISOString();
   const status = decideMockOutcome(params.phone);
@@ -171,7 +187,9 @@ async function mockDirectPay(params: FapshiDirectPayParams): Promise<FapshiDirec
   return { message: "Payment initiated", transId, dateInitiated: now };
 }
 
-async function mockPayout(params: FapshiDirectPayParams): Promise<FapshiDirectPayResult> {
+async function mockPayout(
+  params: FapshiDirectPayParams
+): Promise<FapshiDirectPayResult> {
   // Same simulated ledger/outcome mechanics as directPay — Fapshi's payout
   // endpoint has the identical request/response shape.
   return mockDirectPay(params);
@@ -187,7 +205,11 @@ function mockPaymentStatus(transId: string): FapshiStatusResult {
 
 // ── Health check ────────────────────────────────────────────
 // GET /balance — used as the "hard check" gate before any live-mode call.
-async function healthCheck(): Promise<{ ok: boolean; balance?: number; error?: string }> {
+async function healthCheck(): Promise<{
+  ok: boolean;
+  balance?: number;
+  error?: string;
+}> {
   try {
     const { data } = await client.get("/balance");
     return { ok: true, balance: data?.balance };
@@ -220,7 +242,9 @@ function buildRequestBody(params: FapshiDirectPayParams) {
 
 // ── Public API ───────────────────────────────────────────────
 
-async function directPay(params: FapshiDirectPayParams): Promise<FapshiDirectPayResult> {
+async function directPay(
+  params: FapshiDirectPayParams
+): Promise<FapshiDirectPayResult> {
   assertValidAmount(params.amount);
   assertValidPhone(params.phone);
 
@@ -237,7 +261,9 @@ async function directPay(params: FapshiDirectPayParams): Promise<FapshiDirectPay
   }
 }
 
-async function payout(params: FapshiDirectPayParams): Promise<FapshiDirectPayResult> {
+async function payout(
+  params: FapshiDirectPayParams
+): Promise<FapshiDirectPayResult> {
   assertValidAmount(params.amount);
   assertValidPhone(params.phone);
 
@@ -274,12 +300,39 @@ async function paymentStatus(transId: string): Promise<FapshiStatusResult> {
   }
 }
 
+// Polls /payment-status until Fapshi reports a terminal state
+// (SUCCESSFUL / FAILED / EXPIRED), or returns null if it's still
+// CREATED/pending after the polling window. Shared by every caller
+// that needs to wait on a Fapshi transaction (wallet top-up, wallet
+// withdrawal payout, booking direct-pay) so they all poll the same
+// way instead of each reimplementing it. Callers decide what "still
+// pending after timeout" means for them (throw vs. queue for later
+// reconciliation).
+async function waitForFinalStatus(
+  transId: string,
+  { maxAttempts = 8, delayMs = 4000 }: WaitForFinalStatusOptions = {}
+): Promise<FapshiStatusResult | null> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const status = await paymentStatus(transId);
+    if (
+      status.status === "SUCCESSFUL" ||
+      status.status === "FAILED" ||
+      status.status === "EXPIRED"
+    ) {
+      return status;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return null;
+}
+
 export const FapshiService = {
   isLive,
   detectMedium,
   directPay,
   payout,
   paymentStatus,
+  waitForFinalStatus,
   healthCheck,
 };
 

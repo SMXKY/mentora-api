@@ -72,7 +72,11 @@ services:
     env_file:
       - .env
     volumes:
-      - ./docker/livekit/livekit.yaml:/etc/livekit.yaml:ro
+      - ./docker/livekit/livekit.prod.yaml:/etc/livekit.yaml:ro
+      # TURN's cert_file/key_file (see livekit.prod.yaml) point into this —
+      # certbot renews in place on the host, LiveKit just needs to be
+      # restarted after a renewal to pick up the new cert (see HOSTING.md).
+      - /etc/letsencrypt:/etc/letsencrypt:ro
   redis:
     image: redis:7.2-alpine
     container_name: mentora_redis
