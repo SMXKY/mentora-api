@@ -13,6 +13,9 @@ import {
 import { MessagingService } from "../modules/messaging/messaging.service";
 import { LiveSessionService } from "../modules/liveSession/liveSession.service";
 import { AppError } from "../utils/AppError.util";
+import { t } from "../shared/i18n/t";
+import { parseAcceptLanguage } from "../shared/i18n/resolveLocale";
+import { FALLBACK_LANGUAGE, type SupportedLanguage } from "../shared/i18n/init";
 
 interface AuthedSocket extends Socket {
   data: { user: { id: string; roleId?: string } };
@@ -36,6 +39,23 @@ const userRoom = (userId: string) => `user:${userId}`;
 const bookingRoom = (bookingId: string) => `booking:${bookingId}`;
 const conversationRoom = (conversationId: string) =>
   `conversation:${conversationId}`;
+
+// Mirrors resolveLocale()'s header-based resolution (REST) since a socket
+// handshake is still an HTTP request under the hood — deliberately not a
+// stored user preference, same reasoning as the REST middleware.
+function resolveSocketLang(socket: Socket): SupportedLanguage {
+  const headers = socket.handshake.headers;
+  const xLangHeader = headers["x-lang"];
+  const xLang = Array.isArray(xLangHeader) ? xLangHeader[0] : xLangHeader;
+  const acceptLanguageHeader = headers["accept-language"];
+  const acceptLanguage = Array.isArray(acceptLanguageHeader) ? acceptLanguageHeader[0] : acceptLanguageHeader;
+
+  return (
+    parseAcceptLanguage(xLang) ??
+    parseAcceptLanguage(acceptLanguage) ??
+    FALLBACK_LANGUAGE
+  );
+}
 
 export function initializeSocketIO(httpServer: HttpServer): Server {
   const io = new Server(httpServer, {
@@ -74,6 +94,7 @@ export function initializeSocketIO(httpServer: HttpServer): Server {
   io.on("connection", (socket: Socket) => {
     const authed = socket as AuthedSocket;
     const userId = authed.data.user.id;
+    const lang = resolveSocketLang(socket);
 
     // Every socket auto-joins its own personal room the moment it connects.
     // This is the room `emitToUser` sends to — there is no code path where
@@ -138,20 +159,21 @@ export function initializeSocketIO(httpServer: HttpServer): Server {
     // re-implementing any of that here.
     socket.on(
       "message:send",
-      async (payload: { conversationId: string; content: string; tempId?: string }) => {
+      async (payload: { conversationId: string; content: string; tempId?: string; replyToId?: string }) => {
         try {
           const message = await MessagingService.sendMessage(
             userId,
             payload?.conversationId,
             payload?.content,
-            { userId }
+            { userId },
+            payload?.replyToId
           );
           socket.emit("message:send:ack", { tempId: payload?.tempId, message });
         } catch (err) {
-          const isAppError = err instanceof AppError;
+          const appError = err instanceof AppError ? err : new AppError("messaging/errors:sendFailed", 500);
           socket.emit("message:send:error", {
             tempId: payload?.tempId,
-            error: isAppError ? err.message : "messaging/errors:sendFailed",
+            error: t(appError.messageKey, appError.messageKey, { lng: lang, ...appError.meta }),
           });
         }
       }

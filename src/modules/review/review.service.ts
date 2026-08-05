@@ -138,10 +138,27 @@ async function listTutorReviews(
   cursor: string | undefined,
   limit: number
 ) {
+  return listReviewsForSubject(
+    tutorUserId,
+    ReviewSubjectRole.TUTOR,
+    cursor,
+    limit
+  );
+}
+
+/** Same revealed-only review listing as listTutorReviews, generalised to
+ * any subject role — a student/parent's booking-gated profile reuses this
+ * for reviews left about them, not just a tutor's public profile. */
+async function listReviewsForSubject(
+  subjectUserId: string,
+  subjectRole: ReviewSubjectRole,
+  cursor: string | undefined,
+  limit: number
+) {
   const rows = await prisma.review.findMany({
     where: {
-      subjectId: tutorUserId,
-      subjectRole: ReviewSubjectRole.TUTOR,
+      subjectId: subjectUserId,
+      subjectRole,
       status: ReviewStatus.REVEALED,
       deletedAt: null,
     },
@@ -209,6 +226,7 @@ export const ReviewService = {
   submitReview,
   listTutorReviews,
   listTutorReviewsByProfile,
+  listReviewsForSubject,
   respondToReview,
 };
 export default ReviewService;

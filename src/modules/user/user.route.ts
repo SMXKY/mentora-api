@@ -77,6 +77,17 @@ router.patch(
   userController.updateMyProfilePicture
 );
 
+// Tutor-only, relationship-gated (booking or conversation) — see
+// UserService.getBookerProfile. Registered before the admin "/:id" route
+// below, though the extra path segment means there's no pattern collision
+// either way.
+router.get(
+  "/:id/booker-profile",
+  protect,
+  validate(ParamsId, "params"),
+  userController.getBookerProfile
+);
+
 router.get(
   "/:id",
   protect,

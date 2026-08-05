@@ -8,7 +8,20 @@ import { StatusCodes } from "http-status-codes";
 import { MediaService } from "../../services/media/media.service";
 import { getStorageAdapter, resolveStorageUrl } from "../../services/media";
 import { fileTypes } from "../../services/media/media.types";
-import { FileCategory, FileType } from "../../generated/prisma";
+import { FileCategory, FileType, BookingStatus, ReviewSubjectRole, ReviewStatus } from "../../generated/prisma";
+import { toPublicLastNameInitial } from "../../utils/publicProfile.util";
+import { ReviewService } from "../review/review.service";
+
+// A session actually happened, past a bare paid-but-not-yet-run booking —
+// same "real engagement" bar materials.service.ts uses for content access,
+// minus the still-in-flight statuses (PAID/IN_PROGRESS/AWAITING_CONFIRMATION)
+// since those haven't concluded yet.
+const COMPLETED_BOOKING_STATUSES: BookingStatus[] = [
+  BookingStatus.CONFIRMED,
+  BookingStatus.AUTO_CONFIRMED,
+  BookingStatus.RESOLVED_TUTOR_FAVOR,
+  BookingStatus.RESOLVED_PARENT_FAVOR,
+];
 
 export class UserService extends BaseService<
   any,
@@ -191,6 +204,147 @@ export class UserService extends BaseService<
       roles: user.userRoles.map((ur) => ur.role.name),
       tutorProfile,
       studentProfile,
+    };
+  }
+
+  /**
+   * A tutor-only, booking-or-conversation-gated profile of a student/parent
+   * they're actually dealing with — never searchable, never reachable for a
+   * tutor with no relationship to this person. Deliberately non-invasive:
+   * no last name, phone, email, DOB, or address, and (for a parent) no
+   * details about which children they manage beyond a headcount.
+   *
+   * Mirrors TutorService.getPublicProfile's "same 404 whether the target
+   * doesn't exist or isn't accessible" — a booker's existence is not
+   * information a tutor gets for free just by guessing a user id.
+   */
+  async getBookerProfile(viewerUserId: string, targetUserId: string) {
+    const viewerTutorProfile = await prisma.tutorProfile.findFirst({
+      where: { userId: viewerUserId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!viewerTutorProfile) {
+      throw new AppError("common/errors:forbidden", StatusCodes.FORBIDDEN);
+    }
+
+    const [hasBooking, hasConversation] = await Promise.all([
+      prisma.booking.findFirst({
+        where: {
+          bookerId: targetUserId,
+          tutorProfileId: viewerTutorProfile.id,
+          deletedAt: null,
+        },
+        select: { id: true },
+      }),
+      prisma.conversation.findFirst({
+        where: {
+          deletedAt: null,
+          AND: [
+            { participants: { some: { userId: viewerUserId, removedAt: null } } },
+            { participants: { some: { userId: targetUserId, removedAt: null } } },
+          ],
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!hasBooking && !hasConversation) {
+      throw new AppError("auth/errors:userNotFound", StatusCodes.NOT_FOUND);
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { id: targetUserId, deletedAt: null },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        profilePictureUrl: true,
+        createdAt: true,
+        city: {
+          select: { id: true, name: true, region: { select: { id: true, name: true } } },
+        },
+        studentProfiles: {
+          where: { deletedAt: null },
+          take: 1,
+          select: {
+            subjects: { select: { subject: { select: { id: true, name: true } } } },
+          },
+        },
+        studentProfilesGuarded: {
+          where: { deletedAt: null },
+          select: {
+            subjects: { select: { subject: { select: { id: true, name: true } } } },
+          },
+        },
+      },
+    });
+    if (!user) {
+      throw new AppError("auth/errors:userNotFound", StatusCodes.NOT_FOUND);
+    }
+
+    // A self-registered student always takes priority over "parent" — a
+    // user can't simultaneously be a booking child and someone else's
+    // guardian in this schema, but the ordering keeps intent explicit.
+    const ownStudentProfile = user.studentProfiles[0] ?? null;
+    const guardedProfiles = user.studentProfilesGuarded;
+    const role: "STUDENT" | "PARENT" | null = ownStudentProfile
+      ? "STUDENT"
+      : guardedProfiles.length > 0
+        ? "PARENT"
+        : null;
+
+    // For a parent, "their subjects" doesn't map to a field of their own —
+    // it's the deduped union of what their children are learning.
+    const subjectRows = ownStudentProfile
+      ? ownStudentProfile.subjects
+      : guardedProfiles.flatMap((p) => p.subjects);
+    const subjects = Array.from(
+      new Map(subjectRows.map((s) => [s.subject.id, s.subject])).values()
+    );
+
+    const subjectRole =
+      role === "STUDENT"
+        ? ReviewSubjectRole.STUDENT
+        : role === "PARENT"
+          ? ReviewSubjectRole.PARENT
+          : null;
+
+    const [sessionsCount, reviewsPage, reviewsCount] = await Promise.all([
+      prisma.booking.count({
+        where: {
+          bookerId: targetUserId,
+          status: { in: COMPLETED_BOOKING_STATUSES },
+          deletedAt: null,
+        },
+      }),
+      subjectRole
+        ? ReviewService.listReviewsForSubject(targetUserId, subjectRole, undefined, 5)
+        : Promise.resolve({ data: [] as unknown[] }),
+      subjectRole
+        ? prisma.review.count({
+            where: {
+              subjectId: targetUserId,
+              subjectRole,
+              status: ReviewStatus.REVEALED,
+              deletedAt: null,
+            },
+          })
+        : Promise.resolve(0),
+    ]);
+
+    return {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: toPublicLastNameInitial(user.lastName),
+      profilePictureUrl: resolveStorageUrl(user.profilePictureUrl),
+      city: user.city,
+      memberSince: user.createdAt,
+      role,
+      subjects,
+      studentsCount: role === "PARENT" ? guardedProfiles.length : null,
+      sessionsCount,
+      reviewsCount,
+      reviews: reviewsPage.data,
     };
   }
 }

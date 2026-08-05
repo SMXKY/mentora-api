@@ -17,8 +17,35 @@ import { NotificationService } from "../../services/notification/notification.se
 import { emitToConversation, isUserOnline } from "../../socket/index";
 import { filterMessage } from "../../services/messaging/contentFilter";
 import { messagingConfig } from "../../services/messaging/messagingConfig";
+import { resolveStorageUrl } from "../../services/media";
 
-const DISPLAY_USER_SELECT = { id: true, firstName: true, lastName: true, profilePictureUrl: true };
+const DISPLAY_USER_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  profilePictureUrl: true,
+  tutorProfile: { select: { id: true } },
+};
+
+type DisplayUser = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  profilePictureUrl: string | null;
+  tutorProfile: { id: string } | null;
+};
+
+/** Flattens the tutorProfile relation into a tutorProfileId the client can
+ * link straight to the public tutor profile route — null for non-tutors. */
+function toDisplayParticipant(user: DisplayUser) {
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    profilePictureUrl: user.profilePictureUrl,
+    tutorProfileId: user.tutorProfile?.id ?? null,
+  };
+}
 
 const OPEN_MODERATION_STATUSES: ModerationReviewStatus[] = [
   ModerationReviewStatus.PENDING,
@@ -31,25 +58,51 @@ const OPEN_MODERATION_STATUSES: ModerationReviewStatus[] = [
 /** One conversation ever exists between a given pair of users — this finds it regardless of status/type. */
 async function findConversationForPair(userIdA: string, userIdB: string) {
   const candidates = await prisma.conversation.findMany({
-    where: { deletedAt: null, participants: { some: { userId: userIdA, removedAt: null } } },
+    where: {
+      deletedAt: null,
+      participants: { some: { userId: userIdA, removedAt: null } },
+    },
     include: { participants: { where: { removedAt: null } } },
   });
-  return candidates.find((c) => c.participants.length === 2 && c.participants.some((p) => p.userId === userIdB)) ?? null;
+  return (
+    candidates.find(
+      (c) =>
+        c.participants.length === 2 &&
+        c.participants.some((p) => p.userId === userIdB)
+    ) ?? null
+  );
 }
 
-async function startConversation(initiatorUserId: string, tutorProfileId: string, ctx: ServiceContext) {
-  const tutorProfile = await prisma.tutorProfile.findUnique({ where: { id: tutorProfileId }, select: { userId: true } });
-  if (!tutorProfile) throw new AppError("messaging/errors:tutorNotFound", StatusCodes.NOT_FOUND);
+async function startConversation(
+  initiatorUserId: string,
+  tutorProfileId: string,
+  ctx: ServiceContext
+) {
+  const tutorProfile = await prisma.tutorProfile.findUnique({
+    where: { id: tutorProfileId },
+    select: { userId: true },
+  });
+  if (!tutorProfile)
+    throw new AppError("messaging/errors:tutorNotFound", StatusCodes.NOT_FOUND);
   const tutorUserId = tutorProfile.userId;
 
   if (initiatorUserId === tutorUserId) {
-    throw new AppError("messaging/errors:cannotMessageSelf", StatusCodes.BAD_REQUEST);
+    throw new AppError(
+      "messaging/errors:cannotMessageSelf",
+      StatusCodes.BAD_REQUEST
+    );
   }
 
   // Tutor cannot initiate a new conversation — only Parent/Student can.
-  const initiatorIsTutor = await prisma.tutorProfile.findUnique({ where: { userId: initiatorUserId }, select: { id: true } });
+  const initiatorIsTutor = await prisma.tutorProfile.findUnique({
+    where: { userId: initiatorUserId },
+    select: { id: true },
+  });
   if (initiatorIsTutor) {
-    throw new AppError("messaging/errors:tutorCannotInitiate", StatusCodes.FORBIDDEN);
+    throw new AppError(
+      "messaging/errors:tutorCannotInitiate",
+      StatusCodes.FORBIDDEN
+    );
   }
 
   const existing = await findConversationForPair(initiatorUserId, tutorUserId);
@@ -57,12 +110,23 @@ async function startConversation(initiatorUserId: string, tutorProfileId: string
 
   const conversation = await prisma.$transaction(async (tx) => {
     const created = await tx.conversation.create({
-      data: { type: ConversationType.INQUIRY, status: ConversationStatus.ACTIVE },
+      data: {
+        type: ConversationType.INQUIRY,
+        status: ConversationStatus.ACTIVE,
+      },
     });
     await tx.conversationParticipant.createMany({
       data: [
-        { conversationId: created.id, userId: initiatorUserId, addedById: initiatorUserId },
-        { conversationId: created.id, userId: tutorUserId, addedById: initiatorUserId },
+        {
+          conversationId: created.id,
+          userId: initiatorUserId,
+          addedById: initiatorUserId,
+        },
+        {
+          conversationId: created.id,
+          userId: tutorUserId,
+          addedById: initiatorUserId,
+        },
       ],
     });
     return created;
@@ -80,19 +144,31 @@ async function startConversation(initiatorUserId: string, tutorProfileId: string
 }
 
 /** REQ — booking confirmed+paid upgrades the pair's one-and-only conversation to Active, creating it if it never existed. */
-async function upgradeToActiveForBooking(bookingId: string, tutorUserId: string, parentUserId: string) {
+async function upgradeToActiveForBooking(
+  bookingId: string,
+  tutorUserId: string,
+  parentUserId: string
+) {
   const existing = await findConversationForPair(parentUserId, tutorUserId);
 
   if (existing) {
     return prisma.conversation.update({
       where: { id: existing.id },
-      data: { type: ConversationType.DIRECT, status: ConversationStatus.ACTIVE, bookingId },
+      data: {
+        type: ConversationType.DIRECT,
+        status: ConversationStatus.ACTIVE,
+        bookingId,
+      },
     });
   }
 
   return prisma.$transaction(async (tx) => {
     const created = await tx.conversation.create({
-      data: { type: ConversationType.DIRECT, status: ConversationStatus.ACTIVE, bookingId },
+      data: {
+        type: ConversationType.DIRECT,
+        status: ConversationStatus.ACTIVE,
+        bookingId,
+      },
     });
     await tx.conversationParticipant.createMany({
       data: [
@@ -106,20 +182,38 @@ async function upgradeToActiveForBooking(bookingId: string, tutorUserId: string,
 
 /** REQ — booking completed/cancelled/resolved-dispute archives the conversation (read-only, permanent). */
 async function archiveForBooking(bookingId: string) {
-  const conversation = await prisma.conversation.findFirst({ where: { bookingId } });
+  const conversation = await prisma.conversation.findFirst({
+    where: { bookingId },
+  });
   if (!conversation) return null;
   if (conversation.status === ConversationStatus.ARCHIVED) return conversation;
-  return prisma.conversation.update({ where: { id: conversation.id }, data: { status: ConversationStatus.ARCHIVED } });
+  return prisma.conversation.update({
+    where: { id: conversation.id },
+    data: { status: ConversationStatus.ARCHIVED },
+  });
 }
 
-async function loadConversationForParticipant(conversationId: string, userId: string) {
+async function loadConversationForParticipant(
+  conversationId: string,
+  userId: string
+) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: { participants: { where: { removedAt: null } } },
   });
-  if (!conversation) throw new AppError("messaging/errors:conversationNotFound", StatusCodes.NOT_FOUND);
-  const participant = conversation.participants.find((p) => p.userId === userId);
-  if (!participant) throw new AppError("messaging/errors:notYourConversation", StatusCodes.FORBIDDEN);
+  if (!conversation)
+    throw new AppError(
+      "messaging/errors:conversationNotFound",
+      StatusCodes.NOT_FOUND
+    );
+  const participant = conversation.participants.find(
+    (p) => p.userId === userId
+  );
+  if (!participant)
+    throw new AppError(
+      "messaging/errors:notYourConversation",
+      StatusCodes.FORBIDDEN
+    );
   return { conversation, participant };
 }
 
@@ -128,7 +222,8 @@ const MESSAGING_PATTERN_SIGNAL = "MESSAGING_FILTER_PATTERN";
 /** REQ-015 — 5+ blocked attempts across any of a user's conversations within 24h flags them in Trust & Safety. */
 async function flagUserForTrustSafety(userId: string, blockId: string) {
   let riskScore = await prisma.riskScore.findUnique({ where: { userId } });
-  if (!riskScore) riskScore = await prisma.riskScore.create({ data: { userId } });
+  if (!riskScore)
+    riskScore = await prisma.riskScore.create({ data: { userId } });
 
   await prisma.riskSignal.create({
     data: {
@@ -147,7 +242,10 @@ async function flagUserForTrustSafety(userId: string, blockId: string) {
   });
 
   if (!riskScore.humanReviewDueAt) {
-    await prisma.riskScore.update({ where: { id: riskScore.id }, data: { humanReviewDueAt: new Date() } });
+    await prisma.riskScore.update({
+      where: { id: riskScore.id },
+      data: { humanReviewDueAt: new Date() },
+    });
   }
 }
 
@@ -155,10 +253,16 @@ async function handleBlockedMessage(
   conversationId: string,
   senderId: string,
   attemptedContent: string,
-  outcome: { result: MessageFilterResult; layer: 1 | 2 | 3 | null; matchedPattern: string | null; normalisedContent: string | null },
+  outcome: {
+    result: MessageFilterResult;
+    layer: 1 | 2 | 3 | null;
+    matchedPattern: string | null;
+    normalisedContent: string | null;
+  },
   conversationBlockCount: number
 ) {
-  const { blockEscalationThreshold, patternFlagThreshold } = await messagingConfig.getAll();
+  const { blockEscalationThreshold, patternFlagThreshold } =
+    await messagingConfig.getAll();
 
   const block = await prisma.filterBlock.create({
     data: {
@@ -173,23 +277,36 @@ async function handleBlockedMessage(
   });
 
   const newBlockCount = conversationBlockCount + 1;
-  await prisma.conversation.update({ where: { id: conversationId }, data: { blockCountConversation: newBlockCount } });
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { blockCountConversation: newBlockCount },
+  });
 
   let escalatedToModerator = false;
   if (newBlockCount >= blockEscalationThreshold) {
     const alreadyOpen = await prisma.moderationReview.findFirst({
-      where: { conversationId, trigger: ModerationReviewTrigger.FILTER_ESCALATION, status: { in: OPEN_MODERATION_STATUSES } },
+      where: {
+        conversationId,
+        trigger: ModerationReviewTrigger.FILTER_ESCALATION,
+        status: { in: OPEN_MODERATION_STATUSES },
+      },
     });
     if (!alreadyOpen) {
       await prisma.moderationReview.create({
-        data: { conversationId, trigger: ModerationReviewTrigger.FILTER_ESCALATION, filterBlockId: block.id },
+        data: {
+          conversationId,
+          trigger: ModerationReviewTrigger.FILTER_ESCALATION,
+          filterBlockId: block.id,
+        },
       });
       escalatedToModerator = true;
     }
   }
 
   const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const recentBlockCount = await prisma.filterBlock.count({ where: { senderId, createdAt: { gte: windowStart } } });
+  const recentBlockCount = await prisma.filterBlock.count({
+    where: { senderId, createdAt: { gte: windowStart } },
+  });
   let escalatedToTrustSafety = false;
   if (recentBlockCount >= patternFlagThreshold) {
     escalatedToTrustSafety = true;
@@ -197,11 +314,42 @@ async function handleBlockedMessage(
   }
 
   if (escalatedToModerator || escalatedToTrustSafety) {
-    await prisma.filterBlock.update({ where: { id: block.id }, data: { escalatedToModerator, escalatedToTrustSafety } });
+    await prisma.filterBlock.update({
+      where: { id: block.id },
+      data: { escalatedToModerator, escalatedToTrustSafety },
+    });
   }
 }
 
-function serializeMessage(message: { id: string; conversationId: string; senderId: string; content: string; contentDeleted: boolean; status: MessageStatus; replyToId: string | null; createdAt: Date; deliveredAt: Date | null }) {
+type ReplyToPreview = {
+  id: string;
+  senderId: string;
+  content: string;
+  contentDeleted: boolean;
+} | null;
+
+function serializeReplyTo(replyTo: ReplyToPreview) {
+  if (!replyTo) return null;
+  return {
+    id: replyTo.id,
+    senderId: replyTo.senderId,
+    content: replyTo.contentDeleted ? null : replyTo.content,
+    contentDeleted: replyTo.contentDeleted,
+  };
+}
+
+function serializeMessage(message: {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  contentDeleted: boolean;
+  status: MessageStatus;
+  replyToId: string | null;
+  createdAt: Date;
+  deliveredAt: Date | null;
+  replyTo?: ReplyToPreview;
+}) {
   return {
     id: message.id,
     conversationId: message.conversationId,
@@ -212,44 +360,118 @@ function serializeMessage(message: { id: string; conversationId: string; senderI
     replyToId: message.replyToId,
     createdAt: message.createdAt,
     deliveredAt: message.deliveredAt,
+    replyTo: serializeReplyTo(message.replyTo ?? null),
   };
 }
 
-async function sendMessage(senderId: string, conversationId: string, content: string, ctx: ServiceContext) {
-  const { conversation } = await loadConversationForParticipant(conversationId, senderId);
+async function sendMessage(
+  senderId: string,
+  conversationId: string,
+  content: string,
+  ctx: ServiceContext,
+  replyToId?: string
+) {
+  const { conversation } = await loadConversationForParticipant(
+    conversationId,
+    senderId
+  );
 
   if (conversation.status === ConversationStatus.FROZEN) {
-    throw new AppError("messaging/errors:conversationFrozen", StatusCodes.FORBIDDEN);
+    throw new AppError(
+      "messaging/errors:conversationFrozen",
+      StatusCodes.FORBIDDEN
+    );
   }
   if (conversation.status === ConversationStatus.ARCHIVED) {
-    throw new AppError("messaging/errors:conversationArchived", StatusCodes.FORBIDDEN);
+    throw new AppError(
+      "messaging/errors:conversationArchived",
+      StatusCodes.FORBIDDEN
+    );
   }
 
   const trimmed = content.trim();
-  if (!trimmed) throw new AppError("messaging/errors:messageEmpty", StatusCodes.BAD_REQUEST);
-  if (trimmed.length > 2000) throw new AppError("messaging/errors:messageTooLong", StatusCodes.BAD_REQUEST);
+  if (!trimmed)
+    throw new AppError(
+      "messaging/errors:messageEmpty",
+      StatusCodes.BAD_REQUEST
+    );
+  if (trimmed.length > 2000)
+    throw new AppError(
+      "messaging/errors:messageTooLong",
+      StatusCodes.BAD_REQUEST
+    );
 
-  const { inquiryMessageLimit } = await messagingConfig.getAll();
-  if (conversation.type === ConversationType.INQUIRY) {
-    const messageCount = await prisma.message.count({ where: { conversationId, contentDeleted: false } });
-    if (messageCount >= inquiryMessageLimit) {
-      throw new AppError("messaging/errors:inquiryLimitReached", StatusCodes.FORBIDDEN, { limit: inquiryMessageLimit });
+  // Must belong to this same conversation — never trust a client-supplied
+  // message id blind, or a reply could quote content from a conversation
+  // this sender isn't even a participant of.
+  let replyTo: ReplyToPreview = null;
+  if (replyToId) {
+    replyTo = await prisma.message.findFirst({
+      where: { id: replyToId, conversationId, deletedAt: null },
+      select: { id: true, senderId: true, content: true, contentDeleted: true },
+    });
+    if (!replyTo) {
+      throw new AppError(
+        "messaging/errors:replyToNotFound",
+        StatusCodes.BAD_REQUEST
+      );
     }
   }
 
-  const activeKeywordRows = await prisma.filterKeyword.findMany({ where: { isActive: true }, select: { keyword: true } });
-  const outcome = filterMessage(trimmed, activeKeywordRows.map((k) => k.keyword));
+  const { inquiryMessageLimit } = await messagingConfig.getAll();
+  if (conversation.type === ConversationType.INQUIRY) {
+    const messageCount = await prisma.message.count({
+      where: { conversationId, contentDeleted: false },
+    });
+    if (messageCount >= inquiryMessageLimit) {
+      throw new AppError(
+        "messaging/errors:inquiryLimitReached",
+        StatusCodes.FORBIDDEN,
+        { limit: inquiryMessageLimit }
+      );
+    }
+  }
+
+  const activeKeywordRows = await prisma.filterKeyword.findMany({
+    where: { isActive: true },
+    select: { keyword: true },
+  });
+  const outcome = filterMessage(
+    trimmed,
+    activeKeywordRows.map((k) => k.keyword)
+  );
 
   if (outcome.result !== "CLEAN") {
-    await handleBlockedMessage(conversationId, senderId, trimmed, outcome, conversation.blockCountConversation);
-    throw new AppError("messaging/errors:messageBlocked", StatusCodes.BAD_REQUEST, { result: outcome.result });
+    await handleBlockedMessage(
+      conversationId,
+      senderId,
+      trimmed,
+      outcome,
+      conversation.blockCountConversation
+    );
+    throw new AppError(
+      "messaging/errors:messageBlocked",
+      StatusCodes.BAD_REQUEST,
+      { result: outcome.result }
+    );
   }
 
   const message = await prisma.$transaction(async (tx) => {
-    const created = await tx.message.create({ data: { conversationId, senderId, content: trimmed, status: MessageStatus.SENT } });
+    const created = await tx.message.create({
+      data: {
+        conversationId,
+        senderId,
+        content: trimmed,
+        status: MessageStatus.SENT,
+        replyToId: replyTo?.id,
+      },
+    });
     await tx.conversation.update({
       where: { id: conversationId },
-      data: { lastMessageAt: created.createdAt, lastMessagePreview: trimmed.slice(0, 100) },
+      data: {
+        lastMessageAt: created.createdAt,
+        lastMessagePreview: trimmed.slice(0, 100),
+      },
     });
     await tx.conversationParticipant.updateMany({
       where: { conversationId, userId: { not: senderId }, removedAt: null },
@@ -258,15 +480,24 @@ async function sendMessage(senderId: string, conversationId: string, content: st
     return created;
   });
 
-  const recipients = conversation.participants.filter((p) => p.userId !== senderId);
+  const recipients = conversation.participants.filter(
+    (p) => p.userId !== senderId
+  );
 
-  const onlineFlags = await Promise.all(recipients.map((r) => isUserOnline(r.userId)));
+  const onlineFlags = await Promise.all(
+    recipients.map((r) => isUserOnline(r.userId))
+  );
   const anyRecipientOnline = onlineFlags.some(Boolean);
   const finalMessage = anyRecipientOnline
-    ? await prisma.message.update({ where: { id: message.id }, data: { status: MessageStatus.DELIVERED, deliveredAt: new Date() } })
+    ? await prisma.message.update({
+        where: { id: message.id },
+        data: { status: MessageStatus.DELIVERED, deliveredAt: new Date() },
+      })
     : message;
 
-  emitToConversation(conversationId, "message:new", serializeMessage(finalMessage));
+  const serialized = serializeMessage({ ...finalMessage, replyTo });
+
+  emitToConversation(conversationId, "message:new", serialized);
 
   await Promise.all(
     recipients.map((r) =>
@@ -279,21 +510,34 @@ async function sendMessage(senderId: string, conversationId: string, content: st
     )
   );
 
-  return finalMessage;
+  return serialized;
 }
 
-async function getConversationSummaryForUser(conversationId: string, userId: string) {
-  const { conversation } = await loadConversationForParticipant(conversationId, userId);
+async function getConversationSummaryForUser(
+  conversationId: string,
+  userId: string
+) {
+  const { conversation } = await loadConversationForParticipant(
+    conversationId,
+    userId
+  );
 
   const other = await prisma.conversationParticipant.findFirst({
     where: { conversationId, userId: { not: userId }, removedAt: null },
     include: { user: { select: DISPLAY_USER_SELECT } },
   });
 
+  if (other && other.user && other.user.profilePictureUrl)
+    other.user.profilePictureUrl = resolveStorageUrl(
+      other?.user.profilePictureUrl
+    );
+
   let messagesRemaining: number | null = null;
   if (conversation.type === ConversationType.INQUIRY) {
     const { inquiryMessageLimit } = await messagingConfig.getAll();
-    const messageCount = await prisma.message.count({ where: { conversationId, contentDeleted: false } });
+    const messageCount = await prisma.message.count({
+      where: { conversationId, contentDeleted: false },
+    });
     messagesRemaining = Math.max(inquiryMessageLimit - messageCount, 0);
   }
 
@@ -301,20 +545,35 @@ async function getConversationSummaryForUser(conversationId: string, userId: str
     conversationId,
     type: conversation.type,
     status: conversation.status,
-    otherParticipant: other?.user ?? null,
+    otherParticipant: other?.user ? toDisplayParticipant(other.user) : null,
     messagesRemaining,
   };
 }
 
-async function listConversations(userId: string, tab: "active" | "archived", cursor: string | undefined, limit: number) {
-  const statuses = tab === "archived" ? [ConversationStatus.ARCHIVED] : [ConversationStatus.ACTIVE, ConversationStatus.FROZEN];
+async function listConversations(
+  userId: string,
+  tab: "active" | "archived",
+  cursor: string | undefined,
+  limit: number
+) {
+  const statuses =
+    tab === "archived"
+      ? [ConversationStatus.ARCHIVED]
+      : [ConversationStatus.ACTIVE, ConversationStatus.FROZEN];
 
   const rows = await prisma.conversationParticipant.findMany({
-    where: { userId, removedAt: null, conversation: { status: { in: statuses }, deletedAt: null } },
+    where: {
+      userId,
+      removedAt: null,
+      conversation: { status: { in: statuses }, deletedAt: null },
+    },
     include: {
       conversation: {
         include: {
-          participants: { where: { removedAt: null, userId: { not: userId } }, include: { user: { select: DISPLAY_USER_SELECT } } },
+          participants: {
+            where: { removedAt: null, userId: { not: userId } },
+            include: { user: { select: DISPLAY_USER_SELECT } },
+          },
           booking: { select: { id: true, status: true, subjectId: true } },
         },
       },
@@ -328,12 +587,19 @@ async function listConversations(userId: string, tab: "active" | "archived", cur
   const page = hasNextPage ? rows.slice(0, limit) : rows;
 
   const data = page.map((row) => {
-    const otherParticipant = row.conversation.participants[0]?.user ?? null;
+    row.conversation.participants.forEach((usr) => {
+      usr.user.profilePictureUrl = resolveStorageUrl(
+        usr.user.profilePictureUrl
+      );
+    });
+
+    const otherUser = row.conversation.participants[0]?.user ?? null;
+
     return {
       conversationId: row.conversationId,
       type: row.conversation.type,
       status: row.conversation.status,
-      otherParticipant,
+      otherParticipant: otherUser ? toDisplayParticipant(otherUser) : null,
       lastMessagePreview: row.conversation.lastMessagePreview,
       lastMessageAt: row.conversation.lastMessageAt,
       unreadCount: row.unreadCount,
@@ -343,11 +609,20 @@ async function listConversations(userId: string, tab: "active" | "archived", cur
 
   return {
     data,
-    meta: { nextCursor: hasNextPage ? page[page.length - 1].id : null, hasNextPage, limit },
+    meta: {
+      nextCursor: hasNextPage ? page[page.length - 1].id : null,
+      hasNextPage,
+      limit,
+    },
   };
 }
 
-async function listMessages(conversationId: string, userId: string, cursor: string | undefined, limit: number) {
+async function listMessages(
+  conversationId: string,
+  userId: string,
+  cursor: string | undefined,
+  limit: number
+) {
   await loadConversationForParticipant(conversationId, userId);
 
   const rows = await prisma.message.findMany({
@@ -355,27 +630,47 @@ async function listMessages(conversationId: string, userId: string, cursor: stri
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     take: limit + 1,
-    include: { readReceipts: true },
+    include: {
+      readReceipts: true,
+      replyTo: {
+        select: { id: true, senderId: true, content: true, contentDeleted: true },
+      },
+    },
   });
 
   const hasNextPage = rows.length > limit;
   const page = hasNextPage ? rows.slice(0, limit) : rows;
 
   return {
-    data: page.map((m) => ({ ...serializeMessage(m), readBy: m.readReceipts.map((r) => r.userId) })),
-    meta: { nextCursor: hasNextPage ? page[page.length - 1].id : null, hasNextPage, limit },
+    data: page.map((m) => ({
+      ...serializeMessage(m),
+      readBy: m.readReceipts.map((r) => r.userId),
+    })),
+    meta: {
+      nextCursor: hasNextPage ? page[page.length - 1].id : null,
+      hasNextPage,
+      limit,
+    },
   };
 }
 
-async function markAsRead(conversationId: string, userId: string, messageIds: string[]) {
-  const { participant } = await loadConversationForParticipant(conversationId, userId);
+async function markAsRead(
+  conversationId: string,
+  userId: string,
+  messageIds: string[]
+) {
+  const { participant } = await loadConversationForParticipant(
+    conversationId,
+    userId
+  );
 
   const messages = await prisma.message.findMany({
     where: { id: { in: messageIds }, conversationId },
     select: { id: true, senderId: true },
   });
   const unreadOwnMessages = messages.filter((m) => m.senderId !== userId);
-  if (!unreadOwnMessages.length) return { unreadCount: participant.unreadCount };
+  if (!unreadOwnMessages.length)
+    return { unreadCount: participant.unreadCount };
 
   await prisma.$transaction(async (tx) => {
     for (const m of unreadOwnMessages) {
@@ -385,38 +680,72 @@ async function markAsRead(conversationId: string, userId: string, messageIds: st
         update: {},
       });
     }
-    await tx.message.updateMany({ where: { id: { in: unreadOwnMessages.map((m) => m.id) } }, data: { status: MessageStatus.READ } });
+    await tx.message.updateMany({
+      where: { id: { in: unreadOwnMessages.map((m) => m.id) } },
+      data: { status: MessageStatus.READ },
+    });
   });
 
   const remainingUnread = await prisma.message.count({
-    where: { conversationId, senderId: { not: userId }, deletedAt: null, NOT: { readReceipts: { some: { userId } } } },
+    where: {
+      conversationId,
+      senderId: { not: userId },
+      deletedAt: null,
+      NOT: { readReceipts: { some: { userId } } },
+    },
   });
-  await prisma.conversationParticipant.update({ where: { id: participant.id }, data: { unreadCount: remainingUnread, lastReadAt: new Date() } });
+  await prisma.conversationParticipant.update({
+    where: { id: participant.id },
+    data: { unreadCount: remainingUnread, lastReadAt: new Date() },
+  });
 
   const bySender = new Map<string, string[]>();
   for (const m of unreadOwnMessages) {
     bySender.set(m.senderId, [...(bySender.get(m.senderId) ?? []), m.id]);
   }
-  emitToConversation(conversationId, "message:read", { readerId: userId, messageIds: unreadOwnMessages.map((m) => m.id) });
+  emitToConversation(conversationId, "message:read", {
+    readerId: userId,
+    messageIds: unreadOwnMessages.map((m) => m.id),
+  });
 
   return { unreadCount: remainingUnread };
 }
 
 async function getUnreadCount(userId: string) {
   const result = await prisma.conversationParticipant.aggregate({
-    where: { userId, removedAt: null, conversation: { status: { not: ConversationStatus.ARCHIVED } } },
+    where: {
+      userId,
+      removedAt: null,
+      conversation: { status: { not: ConversationStatus.ARCHIVED } },
+    },
     _sum: { unreadCount: true },
   });
   return result._sum.unreadCount ?? 0;
 }
 
-async function freezeConversation(conversationId: string, adminUserId: string, reason: string, ctx: ServiceContext) {
-  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
-  if (!conversation) throw new AppError("messaging/errors:conversationNotFound", StatusCodes.NOT_FOUND);
+async function freezeConversation(
+  conversationId: string,
+  adminUserId: string,
+  reason: string,
+  ctx: ServiceContext
+) {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+  });
+  if (!conversation)
+    throw new AppError(
+      "messaging/errors:conversationNotFound",
+      StatusCodes.NOT_FOUND
+    );
 
   const updated = await prisma.conversation.update({
     where: { id: conversationId },
-    data: { status: ConversationStatus.FROZEN, frozenById: adminUserId, frozenAt: new Date(), freezeReason: reason },
+    data: {
+      status: ConversationStatus.FROZEN,
+      frozenById: adminUserId,
+      frozenAt: new Date(),
+      freezeReason: reason,
+    },
   });
 
   AuditService.record(ctx, "conversations", {
@@ -432,13 +761,28 @@ async function freezeConversation(conversationId: string, adminUserId: string, r
   return updated;
 }
 
-async function unfreezeConversation(conversationId: string, adminUserId: string, ctx: ServiceContext) {
-  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
-  if (!conversation) throw new AppError("messaging/errors:conversationNotFound", StatusCodes.NOT_FOUND);
+async function unfreezeConversation(
+  conversationId: string,
+  adminUserId: string,
+  ctx: ServiceContext
+) {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+  });
+  if (!conversation)
+    throw new AppError(
+      "messaging/errors:conversationNotFound",
+      StatusCodes.NOT_FOUND
+    );
 
   const updated = await prisma.conversation.update({
     where: { id: conversationId },
-    data: { status: ConversationStatus.ACTIVE, frozenById: null, frozenAt: null, freezeReason: null },
+    data: {
+      status: ConversationStatus.ACTIVE,
+      frozenById: null,
+      frozenAt: null,
+      freezeReason: null,
+    },
   });
 
   AuditService.record(ctx, "conversations", {
@@ -455,13 +799,26 @@ async function unfreezeConversation(conversationId: string, adminUserId: string,
 }
 
 /** Admin-only soft delete — content replaced with a fixed removal notice, visible to both parties. */
-async function deleteMessage(messageId: string, adminUserId: string, ctx: ServiceContext) {
+async function deleteMessage(
+  messageId: string,
+  adminUserId: string,
+  ctx: ServiceContext
+) {
   const message = await prisma.message.findUnique({ where: { id: messageId } });
-  if (!message) throw new AppError("messaging/errors:messageNotFound", StatusCodes.NOT_FOUND);
+  if (!message)
+    throw new AppError(
+      "messaging/errors:messageNotFound",
+      StatusCodes.NOT_FOUND
+    );
 
   const updated = await prisma.message.update({
     where: { id: messageId },
-    data: { contentDeleted: true, deletedById: adminUserId, deletedAt: new Date(), status: MessageStatus.DELETED },
+    data: {
+      contentDeleted: true,
+      deletedById: adminUserId,
+      deletedAt: new Date(),
+      status: MessageStatus.DELETED,
+    },
   });
 
   AuditService.record(ctx, "messages", {
@@ -477,9 +834,20 @@ async function deleteMessage(messageId: string, adminUserId: string, ctx: Servic
   return serializeMessage(updated);
 }
 
-async function warnParticipant(conversationId: string, moderatorUserId: string, note: string, ctx: ServiceContext) {
-  const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
-  if (!conversation) throw new AppError("messaging/errors:conversationNotFound", StatusCodes.NOT_FOUND);
+async function warnParticipant(
+  conversationId: string,
+  moderatorUserId: string,
+  note: string,
+  ctx: ServiceContext
+) {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+  });
+  if (!conversation)
+    throw new AppError(
+      "messaging/errors:conversationNotFound",
+      StatusCodes.NOT_FOUND
+    );
 
   AuditService.record(ctx, "conversations", {
     operation: "UPDATE" as any,
@@ -493,7 +861,11 @@ async function warnParticipant(conversationId: string, moderatorUserId: string, 
   return { conversationId, note };
 }
 
-async function listModerationQueue(status: string | undefined, cursor: string | undefined, limit: number) {
+async function listModerationQueue(
+  status: string | undefined,
+  cursor: string | undefined,
+  limit: number
+) {
   const where: any = {};
   if (status) where.status = status;
 
@@ -502,7 +874,17 @@ async function listModerationQueue(status: string | undefined, cursor: string | 
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     take: limit + 1,
-    include: { filterBlock: true, conversation: { select: { id: true, type: true, status: true, blockCountConversation: true } } },
+    include: {
+      filterBlock: true,
+      conversation: {
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          blockCountConversation: true,
+        },
+      },
+    },
   });
 
   const hasNextPage = rows.length > limit;
@@ -510,7 +892,11 @@ async function listModerationQueue(status: string | undefined, cursor: string | 
 
   return {
     data: page,
-    meta: { nextCursor: hasNextPage ? page[page.length - 1].id : null, hasNextPage, limit },
+    meta: {
+      nextCursor: hasNextPage ? page[page.length - 1].id : null,
+      hasNextPage,
+      limit,
+    },
   };
 }
 
@@ -521,12 +907,23 @@ async function reviewModerationItem(
   reviewNote: string | undefined,
   ctx: ServiceContext
 ) {
-  const review = await prisma.moderationReview.findUnique({ where: { id: moderationReviewId } });
-  if (!review) throw new AppError("messaging/errors:moderationReviewNotFound", StatusCodes.NOT_FOUND);
+  const review = await prisma.moderationReview.findUnique({
+    where: { id: moderationReviewId },
+  });
+  if (!review)
+    throw new AppError(
+      "messaging/errors:moderationReviewNotFound",
+      StatusCodes.NOT_FOUND
+    );
 
   const updated = await prisma.moderationReview.update({
     where: { id: moderationReviewId },
-    data: { status, reviewedById: reviewerId, reviewedAt: new Date(), reviewNote },
+    data: {
+      status,
+      reviewedById: reviewerId,
+      reviewedAt: new Date(),
+      reviewNote,
+    },
   });
 
   AuditService.record(ctx, "moderation_reviews", {
@@ -550,7 +947,18 @@ async function getConversationForAdmin(conversationId: string) {
       filterBlocks: { orderBy: { createdAt: "desc" } },
     },
   });
-  if (!conversation) throw new AppError("messaging/errors:conversationNotFound", StatusCodes.NOT_FOUND);
+
+  if (!conversation)
+    throw new AppError(
+      "messaging/errors:conversationNotFound",
+      StatusCodes.NOT_FOUND
+    );
+
+  conversation.participants.forEach((participant) => {
+    participant.user.profilePictureUrl = resolveStorageUrl(
+      participant.user.profilePictureUrl
+    );
+  });
   return conversation;
 }
 

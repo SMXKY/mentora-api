@@ -19,6 +19,7 @@ import { fileTypes } from "../../services/media/media.types";
 import { probeDurationSeconds } from "../../services/media/mediaDuration.util";
 import { getIntroVideoMinDurationSeconds } from "../../services/tutor/introVideoPolicy.service";
 import { queueScoreRecompute } from "../../services/search/searchScore.processor";
+import { toPublicLastNameInitial } from "../../utils/publicProfile.util";
 
 // Both fields are stored as bare relative storage paths — resolve them to
 // fetchable URLs through the active adapter on every read, never on write.
@@ -44,18 +45,6 @@ function withResolvedMediaUrls<
     ),
     introVideoUrl: resolveStorageUrl(profile.introVideoUrl),
   };
-}
-
-// Public-profile-only redaction: full last name is never exposed publicly,
-// only the first initial (e.g. "Ngu" -> "N."). Applied exclusively inside
-// getPublicProfile — never touch this in a path that returns a tutor's own
-// profile to themselves.
-function toPublicLastNameInitial(
-  lastName: string | null | undefined
-): string | null {
-  if (!lastName) return null;
-  const trimmed = lastName.trim();
-  return trimmed ? `${trimmed[0].toUpperCase()}.` : null;
 }
 
 function minOf(values: Array<number | null | undefined>): number | null {

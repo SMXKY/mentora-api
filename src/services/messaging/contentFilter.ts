@@ -73,6 +73,20 @@ function compactForPhoneMatch(text: string): string {
   return reverseSubstitutions(text).replace(/[\s.\-_]/g, "");
 }
 
+// Collapses whitespace that sits directly around "@" or "." for
+// email/URL/social obfuscation, e.g. "tall @ gmail . com". This only
+// closes gaps touching those two characters — unlike compactForPhoneMatch
+// it must NOT strip whitespace everywhere, or unrelated words elsewhere in
+// the message would get glued together and break the \b word-boundary
+// anchors the URL/domain patterns rely on (e.g. "visit myclasses . com for
+// notes" must stay "visit myclasses.com for notes", not merge into "visit
+// myclasses.comfornotes"). It also must NOT run reverseSubstitutions,
+// which turns "@" into "a" (meant for "c@ll" -> "call") and would destroy
+// a real email address's separator.
+function compactWhitespaceForContactMatch(text: string): string {
+  return text.replace(/\s*([@.])\s*/g, "$1");
+}
+
 // ── Layer 3 — intent keywords ────────────────────────────────
 function stripAccents(text: string): string {
   return text.normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -101,9 +115,17 @@ export function filterMessage(content: string, activeKeywords: string[]): Filter
   if (layer1) return { ...layer1, layer: 1, normalisedContent: null };
 
   // Layer 2
-  const compact = compactForPhoneMatch(content);
-  const layer2 = runLayer1(compact);
-  if (layer2) return { result: "BLOCKED_OBFUSCATED", layer: 2, matchedPattern: layer2.matchedPattern, normalisedContent: compact };
+  const compactPhone = compactForPhoneMatch(content);
+  const layer2Phone = runLayer1(compactPhone);
+  if (layer2Phone) {
+    return { result: "BLOCKED_OBFUSCATED", layer: 2, matchedPattern: layer2Phone.matchedPattern, normalisedContent: compactPhone };
+  }
+
+  const compactSpaces = compactWhitespaceForContactMatch(content);
+  const layer2Spaces = runLayer1(compactSpaces);
+  if (layer2Spaces) {
+    return { result: "BLOCKED_OBFUSCATED", layer: 2, matchedPattern: layer2Spaces.matchedPattern, normalisedContent: compactSpaces };
+  }
 
   // Layer 3 — checked against a plain (case/accent-insensitive) variant and,
   // separately, a character-substitution-reversed variant so that both

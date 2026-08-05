@@ -11,6 +11,7 @@
   "inquiryLimitReached": "Vous avez atteint la limite de {{limit}} messages pour les conversations avant réservation. Réservez un cours pour continuer à discuter.",
   "messageBlocked": "Ce message ne peut pas être envoyé — il semble contenir des coordonnées ou un lien. Merci de garder la conversation sur Mentora.",
   "messageNotFound": "Message introuvable.",
+  "replyToNotFound": "Le message auquel vous répondez n'est plus disponible.",
   "moderationReviewNotFound": "Révision de modération introuvable.",
   "sendFailed": "Votre message n'a pas pu être envoyé. Veuillez réessayer."
 }

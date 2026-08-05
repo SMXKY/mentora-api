@@ -87,6 +87,21 @@ describe("filterMessage — Layer 2: obfuscation", () => {
   it("still allows a genuinely clean short numeric mention", () => {
     expect(filterMessage("we have 3 sessions left", KEYWORDS).result).toBe("CLEAN");
   });
+
+  it("catches an email address spaced out around the @ and the dot", () => {
+    const outcome = filterMessage("tall @ gmail . com", KEYWORDS);
+    expect(outcome.result).toBe("BLOCKED_OBFUSCATED");
+    expect(outcome.layer).toBe(2);
+    expect(outcome.matchedPattern).toBe("email");
+  });
+
+  it("catches a bare domain spaced out around the dot", () => {
+    expect(filterMessage("visit myclasses . com for notes", KEYWORDS).result).toBe("BLOCKED_OBFUSCATED");
+  });
+
+  it("still allows ordinary text containing stray spaced punctuation", () => {
+    expect(filterMessage("We covered chapters 1 . 2 and 1 . 3 today", KEYWORDS).result).toBe("CLEAN");
+  });
 });
 
 describe("filterMessage — Layer 3: intent keywords", () => {

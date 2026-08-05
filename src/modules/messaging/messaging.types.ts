@@ -17,6 +17,7 @@ export type StartConversationInput = z.infer<typeof StartConversationSchema>;
 export const SendMessageSchema = z
   .object({
     content: z.string().trim().min(1).max(2000),
+    replyToId: z.string().uuid().optional(),
   })
   .openapi("SendMessage");
 export type SendMessageInput = z.infer<typeof SendMessageSchema>;
