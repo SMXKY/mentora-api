@@ -17,7 +17,44 @@ import {
   DownloadPolicyResponse,
   ModerationRemoveInput,
   CollectionSuspendInput,
+  AdminCollectionSearchQuery,
+  AdminMaterialSearchQuery,
 } from "./materials.types";
+
+interface AdminPaginatedResult<T> {
+  data: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+}
+
+function paginationMeta(total: number, page: number, limit: number) {
+  const totalPages = Math.ceil(total / limit) || 1;
+  return { total, page, limit, totalPages, hasNextPage: page < totalPages, hasPrevPage: page > 1 };
+}
+
+const TUTOR_INFO_SELECT = {
+  id: true,
+  profilePictureUrl: true,
+  user: { select: { firstName: true, lastName: true } },
+} as const;
+
+function toTutorInfo(tutorProfile: {
+  id: string;
+  profilePictureUrl: string | null;
+  user: { firstName: string | null; lastName: string | null };
+}) {
+  return {
+    tutorProfileId: tutorProfile.id,
+    name: [tutorProfile.user.firstName, tutorProfile.user.lastName].filter(Boolean).join(" "),
+    profilePictureUrl: tutorProfile.profilePictureUrl,
+  };
+}
 
 const DOWNLOAD_POLICY_CONFIG_KEY = "materials.download_policy";
 const DEFAULT_DOWNLOAD_POLICY: DownloadPolicyResponse = {
@@ -221,6 +258,103 @@ async function getMaterialVersionHistory(materialId: string) {
   });
 }
 
+// ── Cross-tutor search (Epic 5) ─────────────────────────────────
+async function searchCollections(
+  query: AdminCollectionSearchQuery
+): Promise<AdminPaginatedResult<any>> {
+  const { page, limit, search, tutorProfileId, subjectId, levelId, isPublished, isFreePreview, sortBy, sortOrder } = query;
+
+  const where: Record<string, any> = { deletedAt: null };
+  if (tutorProfileId) where.tutorProfileId = tutorProfileId;
+  if (subjectId) where.subjectId = subjectId;
+  if (levelId) where.levelId = levelId;
+  if (isPublished !== undefined) where.isPublished = isPublished;
+  if (isFreePreview !== undefined) where.isFreePreview = isFreePreview;
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { description: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  // "tutorName" isn't a real column — sort on the joined User's first name.
+  const orderBy =
+    sortBy === "tutorName"
+      ? { tutorProfile: { user: { firstName: sortOrder } } }
+      : { [sortBy]: sortOrder };
+
+  const [rows, total] = await Promise.all([
+    prisma.collection.findMany({
+      where,
+      include: {
+        tutorProfile: { select: TUTOR_INFO_SELECT },
+        subject: { select: { id: true, name: true } },
+        level: { select: { id: true, name: true } },
+      },
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.collection.count({ where }),
+  ]);
+
+  return {
+    data: rows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      description: c.description,
+      subject: c.subject,
+      level: c.level,
+      isPublished: c.isPublished,
+      isFreePreview: c.isFreePreview,
+      createdAt: c.createdAt,
+      tutor: toTutorInfo(c.tutorProfile),
+    })),
+    meta: paginationMeta(total, page, limit),
+  };
+}
+
+async function searchMaterials(
+  query: AdminMaterialSearchQuery
+): Promise<AdminPaginatedResult<any>> {
+  const { page, limit, search, collectionId, tutorProfileId, materialType, isFreePreview, sortBy, sortOrder } = query;
+
+  const where: Record<string, any> = { deletedAt: null };
+  if (collectionId) where.collectionId = collectionId;
+  if (tutorProfileId) where.collection = { tutorProfileId };
+  if (materialType) where.materialType = materialType;
+  if (isFreePreview !== undefined) where.isFreePreview = isFreePreview;
+  if (search) where.name = { contains: search, mode: "insensitive" };
+
+  const [rows, total] = await Promise.all([
+    prisma.material.findMany({
+      where,
+      include: {
+        collection: {
+          select: { id: true, name: true, tutorProfile: { select: TUTOR_INFO_SELECT } },
+        },
+      },
+      orderBy: { [sortBy]: sortOrder },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.material.count({ where }),
+  ]);
+
+  return {
+    data: rows.map((m) => ({
+      id: m.id,
+      name: m.name,
+      materialType: m.materialType,
+      isFreePreview: m.isFreePreview,
+      createdAt: m.createdAt,
+      collection: { id: m.collection.id, name: m.collection.name },
+      tutor: toTutorInfo(m.collection.tutorProfile),
+    })),
+    meta: paginationMeta(total, page, limit),
+  };
+}
+
 export const MaterialsAdminService = {
   getDownloadPolicy,
   updateDownloadPolicy,
@@ -228,6 +362,8 @@ export const MaterialsAdminService = {
   suspendCollection,
   getModerationHistory,
   getMaterialVersionHistory,
+  searchCollections,
+  searchMaterials,
 };
 
 export default MaterialsAdminService;

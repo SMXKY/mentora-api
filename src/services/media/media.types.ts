@@ -17,6 +17,18 @@ export const fileTypes = {
   audio: {
     mp3: { ext: ".mp3", mime: "audio/mpeg" },
     m4a: { ext: ".m4a", mime: "audio/mp4" },
+    // Mobile voice-note recorders (e.g. expo-audio's AAC preset) write an
+    // .m4a file that content-sniffing (the `file-type` package) sometimes
+    // identifies as video/mp4 rather than audio/mp4 — .m4a and video MP4
+    // share the exact same ISO-BMFF container, and the brand string in the
+    // ftyp box isn't always audio-specific, so the sniffer's best guess is
+    // ambiguous. This entry is listed AFTER `m4a` above deliberately: the
+    // extension-match lookup (`.find`, first-match-wins) still resolves an
+    // .m4a file's stored fileType/mimeType to audio/mp4 either way — this
+    // only widens what content-sniffing accepts for files already named
+    // .m4a, it never lets an actual .mp4-named upload through (that's a
+    // separate extension that isn't in this policy's allowed list at all).
+    m4aContainer: { ext: ".m4a", mime: "video/mp4" },
     wav: { ext: ".wav", mime: "audio/wav" },
   },
   video: {

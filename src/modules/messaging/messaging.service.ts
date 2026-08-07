@@ -21,12 +21,17 @@ import { filterMessage } from "../../services/messaging/contentFilter";
 import { messagingConfig } from "../../services/messaging/messagingConfig";
 import { resolveStorageUrl } from "../../services/media";
 import { encodeForLegacyDb, decodeFromLegacyDb } from "../../utils/legacyTextEncoding.util";
+import { UserService } from "../user/user.service";
+import { ReportCategory } from "./messaging.types";
+
+const userService = new UserService();
 
 const DISPLAY_USER_SELECT = {
   id: true,
   firstName: true,
   lastName: true,
   profilePictureUrl: true,
+  lastActiveAt: true,
   tutorProfile: { select: { id: true } },
 };
 
@@ -35,11 +40,17 @@ type DisplayUser = {
   firstName: string | null;
   lastName: string | null;
   profilePictureUrl: string | null;
+  lastActiveAt: Date | null;
   tutorProfile: { id: string } | null;
 };
 
 /** Flattens the tutorProfile relation into a tutorProfileId the client can
- * link straight to the public tutor profile route — null for non-tutors. */
+ * link straight to the public tutor profile route — null for non-tutors.
+ * lastActiveAt is included everywhere this runs (cheap, always selected);
+ * isOnline is deliberately NOT computed here — it needs a live socket-room
+ * check (isUserOnline), which is only worth paying for the single
+ * conversation a viewer is actually looking at (getConversationSummaryForUser),
+ * not for every row in a conversation list. */
 function toDisplayParticipant(user: DisplayUser) {
   return {
     id: user.id,
@@ -47,6 +58,7 @@ function toDisplayParticipant(user: DisplayUser) {
     lastName: user.lastName,
     profilePictureUrl: user.profilePictureUrl,
     tutorProfileId: user.tutorProfile?.id ?? null,
+    lastActiveAt: user.lastActiveAt,
   };
 }
 
@@ -438,6 +450,31 @@ async function sendMessage(
     );
   }
 
+  // Chat-only block enforcement — checked on every send (not just at
+  // conversation-open time) so a block taken mid-conversation takes effect
+  // immediately in both directions, socket or REST.
+  const otherParticipant = conversation.participants.find(
+    (p) => p.userId !== senderId
+  );
+  if (otherParticipant) {
+    const { blockedByA, blockedByB } = await userService.getBlockStatus(
+      senderId,
+      otherParticipant.userId
+    );
+    if (blockedByA) {
+      throw new AppError(
+        "messaging/errors:youBlockedRecipient",
+        StatusCodes.FORBIDDEN
+      );
+    }
+    if (blockedByB) {
+      throw new AppError(
+        "messaging/errors:blockedByRecipient",
+        StatusCodes.FORBIDDEN
+      );
+    }
+  }
+
   const trimmed = (content ?? "").trim();
   // An attachment can carry no caption at all (WhatsApp-style) — only
   // reject empty when there's also no attachment to send.
@@ -629,12 +666,27 @@ async function getConversationSummaryForUser(
     messagesRemaining = Math.max(inquiryMessageLimit - messageCount, 0);
   }
 
+  // Both are cheap enough to always compute for a single open conversation
+  // (unlike listConversations, where doing this per-row would multiply
+  // out) — isOnline is a live socket-room check, block status two indexed
+  // lookups.
+  const [isOnline, blockStatus] = other?.user
+    ? await Promise.all([
+        isUserOnline(other.user.id),
+        userService.getBlockStatus(userId, other.user.id),
+      ])
+    : [false, { blockedByA: false, blockedByB: false }];
+
   return {
     conversationId,
     type: conversation.type,
     status: conversation.status,
-    otherParticipant: other?.user ? toDisplayParticipant(other.user) : null,
+    otherParticipant: other?.user
+      ? { ...toDisplayParticipant(other.user), isOnline }
+      : null,
     messagesRemaining,
+    iBlockedThem: blockStatus.blockedByA,
+    theyBlockedMe: blockStatus.blockedByB,
   };
 }
 
@@ -807,6 +859,49 @@ async function markAsRead(
   });
 
   return { unreadCount: remainingUnread };
+}
+
+/**
+ * Feeds the SAME Trust & Safety review queue the automated content filter
+ * already escalates into (ModerationReview, trigger MANUAL_REPORT — a value
+ * the enum already had, unused until now) — reusing the existing admin
+ * workflow/permissions rather than building a parallel one. Who's being
+ * reported isn't a column on ModerationReview; an admin infers it from
+ * conversationId's participants minus reportedById, which is unambiguous
+ * for a 1:1 conversation.
+ */
+async function reportUser(
+  reporterId: string,
+  conversationId: string,
+  category: ReportCategory,
+  note: string | undefined,
+  ctx: ServiceContext
+) {
+  await loadConversationForParticipant(conversationId, reporterId);
+
+  const reportReason = (note ? `${category}: ${note}` : category).slice(
+    0,
+    255
+  );
+
+  const review = await prisma.moderationReview.create({
+    data: {
+      conversationId,
+      trigger: ModerationReviewTrigger.MANUAL_REPORT,
+      reportedById: reporterId,
+      reportReason,
+    },
+  });
+
+  AuditService.record(ctx, "moderation_reviews", {
+    operation: "CREATE" as any,
+    category: "WRITE" as any,
+    recordId: review.id,
+    newState: { trigger: "MANUAL_REPORT", reportReason },
+    eventType: "user_reported",
+  });
+
+  return { id: review.id };
 }
 
 async function getUnreadCount(userId: string) {
@@ -1092,6 +1187,7 @@ export const MessagingService = {
   listConversations,
   listMessages,
   markAsRead,
+  reportUser,
   getUnreadCount,
   freezeConversation,
   unfreezeConversation,

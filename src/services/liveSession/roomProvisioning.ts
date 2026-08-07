@@ -1,4 +1,5 @@
 import { roomServiceClient } from "../../config/livekit.config";
+import { liveSessionConfig } from "./liveSessionConfig";
 
 // Self-hosted LiveKit (single node, no Redis-backed room persistence) holds
 // room state in memory only — a container restart (crash, `docker compose
@@ -10,8 +11,8 @@ import { roomServiceClient } from "../../config/livekit.config";
 // exist". No dependency on liveSession.service.ts or
 // roomLifecycle.processor.ts here on purpose — both of those import from
 // each other already, and this needs to be callable from both without
-// creating a cycle.
-const EMPTY_TIMEOUT_MINUTES = 30;
+// creating a cycle. liveSessionConfig has no such dependency, so it's safe
+// to pull the (admin-configurable) empty-room grace period from there.
 const DEPARTURE_TIMEOUT_MINUTES = 15;
 
 export interface RoomProvisioningInput {
@@ -26,9 +27,10 @@ export interface RoomProvisioningInput {
 /** Recreates the LiveKit room with the same name/params the original creation used. */
 export async function recreateLiveKitRoom(input: RoomProvisioningInput): Promise<void> {
   const maxParticipants = input.isGroupSession ? (input.maxStudents ?? 20) + 1 : 2;
+  const { emptyTimeoutMinutes } = await liveSessionConfig.getAll();
   await roomServiceClient.createRoom({
     name: input.roomName,
-    emptyTimeout: EMPTY_TIMEOUT_MINUTES * 60,
+    emptyTimeout: emptyTimeoutMinutes * 60,
     departureTimeout: DEPARTURE_TIMEOUT_MINUTES * 60,
     maxParticipants,
     metadata: JSON.stringify({

@@ -276,3 +276,38 @@ export const CollectionSuspendSchema = z
   })
   .openapi("MaterialsCollectionSuspend");
 export type CollectionSuspendInput = z.infer<typeof CollectionSuspendSchema>;
+
+// ── Admin: cross-tutor search ───────────────────────────────
+// Epic 5 (Admin Routes & API Docs Overhaul) — browse/search every tutor's
+// material collections, and every material, platform-wide, not one
+// tutor at a time.
+const AdminSearchPaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  search: z.string().trim().max(200).optional(),
+});
+
+export const AdminCollectionSearchQuerySchema = AdminSearchPaginationSchema.extend({
+  tutorProfileId: z.string().uuid("common/errors:validation.invalidFormat").optional(),
+  subjectId: z.string().uuid("common/errors:validation.invalidFormat").optional(),
+  levelId: z.string().uuid("common/errors:validation.invalidFormat").optional(),
+  isPublished: z.coerce.boolean().optional(),
+  isFreePreview: z.coerce.boolean().optional(),
+  sortBy: z.enum(["name", "createdAt", "tutorName"]).optional().default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+})
+  .openapi("MaterialsAdminCollectionSearchQuery");
+export type AdminCollectionSearchQuery = z.infer<typeof AdminCollectionSearchQuerySchema>;
+
+export const AdminMaterialSearchQuerySchema = AdminSearchPaginationSchema.extend({
+  collectionId: z.string().uuid("common/errors:validation.invalidFormat").optional(),
+  tutorProfileId: z.string().uuid("common/errors:validation.invalidFormat").optional(),
+  materialType: z
+    .enum(["VIDEO", "AUDIO", "DOCUMENT", "IMAGE", "WRITTEN_NOTE"])
+    .optional(),
+  isFreePreview: z.coerce.boolean().optional(),
+  sortBy: z.enum(["name", "createdAt", "orderIndex"]).optional().default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+})
+  .openapi("MaterialsAdminMaterialSearchQuery");
+export type AdminMaterialSearchQuery = z.infer<typeof AdminMaterialSearchQuerySchema>;

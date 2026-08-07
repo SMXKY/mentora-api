@@ -101,6 +101,12 @@ export function initializeSocketIO(httpServer: HttpServer): Server {
     // a client chooses or overrides this.
     socket.join(userRoom(userId));
 
+    // "Online" in the UI is the live isUserOnline() check below, not this —
+    // lastActiveAt only matters once the user has actually disconnected, so
+    // this connect-time write mainly covers the edge case of a user who
+    // connects and is queried before ever disconnecting again.
+    touchLastActive(userId);
+
     sendInitialNotificationState(authed);
 
     // ── Notification events ──
@@ -237,11 +243,15 @@ export function initializeSocketIO(httpServer: HttpServer): Server {
     });
 
     socket.on("session:call:accept", (payload: { bookingId: string; callerId: string }) => {
-      LiveSessionService.respondToCall(userId, payload?.bookingId, payload?.callerId, true);
+      LiveSessionService.acceptCall(userId, payload?.bookingId, payload?.callerId);
     });
 
-    socket.on("session:call:reject", (payload: { bookingId: string; callerId: string }) => {
-      LiveSessionService.respondToCall(userId, payload?.bookingId, payload?.callerId, false);
+    socket.on("session:leave", async (payload: { bookingId: string }) => {
+      try {
+        await LiveSessionService.notifyPeerLeft(userId, payload?.bookingId);
+      } catch (err) {
+        console.error({ event: "socket_session_leave_error", error: err instanceof Error ? err.message : String(err) });
+      }
     });
 
     socket.on("disconnect", () => {
@@ -256,6 +266,12 @@ export function initializeSocketIO(httpServer: HttpServer): Server {
           socket.to(conversationRoom(conversationId)).emit("typing:stop", { conversationId, userId });
         }
       }
+      // This is the write that actually matters for "last seen" — a user
+      // with another tab/device still connected stays reported "online" via
+      // isUserOnline() regardless, so an extra write here while they're
+      // still online elsewhere is harmless, just gets overwritten again on
+      // their real final disconnect.
+      touchLastActive(userId);
     });
   });
 
@@ -324,4 +340,19 @@ export async function isUserOnline(userId: string): Promise<boolean> {
   if (!ioInstance) return false;
   const sockets = await ioInstance.in(userRoom(userId)).fetchSockets();
   return sockets.length > 0;
+}
+
+// Fire-and-forget: presence tracking must never fail or slow down a
+// connect/disconnect. A dropped write just means a slightly stale "last
+// seen" timestamp, never a broken connection.
+function touchLastActive(userId: string): void {
+  prisma.user
+    .update({ where: { id: userId }, data: { lastActiveAt: new Date() } })
+    .catch((err) => {
+      console.error({
+        event: "touch_last_active_error",
+        userId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 }

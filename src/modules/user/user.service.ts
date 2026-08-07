@@ -347,4 +347,56 @@ export class UserService extends BaseService<
       reviews: reviewsPage.data,
     };
   }
+
+  /**
+   * Chat-only block — deliberately doesn't touch search results or booking
+   * eligibility (see the UserBlock model comment). Enforcement lives in
+   * MessagingService.sendMessage, which checks getBlockStatus for the
+   * conversation's other participant on every send.
+   */
+  async blockUser(blockerId: string, blockedId: string) {
+    if (blockerId === blockedId) {
+      throw new AppError("common/errors:forbidden", StatusCodes.BAD_REQUEST);
+    }
+    const target = await prisma.user.findFirst({
+      where: { id: blockedId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!target) {
+      throw new AppError("auth/errors:userNotFound", StatusCodes.NOT_FOUND);
+    }
+    await prisma.userBlock.upsert({
+      where: { blockerId_blockedId: { blockerId, blockedId } },
+      create: { blockerId, blockedId },
+      update: {},
+    });
+    return { blocked: true };
+  }
+
+  async unblockUser(blockerId: string, blockedId: string) {
+    await prisma.userBlock.deleteMany({ where: { blockerId, blockedId } });
+    return { blocked: false };
+  }
+
+  /** Direction-aware — the caller needs to know not just "is this pair
+   * blocked" but which side did it, since the UI/error message differs
+   * ("you blocked them" vs "they blocked you"). */
+  async getBlockStatus(
+    userIdA: string,
+    userIdB: string
+  ): Promise<{ blockedByA: boolean; blockedByB: boolean }> {
+    const rows = await prisma.userBlock.findMany({
+      where: {
+        OR: [
+          { blockerId: userIdA, blockedId: userIdB },
+          { blockerId: userIdB, blockedId: userIdA },
+        ],
+      },
+      select: { blockerId: true },
+    });
+    return {
+      blockedByA: rows.some((r) => r.blockerId === userIdA),
+      blockedByB: rows.some((r) => r.blockerId === userIdB),
+    };
+  }
 }

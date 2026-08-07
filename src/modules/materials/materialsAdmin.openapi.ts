@@ -5,6 +5,8 @@ import {
   DownloadPolicyResponseSchema,
   ModerationRemoveSchema,
   CollectionSuspendSchema,
+  AdminCollectionSearchQuerySchema,
+  AdminMaterialSearchQuerySchema,
 } from "./materials.types";
 
 // ============================================================
@@ -96,4 +98,35 @@ registry.registerPath({
   ...bearer,
   request: { params: z.object({ tutorId: z.string().uuid() }) },
   responses: { 200: { description: "History" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: `${basePath}/collections`,
+  tags,
+  summary: "Search/browse every tutor's material collections, platform-wide",
+  description:
+    "Paginated (page/limit), text search across name+description, filters " +
+    "(tutorProfileId, subjectId, levelId, isPublished, isFreePreview), sort " +
+    "by name/createdAt/tutorName. Each result has tutor info (id, name, " +
+    "photo) attached — no second lookup needed. Active (non-deleted) " +
+    "collections only.",
+  ...bearer,
+  request: { query: AdminCollectionSearchQuerySchema },
+  responses: { 200: { description: "Page of collections, with pagination meta" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: `${basePath}/materials`,
+  tags,
+  summary: "Search/browse every material across every tutor, platform-wide",
+  description:
+    "Paginated, text search on name, filters (collectionId, tutorProfileId, " +
+    "materialType, isFreePreview), sort by name/createdAt/orderIndex. Scope " +
+    "to one collection via collectionId, or one tutor via tutorProfileId. " +
+    "Tutor info attached per result. Active (non-deleted) materials only.",
+  ...bearer,
+  request: { query: AdminMaterialSearchQuerySchema },
+  responses: { 200: { description: "Page of materials, with pagination meta" } },
 });

@@ -18,8 +18,6 @@ import {
 import { roomServiceClient, createAccessToken, VideoGrant } from "../../config/livekit.config";
 import { ensureLiveKitRoomExists } from "../../services/liveSession/roomProvisioning";
 import { LIVEKIT_URL } from "../../utils/enviromentVariablesCheck.util";
-import { MediaService } from "../../services/media/media.service";
-import { fileTypes } from "../../services/media/media.types";
 import { permissions } from "../../data/permission.data";
 import { emitToUser } from "../../socket/index";
 import {
@@ -33,8 +31,6 @@ import {
   ConnectionQuality,
   NotificationType,
   NotificationResourceType,
-  FileCategory,
-  FileType,
 } from "../../generated/prisma";
 
 const TOKEN_EXPIRY_BUFFER_SECONDS = 30 * 60;
@@ -114,6 +110,59 @@ async function resolveSessionAccess(bookingId: string, userId: string): Promise<
     role: isStudentBooker ? "STUDENT" : "PARENT",
     participantRole: isStudentBooker ? ParticipantRole.STUDENT : ParticipantRole.PARENT,
   };
+}
+
+/**
+ * Backs the persistent app-wide "session live" banner (Epic 4): every ACTIVE
+ * 1:1 room the user is a party to, regardless of whether this device is the
+ * one currently inside LiveSessionScreen — so it's correct even on a device
+ * that never received the original call/room_live push (cold start, a
+ * second device, a missed socket event).
+ */
+async function listActiveSessionsForUser(userId: string) {
+  const rooms = await prisma.liveRoom.findMany({
+    where: {
+      status: LiveRoomStatus.ACTIVE,
+      booking: {
+        deletedAt: null,
+        isGroupSession: false,
+        OR: [{ bookerId: userId }, { tutorProfile: { userId } }],
+      },
+    },
+    include: {
+      booking: {
+        select: {
+          bookerId: true,
+          tutorProfile: {
+            select: { userId: true, profilePictureUrl: true, user: { select: { firstName: true, lastName: true } } },
+          },
+          booker: { select: { firstName: true, lastName: true, profilePictureUrl: true } },
+        },
+      },
+    },
+  });
+
+  return rooms.map((room) => {
+    const isTutor = room.booking.tutorProfile.userId === userId;
+    const counterpart = isTutor
+      ? room.booking.booker
+        ? { firstName: room.booking.booker.firstName, lastName: room.booking.booker.lastName, profilePictureUrl: room.booking.booker.profilePictureUrl }
+        : null
+      : {
+          firstName: room.booking.tutorProfile.user.firstName,
+          lastName: room.booking.tutorProfile.user.lastName,
+          profilePictureUrl: room.booking.tutorProfile.profilePictureUrl,
+        };
+
+    return {
+      bookingId: room.bookingId,
+      scheduledStartAt: room.scheduledStartAt,
+      scheduledEndAt: room.scheduledEndAt,
+      actualStartAt: room.actualStartAt,
+      counterpartName: counterpart ? [counterpart.firstName, counterpart.lastName].filter(Boolean).join(" ") : null,
+      counterpartPhotoUrl: counterpart?.profilePictureUrl ?? null,
+    };
+  });
 }
 
 async function getRoomOrThrow(bookingId: string) {
@@ -221,6 +270,13 @@ async function generateToken(
     identity: userId,
     role: access.role,
     expiresInSeconds: ttlSeconds,
+    // Server-authoritative timer inputs — the client derives its countdown
+    // from these plus its own request/response round trip rather than
+    // trusting its local clock, which can be skewed or drift during a call.
+    serverNow: new Date().toISOString(),
+    scheduledStartAt: liveRoom.scheduledStartAt.toISOString(),
+    scheduledEndAt: liveRoom.scheduledEndAt.toISOString(),
+    actualStartAt: liveRoom.actualStartAt ? liveRoom.actualStartAt.toISOString() : null,
   };
 }
 
@@ -267,6 +323,20 @@ async function initiateCall(callerId: string, bookingId: string): Promise<void> 
   const calleeId = access.role === "TUTOR" ? access.booking.bookerId : access.booking.tutorProfile.userId;
   if (!calleeId) return;
 
+  // A callee who has already joined this room before (i.e. this is a
+  // reconnect/rejoin, not their first time being called for this session)
+  // never gets the full-screen incoming-call UI again — LiveKit's own
+  // reconnect flow handles a transient drop, and the persistent "session
+  // live" banner (see LiveSessionBanner) covers the case where they need a
+  // way back in.
+  const liveRoom = await prisma.liveRoom.findUnique({ where: { bookingId } });
+  if (liveRoom) {
+    const existingCalleeParticipant = await prisma.sessionParticipant.findUnique({
+      where: { liveRoomId_userId: { liveRoomId: liveRoom.id, userId: calleeId } },
+    });
+    if (existingCalleeParticipant?.firstJoinedAt) return;
+  }
+
   const key = ringKey(bookingId, calleeId);
   if (pendingRings.has(key)) return; // already ringing this callee for this booking
 
@@ -284,16 +354,22 @@ async function initiateCall(callerId: string, bookingId: string): Promise<void> 
     ringSeconds: RING_TIMEOUT_MS / 1000,
   });
 
+  // The socket emit above only reaches a foregrounded, connected client —
+  // it produces no sound/vibration on a locked or backgrounded device.
+  // This push (OS default sound/ringtone, nothing overridden — see
+  // push.channel.ts) is what actually makes the device ring, so it has to
+  // fire now, at call start, not only after the ring is already missed.
+  NotificationService.send({
+    type: NotificationType.SESSION_INCOMING_CALL,
+    target: { kind: "user", userId: calleeId },
+    resourceType: NotificationResourceType.BOOKING,
+    resourceId: bookingId,
+    data: { callerName },
+  }).catch(() => undefined);
+
   const timeout = setTimeout(() => {
     pendingRings.delete(key);
     emitToUser(callerId, "session:call:missed", { bookingId, calleeId });
-    NotificationService.send({
-      type: NotificationType.SESSION_INCOMING_CALL,
-      target: { kind: "user", userId: calleeId },
-      resourceType: NotificationResourceType.BOOKING,
-      resourceId: bookingId,
-      data: { callerName },
-    }).catch(() => undefined);
   }, RING_TIMEOUT_MS);
 
   pendingRings.set(key, timeout);
@@ -308,9 +384,32 @@ function clearRing(bookingId: string, calleeId: string): void {
   }
 }
 
-function respondToCall(calleeId: string, bookingId: string, callerId: string, accepted: boolean): void {
+/**
+ * Distinguishes "left on purpose" from a network drop for the other party's
+ * UI (a network drop leaves the LiveKit room's participant list looking the
+ * same either way — LiveKit itself doesn't tell the other side why someone
+ * disappeared). Fired from the client's unmount/leave path, not from a
+ * button click specifically, so it fires the same way whether the user hit
+ * Leave, hit End Session, or just navigated away.
+ */
+async function notifyPeerLeft(leavingUserId: string, bookingId: string): Promise<void> {
+  const access = await resolveSessionAccess(bookingId, leavingUserId).catch(() => null);
+  if (!access || access.booking.isGroupSession) return;
+
+  const peerId = access.role === "TUTOR" ? access.booking.bookerId : access.booking.tutorProfile.userId;
+  if (!peerId) return;
+
+  emitToUser(peerId, "session:peer_left", { bookingId, userId: leavingUserId });
+}
+
+// "Ignore" (the only other choice on the incoming prompt) is intentionally
+// not a server call at all — it never tells the caller anything, the ring
+// just stops locally. There's nothing to "reject": Epic 1 dropped the
+// accept/decline gate entirely, the session already exists the moment
+// either party starts it.
+function acceptCall(calleeId: string, bookingId: string, callerId: string): void {
   clearRing(bookingId, calleeId);
-  emitToUser(callerId, accepted ? "session:call:accepted" : "session:call:rejected", { bookingId, calleeId });
+  emitToUser(callerId, "session:call:accepted", { bookingId, calleeId });
 }
 
 async function generateObserverToken(ctx: ServiceContext, bookingId: string) {
@@ -433,11 +532,15 @@ async function endSession(tutorUserId: string, bookingId: string, ctx: ServiceCo
     eventType: "live_session_ended_by_tutor",
   });
 
-  // Deleting the room disconnects everyone and triggers LiveKit's own
-  // room_finished webhook, which does the actual overlap calc + hand-off —
-  // this proxy endpoint only needs to authorize, audit, and pre-tag why.
-  await roomServiceClient.deleteRoom(liveRoom.roomName).catch(() => undefined);
-
+  // Graceful leave, not a hard delete: the tutor's own client disconnects
+  // itself after this call succeeds (see endCall in LiveSessionScreen), but
+  // the room itself stays up for the other party to keep talking or wrap up
+  // — deleteRoom() used to disconnect everyone immediately, which meant
+  // "End Session" from the tutor's side cut the student off mid-sentence.
+  // The room only actually closes once occupancy hits 0 and LiveKit's own
+  // emptyTimeout elapses, firing room_finished -> handleRoomFinished ->
+  // finalizeSession, which will use the endReason set above (TUTOR_ENDED)
+  // rather than falling back to ALL_LEFT.
   return { ended: true };
 }
 
@@ -535,29 +638,6 @@ async function postChatMessage(userId: string, bookingId: string, content: strin
   });
 }
 
-async function exportWhiteboard(
-  userId: string,
-  bookingId: string,
-  file: { tempFilePath: string; originalFileName: string }
-) {
-  await resolveSessionAccess(bookingId, userId);
-  const liveRoom = await getRoomOrThrow(bookingId);
-
-  const [result] = await MediaService.upload([file], {
-    uploadedById: userId,
-    fileCategory: FileCategory.WHITEBOARD_EXPORT,
-    fileType: FileType.IMAGE,
-    allowedTypes: [fileTypes.image.png],
-    maxSizeMB: 20,
-    refTable: "live_rooms",
-    refRecordId: liveRoom.id,
-  });
-
-  await prisma.liveRoom.update({ where: { id: liveRoom.id }, data: { whiteboardFileId: result.fileId } });
-
-  return { fileId: result.fileId };
-}
-
 async function getAdminAudit(bookingId: string) {
   const liveRoom = await prisma.liveRoom.findUnique({
     where: { bookingId },
@@ -590,10 +670,22 @@ async function handleRoomStarted(roomName: string): Promise<void> {
     data: { status: LiveRoomStatus.ACTIVE, actualStartAt: liveRoom.actualStartAt ?? new Date() },
   });
 
-  const booking = await prisma.booking.findUnique({ where: { id: liveRoom.bookingId } });
+  const booking = await prisma.booking.findUnique({
+    where: { id: liveRoom.bookingId },
+    include: { tutorProfile: { select: { userId: true } } },
+  });
   if (booking && booking.status === BookingStatus.PAID) {
     assertValidTransition(booking.status, BookingStatus.IN_PROGRESS);
     await prisma.booking.update({ where: { id: booking.id }, data: { status: BookingStatus.IN_PROGRESS } });
+  }
+
+  // Feeds the persistent app-wide "session live" banner (Epic 4) for
+  // whichever party isn't currently the one inside LiveSessionScreen —
+  // 1:1 only, group sessions already get their own room_live push from
+  // notifyGroupRoomLive at token-generation time.
+  if (booking && !booking.isGroupSession) {
+    const partyIds = [booking.tutorProfile.userId, booking.bookerId].filter((id): id is string => !!id);
+    for (const uid of partyIds) emitToUser(uid, "session:room_live", { bookingId: liveRoom.bookingId });
   }
 }
 
@@ -716,8 +808,19 @@ async function finalizeSession(liveRoomId: string, endReason: SessionEndReason |
     },
   });
 
-  const booking = await prisma.booking.findUnique({ where: { id: liveRoom.bookingId } });
+  const booking = await prisma.booking.findUnique({
+    where: { id: liveRoom.bookingId },
+    include: { tutorProfile: { select: { userId: true } } },
+  });
   if (!booking) return;
+
+  // Clears the persistent "session live" banner app-wide, including on a
+  // device that never joined this particular room — the room can close
+  // while a party is only ever getting there via the banner itself.
+  if (!booking.isGroupSession) {
+    const partyIds = [booking.tutorProfile.userId, booking.bookerId].filter((id): id is string => !!id);
+    for (const uid of partyIds) emitToUser(uid, "session:room_ended", { bookingId: liveRoom.bookingId });
+  }
 
   if (booking.status === BookingStatus.IN_PROGRESS) {
     assertValidTransition(booking.status, BookingStatus.AWAITING_CONFIRMATION);
@@ -775,10 +878,12 @@ async function handleRoomFinished(roomName: string): Promise<void> {
 export const LiveSessionService = {
   resolveSessionAccess,
   getRoomOrThrow,
+  listActiveSessionsForUser,
   generateToken,
   generateObserverToken,
   initiateCall,
-  respondToCall,
+  acceptCall,
+  notifyPeerLeft,
   muteParticipant,
   removeParticipant,
   lockRoom,
@@ -788,7 +893,6 @@ export const LiveSessionService = {
   recordConnectionQuality,
   listChat,
   postChatMessage,
-  exportWhiteboard,
   getAdminAudit,
   handleRoomStarted,
   handleParticipantJoined,

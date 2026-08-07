@@ -57,53 +57,95 @@ export class UserRepository extends BaseRepository<any> {
     return records.map((r) => this.omitPassword(r));
   }
 
+  // ============================================================
+  // ROLES BY DEFAULT
+  // Every admin-facing "get users" read (list, search, get-by-id,
+  // deleted-list, deleted-get-by-id) includes role data without the
+  // caller needing ?include=userRoles — userRoles is merged into the
+  // include on every read below and flattened to a plain `roles:
+  // string[]` of role names, matching the shape UserService.getMe()
+  // already uses for the self-service /me endpoint.
+  // ============================================================
+
+  private readonly rolesInclude = {
+    userRoles: { where: { isActive: true }, include: { role: true } },
+  };
+
+  private withRolesInclude(
+    include?: Record<string, boolean | object>
+  ): Record<string, boolean | object> {
+    return { ...(include ?? {}), ...this.rolesInclude };
+  }
+
+  private flattenRoles<R>(record: R): R {
+    if (record && typeof record === "object" && "userRoles" in (record as any)) {
+      const { userRoles, ...rest } = record as any;
+      return { ...rest, roles: (userRoles as any[]).map((ur) => ur.role.name) } as R;
+    }
+    return record;
+  }
+
+  private flattenRolesFromList<R>(records: R[]): R[] {
+    return records.map((r) => this.flattenRoles(r));
+  }
+
   async findById(
     id: string,
     include?: Record<string, boolean | object>
   ): Promise<any> {
-    return this.omitPassword(await super.findById(id, include));
+    const record = await super.findById(id, this.withRolesInclude(include));
+    return this.flattenRoles(this.omitPassword(record));
   }
 
   async findOne(
     where: Record<string, any>,
     include?: Record<string, boolean | object>
   ): Promise<any> {
-    return this.omitPassword(await super.findOne(where, include));
+    const record = await super.findOne(where, this.withRolesInclude(include));
+    return this.flattenRoles(this.omitPassword(record));
   }
 
   async findAll(
     where: Record<string, any> = {},
     include?: Record<string, boolean | object>
   ): Promise<any[]> {
-    return this.omitPasswordFromList(await super.findAll(where, include));
+    const records = await super.findAll(where, this.withRolesInclude(include));
+    return this.flattenRolesFromList(this.omitPasswordFromList(records));
   }
 
   async findMany(
     options: OffsetFindOptions = {}
   ): Promise<OffsetPaginatedResult<any>> {
-    const result = await super.findMany(options);
-    return { ...result, data: this.omitPasswordFromList(result.data) };
+    const result = await super.findMany(
+      options.select ? options : { ...options, include: this.withRolesInclude(options.include) }
+    );
+    return { ...result, data: this.flattenRolesFromList(this.omitPasswordFromList(result.data)) };
   }
 
   async findManyCursor(
     options: CursorFindOptions = {}
   ): Promise<CursorPaginatedResult<any>> {
-    const result = await super.findManyCursor(options);
-    return { ...result, data: this.omitPasswordFromList(result.data) };
+    const result = await super.findManyCursor(
+      options.select ? options : { ...options, include: this.withRolesInclude(options.include) }
+    );
+    return { ...result, data: this.flattenRolesFromList(this.omitPasswordFromList(result.data)) };
   }
 
   async findDeleted(
     options: OffsetFindOptions = {}
   ): Promise<OffsetPaginatedResult<any>> {
-    const result = await super.findDeleted(options);
-    return { ...result, data: this.omitPasswordFromList(result.data) };
+    const result = await super.findDeleted(
+      options.select ? options : { ...options, include: this.withRolesInclude(options.include) }
+    );
+    return { ...result, data: this.flattenRolesFromList(this.omitPasswordFromList(result.data)) };
   }
 
   async findDeletedById(
     id: string,
     include?: Record<string, boolean | object>
   ): Promise<any> {
-    return this.omitPassword(await super.findDeletedById(id, include));
+    const record = await super.findDeletedById(id, this.withRolesInclude(include));
+    return this.flattenRoles(this.omitPassword(record));
   }
 
   async create(data: Record<string, any>): Promise<any> {

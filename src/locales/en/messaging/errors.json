@@ -13,6 +13,8 @@
   "messageNotFound": "Message not found.",
   "replyToNotFound": "The message you're replying to isn't available anymore.",
   "attachmentNotFound": "That attachment couldn't be found. Please try attaching it again.",
+  "youBlockedRecipient": "You've blocked this user. Unblock them to send a message.",
+  "blockedByRecipient": "This message couldn't be delivered.",
   "moderationReviewNotFound": "Moderation review not found.",
   "sendFailed": "Your message couldn't be sent. Please try again."
 }

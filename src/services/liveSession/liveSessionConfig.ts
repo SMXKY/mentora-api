@@ -26,6 +26,12 @@ export const liveSessionConfig = createConfigGroup({
     description: "Minimum Tutor/Student overlap percentage of scheduled duration below which a session is auto-flagged for Admin review before escrow release",
     default: 50,
   },
+  emptyTimeoutMinutes: {
+    key: "live_sessions.empty_timeout_minutes",
+    category: ConfigCategory.LIVE_SESSIONS,
+    description: "Grace period a LiveKit room is kept alive after it becomes empty (0 occupants) before LiveKit auto-closes it and fires room_finished — this is the only thing that actually ends a session now that manual End Session is a graceful leave rather than a hard delete",
+    default: 30,
+  },
 });
 
 export type LiveSessionConfig = Awaited<ReturnType<typeof liveSessionConfig.getAll>>;

@@ -10,7 +10,19 @@ The service is split into four layers, each with one job.
 
 **`media.types.ts`** is the contract layer. It exports `fileTypes`, a fixed catalogue of extension/MIME pairs (`fileTypes.image.jpg`, `fileTypes.video.mp4`, etc.) so nobody ever types a raw string like `".jpg"` into a call site. It also holds `categoryFolderMap`, which is the single place that decides which physical folder a `FileCategory` lands in. Callers never construct a path — they just say what category the file belongs to, and the service resolves it.
 
-**`storage/`** is the actual bytes layer. `storage.adapter.ts` defines a small interface — `put`, `remove`, `resolveUrl`, `fetchToTemp` — and `dev.storage.ts` / `ftp.storage.ts` each implement it for local disk and for Interserver's FTP respectively. `storage/index.ts` picks whichever one applies based on `NODE_ENV`. This is the layer that would change if you ever switched providers, and it's the only layer that would need to change — nothing above it knows or cares whether bytes are sitting on disk or on an FTP server.
+**The storage adapters** (flat inside `src/services/media/`, not a nested
+`storage/` subfolder — corrected here, Epic 4 sweep) are the actual bytes
+layer. `storage.adapter.ts` defines a small interface — `put`, `remove`,
+`resolveUrl`, `fetchToTemp` — and three adapters implement it:
+`dev.storage.ts` (local disk), `ftp.storage.ts` (Interserver FTP), and
+`cloudflare.sotrage.ts` (Cloudflare R2 — **added since this doc was
+originally written**; note the filename's typo, `sotrage` not `storage`, is
+in the actual file on disk). `index.ts`'s `getStorageAdapter()` picks which
+one based on `STORAGE_PROVIDER` (`"r2"` / `"ftp"` / `"dev"`) if set,
+otherwise falls back to `NODE_ENV === "production" ? ftp : dev`. This is the
+layer that would change if you ever switched providers, and it's the only
+layer that would need to change — nothing above it knows or cares which of
+disk, FTP, or R2 the bytes are sitting on.
 
 Critically, **no URL is ever stored in the database.** Only the relative `storagePath` (e.g. `kyc-documents/uuid-front.jpg`) is saved. The base URL — dev's `localhost:3000/uploads` or production's FTP base — is resolved fresh every time `getFileUrl()` is called, by whichever adapter is active. If you migrate providers next year, every existing file record keeps working with zero data migration.
 

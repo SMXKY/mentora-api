@@ -11,6 +11,7 @@ import {
   ListConversationsQuerySchema,
   ListMessagesQuerySchema,
   MarkAsReadSchema,
+  ReportUserSchema,
   FreezeConversationSchema,
   WarnParticipantSchema,
   ReviewModerationSchema,
@@ -59,7 +60,12 @@ router.post(
   validate(MarkAsReadSchema),
   messagingController.markAsRead
 );
-
+router.post(
+  "/:id/report",
+  validate(ParamsConversationId, "params"),
+  validate(ReportUserSchema),
+  messagingController.reportUser
+);
 // ── Admin/Moderator ──
 router.post(
   "/:id/freeze",

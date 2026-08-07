@@ -10,6 +10,11 @@ import { sessionStartAt, watCalendarDate } from "../availability/availability.lo
 import { BookingService } from "./booking.service";
 
 const CHECKIN_OPENS_MINUTES_BEFORE = 15;
+// Escalation step between the at-start reminder and the 30-min admin
+// no-show flag (bookingConfig.homeNoShowGraceMinutes) — not itself
+// admin-configurable, since it's just a nudge to the party, not a
+// business-affecting threshold like the no-show flag is.
+const CHECKIN_OVERDUE_GRACE_MINUTES = 10;
 
 async function checkIn(userId: string, bookingId: string) {
   const { booking, isBooker, isTutor } = await BookingService.getBookingForUser(bookingId, userId);
@@ -83,6 +88,85 @@ async function checkOut(userId: string, bookingId: string) {
   return BookingService.serializeBooking(await prisma.booking.findUniqueOrThrow({ where: { id: bookingId } }));
 }
 
+/** Sends type (REMINDER or OVERDUE) once per party who still hasn't checked
+ * in for this booking — deduped per-recipient via a Notification existence
+ * check, since (unlike the admin-facing no-show flag) this can legitimately
+ * need to go to one party, the other, or both independently. */
+async function sendPerPartyCheckinNotice(
+  booking: {
+    id: string;
+    tutorCheckedInAt: Date | null;
+    bookerCheckedInAt: Date | null;
+    bookerId: string | null;
+    tutorProfile: { userId: string };
+  },
+  type: typeof NotificationType.SESSION_CHECKIN_REMINDER | typeof NotificationType.SESSION_CHECKIN_OVERDUE
+): Promise<number> {
+  const pendingUserIds = [
+    !booking.tutorCheckedInAt ? booking.tutorProfile.userId : null,
+    !booking.bookerCheckedInAt ? booking.bookerId : null,
+  ].filter((id): id is string => !!id);
+  if (pendingUserIds.length === 0) return 0;
+
+  let sent = 0;
+  for (const userId of pendingUserIds) {
+    const alreadyNotified = await prisma.notification.findFirst({
+      where: { type, resourceId: booking.id, recipientId: userId },
+    });
+    if (alreadyNotified) continue;
+
+    await NotificationService.send({
+      type,
+      target: { kind: "user", userId },
+      resourceType: NotificationResourceType.BOOKING,
+      resourceId: booking.id,
+    });
+    sent++;
+  }
+  return sent;
+}
+
+function findUncheckedInHomeBookingsToday() {
+  return prisma.booking.findMany({
+    where: {
+      sessionType: "HOME",
+      status: BookingStatus.PAID,
+      sessionDate: watCalendarDate(),
+      deletedAt: null,
+      OR: [{ tutorCheckedInAt: null }, { bookerCheckedInAt: null }],
+    },
+    include: { tutorProfile: { select: { userId: true } } },
+  });
+}
+
+/** Session start has arrived — nudge whichever party (tutor, booker, or
+ * both) hasn't checked in yet. */
+async function sweepCheckinReminders(): Promise<{ notified: number }> {
+  const now = new Date();
+  const candidates = await findUncheckedInHomeBookingsToday();
+
+  let notified = 0;
+  for (const booking of candidates) {
+    if (sessionStartAt(booking) > now) continue;
+    notified += await sendPerPartyCheckinNotice(booking, NotificationType.SESSION_CHECKIN_REMINDER);
+  }
+  return { notified };
+}
+
+/** A grace period past start has elapsed and someone still hasn't checked
+ * in — a second, more urgent nudge ahead of the eventual admin no-show flag. */
+async function sweepCheckinOverdue(): Promise<{ notified: number }> {
+  const cutoff = new Date(Date.now() - CHECKIN_OVERDUE_GRACE_MINUTES * 60 * 1000);
+  const candidates = await findUncheckedInHomeBookingsToday();
+
+  let notified = 0;
+  for (const booking of candidates) {
+    if (sessionStartAt(booking) > cutoff) continue;
+    notified += await sendPerPartyCheckinNotice(booking, NotificationType.SESSION_CHECKIN_OVERDUE);
+  }
+  return { notified };
+}
+
 /** Sweep: HOME sessions, 30+ min past start, nobody checked in — flagged for admin review. Notified once via a Notification existence check (no dedicated "flag" column on Booking). */
 async function sweepNoShows(graceMinutes: number): Promise<{ flagged: number }> {
   const cutoff = new Date(Date.now() - graceMinutes * 60 * 1000);
@@ -127,6 +211,8 @@ export function startNoShowSweep(): void {
   noShowInterval = setInterval(async () => {
     try {
       const { homeNoShowGraceMinutes } = await bookingConfig.getAll();
+      await sweepCheckinReminders();
+      await sweepCheckinOverdue();
       await sweepNoShows(homeNoShowGraceMinutes);
     } catch (err: any) {
       console.error({ event: "no_show_sweep_failed", error: err.message });
@@ -139,5 +225,13 @@ export function stopNoShowSweep(): void {
   noShowInterval = null;
 }
 
-export const CheckinService = { checkIn, checkOut, sweepNoShows, startNoShowSweep, stopNoShowSweep };
+export const CheckinService = {
+  checkIn,
+  checkOut,
+  sweepNoShows,
+  sweepCheckinReminders,
+  sweepCheckinOverdue,
+  startNoShowSweep,
+  stopNoShowSweep,
+};
 export default CheckinService;

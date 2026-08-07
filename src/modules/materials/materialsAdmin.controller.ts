@@ -46,6 +46,16 @@ export const materialsAdminController = {
     );
     appResponder(StatusCodes.OK, versions, res);
   }),
+
+  searchCollections: catchAsync(async (req: Request, res: Response) => {
+    const result = await MaterialsAdminService.searchCollections(req.query as any);
+    appResponder(StatusCodes.OK, result.data, res, result.meta);
+  }),
+
+  searchMaterials: catchAsync(async (req: Request, res: Response) => {
+    const result = await MaterialsAdminService.searchMaterials(req.query as any);
+    appResponder(StatusCodes.OK, result.data, res, result.meta);
+  }),
 };
 
 export default materialsAdminController;

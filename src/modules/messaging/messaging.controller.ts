@@ -50,6 +50,12 @@ export const messagingController = {
     appResponder(StatusCodes.OK, { unreadCount }, res);
   }),
 
+  reportUser: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    const result = await MessagingService.reportUser(ctx.userId!, req.params.id, req.body.category, req.body.note, ctx);
+    appResponder(StatusCodes.CREATED, result, res);
+  }),
+
   // ── Admin/Moderator ──
   freeze: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);

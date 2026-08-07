@@ -214,6 +214,25 @@ model IpBlock {
   @@map("ip_blocks")
 }
 
+// User-to-user block — chat-only scope: enforced solely at message send
+// time (see MessagingService.sendMessage). Deliberately doesn't touch
+// search results or booking eligibility; a blocked pair with an existing
+// booking still has to go through support/cancellation like anyone else.
+model UserBlock {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  blockerId String   @map("blocker_id") @db.Uuid
+  blockedId String   @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("UserBlocksMade", fields: [blockerId], references: [id])
+  blocked User @relation("UserBlocksReceived", fields: [blockedId], references: [id])
+
+  @@unique([blockerId, blockedId], map: "idx_block_blocker_blocked")
+  @@index([blockerId])
+  @@index([blockedId])
+  @@map("user_blocks")
+}
+
 enum LogOperation {
   CREATE
   READ
@@ -375,6 +394,11 @@ model User {
   kycCountersignatureRequired Boolean @default(false) @map("kyc_countersignature_required")
 
   lastLoggedInAt DateTime? @map("last_logged_in_at")
+  // Distinct from lastLoggedInAt (a login event) — this tracks actual socket
+  // presence, updated on connect/disconnect (see socket/index.ts). "Online"
+  // in the UI is the live in-memory check (isUserOnline); this field is only
+  // read once a user has disconnected, to show "last seen X ago".
+  lastActiveAt DateTime? @map("last_active_at")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -388,6 +412,9 @@ model User {
 
   ipBlocksCreated IpBlock[]  @relation("IpBlockBlockedBy")
   auditLogs       AuditLog[] @relation("AuditLogActor")
+
+  userBlocksMade     UserBlock[] @relation("UserBlocksMade")
+  userBlocksReceived UserBlock[] @relation("UserBlocksReceived")
 
   devices                UserDevice[]
   sessions               UserSession[]       @relation("UserSessionUser")

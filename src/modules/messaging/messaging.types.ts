@@ -46,6 +46,23 @@ export const ListMessagesQuerySchema = z
   .openapi("ListMessagesQuery");
 export type ListMessagesQueryInput = z.infer<typeof ListMessagesQuerySchema>;
 
+export const REPORT_CATEGORIES = [
+  "HARASSMENT",
+  "INAPPROPRIATE",
+  "SAFETY_CONCERN",
+  "SPAM",
+  "OTHER",
+] as const;
+export type ReportCategory = (typeof REPORT_CATEGORIES)[number];
+
+export const ReportUserSchema = z
+  .object({
+    category: z.enum(REPORT_CATEGORIES),
+    note: z.string().trim().max(500).optional(),
+  })
+  .openapi("ReportUser");
+export type ReportUserInput = z.infer<typeof ReportUserSchema>;
+
 export const MarkAsReadSchema = z
   .object({
     messageIds: z.array(z.string().uuid()).min(1).max(200),

@@ -56,6 +56,18 @@ export class UserController extends BaseController<any> {
       appResponder(StatusCodes.OK, result, res);
     }
   );
+
+  blockUser = catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    const result = await this.service.blockUser(ctx.userId!, req.params.id);
+    appResponder(StatusCodes.OK, result, res);
+  });
+
+  unblockUser = catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    const result = await this.service.unblockUser(ctx.userId!, req.params.id);
+    appResponder(StatusCodes.OK, result, res);
+  });
 }
 
 export const userController = new UserController();

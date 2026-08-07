@@ -88,6 +88,22 @@ router.get(
   userController.getBookerProfile
 );
 
+// Chat-only block/unblock — any authenticated user, no special permission,
+// same reasoning as booker-profile: this is a self-service action on the
+// caller's own relationship to another user, not an admin operation.
+router.post(
+  "/:id/block",
+  protect,
+  validate(ParamsId, "params"),
+  userController.blockUser
+);
+router.delete(
+  "/:id/block",
+  protect,
+  validate(ParamsId, "params"),
+  userController.unblockUser
+);
+
 router.get(
   "/:id",
   protect,

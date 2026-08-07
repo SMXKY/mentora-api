@@ -5,6 +5,7 @@ import redis from "../../config/redis.config";
 import { roomServiceClient } from "../../config/livekit.config";
 import { LiveSessionService, sessionStartAt, sessionEndAt } from "../../modules/liveSession/liveSession.service";
 import { NotificationService } from "../notification/notification.service";
+import { liveSessionConfig } from "./liveSessionConfig";
 import {
   BookingStatus,
   SessionType,
@@ -25,7 +26,6 @@ const HEARTBEAT_KEY = "live_sessions.room_lifecycle_job_heartbeat";
 const ROOM_CREATE_LOCK_PREFIX = "live-session:room-create-lock:";
 const TUTOR_NOT_JOINED_NOTIFIED_PREFIX = "live-session:tutor-not-joined-notified:";
 
-const EMPTY_TIMEOUT_MINUTES = 30;
 const DEPARTURE_TIMEOUT_MINUTES = 15;
 const TUTOR_GRACE_MINUTES = 10;
 const MAX_ROOM_CREATION_ATTEMPTS = 8;
@@ -98,6 +98,7 @@ async function createRoomForBooking(booking: {
   const scheduledEndAt = sessionEndAt(booking);
   const roomName = randomUUID();
   const maxParticipants = booking.isGroupSession ? (booking.groupSession?.maxStudents ?? 20) + 1 : 2;
+  const { emptyTimeoutMinutes } = await liveSessionConfig.getAll();
 
   const liveRoom = await prisma.liveRoom.create({
     data: {
@@ -113,7 +114,7 @@ async function createRoomForBooking(booking: {
   try {
     await roomServiceClient.createRoom({
       name: roomName,
-      emptyTimeout: EMPTY_TIMEOUT_MINUTES * 60,
+      emptyTimeout: emptyTimeoutMinutes * 60,
       departureTimeout: DEPARTURE_TIMEOUT_MINUTES * 60,
       maxParticipants,
       metadata: JSON.stringify({
@@ -184,7 +185,8 @@ export async function createRoomsForUpcomingBookings(): Promise<{ created: numbe
  * existing row rather than creating a new one.
  */
 async function findFailedRoomsToRetry() {
-  const cutoff = new Date(Date.now() - EMPTY_TIMEOUT_MINUTES * 60 * 1000);
+  const { emptyTimeoutMinutes } = await liveSessionConfig.getAll();
+  const cutoff = new Date(Date.now() - emptyTimeoutMinutes * 60 * 1000);
   const rooms = await prisma.liveRoom.findMany({
     where: {
       status: LiveRoomStatus.FAILED,
@@ -200,6 +202,7 @@ async function findFailedRoomsToRetry() {
 
 export async function retryFailedRoomCreations(): Promise<{ retried: number; recovered: number }> {
   const rooms = await findFailedRoomsToRetry();
+  const { emptyTimeoutMinutes } = await liveSessionConfig.getAll();
   let recovered = 0;
 
   for (const room of rooms) {
@@ -209,7 +212,7 @@ export async function retryFailedRoomCreations(): Promise<{ retried: number; rec
     try {
       await roomServiceClient.createRoom({
         name: room.roomName,
-        emptyTimeout: EMPTY_TIMEOUT_MINUTES * 60,
+        emptyTimeout: emptyTimeoutMinutes * 60,
         departureTimeout: DEPARTURE_TIMEOUT_MINUTES * 60,
         maxParticipants,
         metadata: JSON.stringify({
@@ -252,7 +255,8 @@ async function notifyEmptyTimeout(bookingId: string): Promise<void> {
 }
 
 export async function closeEmptyRooms(): Promise<{ closed: number }> {
-  const cutoff = new Date(Date.now() - EMPTY_TIMEOUT_MINUTES * 60 * 1000);
+  const { emptyTimeoutMinutes } = await liveSessionConfig.getAll();
+  const cutoff = new Date(Date.now() - emptyTimeoutMinutes * 60 * 1000);
   const staleRooms = await prisma.liveRoom.findMany({
     where: {
       status: { in: [LiveRoomStatus.PENDING, LiveRoomStatus.CREATED] },

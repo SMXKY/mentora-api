@@ -8,7 +8,28 @@ Every role's home screen needs a handful of numbers and short lists pulled from 
 
 ## The core idea: query the real tables now, even where they're empty
 
-Booking, Dispute, Review, and Materials don't have CRUD modules yet — only their Prisma models exist. Rather than mock those sections until "the booking module" is built, every query in this service reads the real table directly (`prisma.booking.findMany(...)`, `prisma.dispute.count(...)`, etc.). Today those come back empty because nothing writes to them yet. The moment a booking/dispute/review module starts creating rows, this dashboard populates automatically — no dashboard code changes needed. The same philosophy was applied to the notification module fix earlier: build the read side against the real schema now, so functionality "just works" the moment the write side exists.
+> **Update (Admin Routes & API Docs Overhaul, Epic 4 sweep):** at the time
+> this doc was originally written, Booking, Dispute, Review, and Materials
+> had no CRUD modules yet — only their Prisma models existed. That's no
+> longer true: `src/modules/booking`, `src/modules/dispute`,
+> `src/modules/review`, and `src/modules/materials` are all fully built and
+> in active use. The queries described below were written against the real
+> schema from day one specifically so they'd "just work" once those modules
+> shipped, and they do — but this doc's dashboard-specific claims below
+> haven't been individually re-verified line-by-line against every query in
+> `dashboard.service.ts` as part of this sweep; if you're relying on a
+> specific figure this doc describes, check the actual query in
+> `dashboard.service.ts` first.
+
+Booking, Dispute, Review, and Materials all have full CRUD modules now (see
+above). Every query in this service reads the real table directly
+(`prisma.booking.findMany(...)`, `prisma.dispute.count(...)`, etc.), which
+means the numbers described in this doc should now be populated by real
+data rather than the correctly-empty state described when this doc was
+first written. The same philosophy was applied to the notification module
+fix earlier: build the read side against the real schema from day one, so
+functionality "just works" the moment the write side exists — that's exactly
+what happened here.
 
 Fields that have no real backing anywhere in this codebase (Flagsmith feature-flag state, BullMQ job heartbeats — `JobHeartbeatRegistry` is schema-only, never written to) are **not** faked. They're either omitted or, for `systemHealth`, scoped down to what's honestly checkable (DB/Redis reachability) rather than a fabricated uptime/error-rate number.
 
@@ -44,8 +65,8 @@ const dashboard = await DashboardService.getForUser(userId, { fresh: true });
 
 | Field | Status |
 |---|---|
-| Bookings, disputes, reviews, materials | Real queries against real tables — correctly empty until their respective modules (booking/dispute/review/materials) exist |
-| Revenue / escrow / payouts (Admin) | Real queries — correctly zero until a payment write-path exists |
+| Bookings, disputes, reviews, materials | Real queries against real tables. **(Epic 4 sweep, updated)** `src/modules/booking`, `dispute`, `review`, and `materials` now all exist and are in active use — these should be populated, not empty, unless a specific user genuinely has no data of that kind. |
+| Revenue / escrow / payouts (Admin) | Real queries. **(Epic 4 sweep, updated)** `src/modules/payment` now exists and is in active use — no longer correctly-zero-by-default. |
 | Feature flags (Super Admin) | Not implemented — no Flagsmith client exists anywhere in `src`, only env vars checked at boot |
 | Job health / error rate (Admin) | Not implemented — `JobHeartbeatRegistry`/`DeadLetterJob` are schema-only, nothing writes to them |
 | Storage usage / RBAC overview (Super Admin "plus" list) | Not implemented — no REQ-numbered acceptance criterion exists for these |

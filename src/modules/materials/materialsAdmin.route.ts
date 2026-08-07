@@ -9,6 +9,8 @@ import {
   DownloadPolicyUpdateSchema,
   ModerationRemoveSchema,
   CollectionSuspendSchema,
+  AdminCollectionSearchQuerySchema,
+  AdminMaterialSearchQuerySchema,
 } from "./materials.types";
 
 const router = Router();
@@ -67,6 +69,22 @@ router.get(
   restrictTo(permissions.materials.moderationRead),
   validate(TutorIdParams, "params"),
   materialsAdminController.getModerationHistory
+);
+
+// ── Cross-tutor search (Epic 5) — browse/search every tutor's
+// collections and materials platform-wide, not one tutor at a time.
+router.get(
+  "/collections",
+  restrictTo(permissions.materials.moderationRead),
+  validate(AdminCollectionSearchQuerySchema, "query"),
+  materialsAdminController.searchCollections
+);
+
+router.get(
+  "/materials",
+  restrictTo(permissions.materials.moderationRead),
+  validate(AdminMaterialSearchQuerySchema, "query"),
+  materialsAdminController.searchMaterials
 );
 
 export default router;

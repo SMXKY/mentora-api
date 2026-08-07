@@ -1,8 +1,4 @@
 import { Router } from "express";
-import multer from "multer";
-import os from "os";
-import path from "path";
-import { randomUUID } from "crypto";
 import { liveSessionController } from "./liveSession.controller";
 import { validate } from "../../middlewares/validate.middleware";
 import protect from "../../middlewares/protect.middleware";
@@ -21,20 +17,10 @@ import {
 import checkAccountCompletion from "../../middlewares/checkAccountCompletion.middleware";
 import checkKyc from "../../middlewares/checkKyc.middleware";
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: os.tmpdir(),
-    filename: (_req, file, cb) =>
-      cb(
-        null,
-        `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`
-      ),
-  }),
-  limits: { fileSize: 20 * 1024 * 1024, files: 1 },
-});
-
 const router = Router();
 router.use(protect, checkAccountCompletion, checkKyc);
+
+router.get("/active", liveSessionController.listActive);
 
 const bookingIdParams = validate(ParamsBookingId, "params");
 
@@ -92,13 +78,6 @@ router.post(
   restrictTo(permissions.liveSessions.chatRead),
   validate(SendChatMessageSchema),
   liveSessionController.postChat
-);
-
-router.post(
-  "/:bookingId/whiteboard",
-  bookingIdParams,
-  upload.single("file"),
-  liveSessionController.exportWhiteboard
 );
 
 // ── Admin ────────────────────────────────────────────────────
