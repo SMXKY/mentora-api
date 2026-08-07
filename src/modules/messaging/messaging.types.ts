@@ -16,8 +16,15 @@ export type StartConversationInput = z.infer<typeof StartConversationSchema>;
 
 export const SendMessageSchema = z
   .object({
-    content: z.string().trim().min(1).max(2000),
+    // Optional now that a message can be an attachment with no caption —
+    // the refine below still requires at least one of content/attachment.
+    content: z.string().trim().max(2000).optional(),
     replyToId: z.string().uuid().optional(),
+    attachmentFileId: z.string().uuid().optional(),
+  })
+  .refine((data) => !!data.content?.trim() || !!data.attachmentFileId, {
+    message: "messaging/errors:messageEmpty",
+    path: ["content"],
   })
   .openapi("SendMessage");
 export type SendMessageInput = z.infer<typeof SendMessageSchema>;

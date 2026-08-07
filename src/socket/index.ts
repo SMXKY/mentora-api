@@ -159,14 +159,15 @@ export function initializeSocketIO(httpServer: HttpServer): Server {
     // re-implementing any of that here.
     socket.on(
       "message:send",
-      async (payload: { conversationId: string; content: string; tempId?: string; replyToId?: string }) => {
+      async (payload: { conversationId: string; content?: string; tempId?: string; replyToId?: string; attachmentFileId?: string }) => {
         try {
           const message = await MessagingService.sendMessage(
             userId,
             payload?.conversationId,
             payload?.content,
             { userId },
-            payload?.replyToId
+            payload?.replyToId,
+            payload?.attachmentFileId
           );
           socket.emit("message:send:ack", { tempId: payload?.tempId, message });
         } catch (err) {

@@ -12,6 +12,7 @@
   "messageBlocked": "Ce message ne peut pas être envoyé — il semble contenir des coordonnées ou un lien. Merci de garder la conversation sur Mentora.",
   "messageNotFound": "Message introuvable.",
   "replyToNotFound": "Le message auquel vous répondez n'est plus disponible.",
+  "attachmentNotFound": "Cette pièce jointe est introuvable. Veuillez réessayer de la joindre.",
   "moderationReviewNotFound": "Révision de modération introuvable.",
   "sendFailed": "Votre message n'a pas pu être envoyé. Veuillez réessayer."
 }

@@ -10,6 +10,8 @@ import {
   ModerationReviewStatus,
   NotificationType,
   NotificationResourceType,
+  FileCategory,
+  FileType,
 } from "../../generated/prisma";
 import { ServiceContext } from "../../base/base.types";
 import { AuditService } from "../../utils/logUserActivity.util";
@@ -18,6 +20,7 @@ import { emitToConversation, isUserOnline } from "../../socket/index";
 import { filterMessage } from "../../services/messaging/contentFilter";
 import { messagingConfig } from "../../services/messaging/messagingConfig";
 import { resolveStorageUrl } from "../../services/media";
+import { encodeForLegacyDb, decodeFromLegacyDb } from "../../utils/legacyTextEncoding.util";
 
 const DISPLAY_USER_SELECT = {
   id: true,
@@ -268,10 +271,13 @@ async function handleBlockedMessage(
     data: {
       conversationId,
       senderId,
-      attemptedContent,
+      attemptedContent: encodeForLegacyDb(attemptedContent),
       filterResult: outcome.result,
       matchedPattern: outcome.matchedPattern,
-      normalisedContent: outcome.normalisedContent,
+      normalisedContent:
+        outcome.normalisedContent != null
+          ? encodeForLegacyDb(outcome.normalisedContent)
+          : null,
       filterLayer: outcome.layer ?? 1,
     },
   });
@@ -333,9 +339,46 @@ function serializeReplyTo(replyTo: ReplyToPreview) {
   return {
     id: replyTo.id,
     senderId: replyTo.senderId,
-    content: replyTo.contentDeleted ? null : replyTo.content,
+    content: replyTo.contentDeleted ? null : decodeFromLegacyDb(replyTo.content),
     contentDeleted: replyTo.contentDeleted,
   };
+}
+
+type AttachmentPreview = {
+  id: string;
+  storagePath: string;
+  fileType: FileType;
+  mimeType: string;
+  originalFileName: string;
+  fileSizeBytes: bigint;
+} | null;
+
+function serializeAttachment(attachment: AttachmentPreview) {
+  if (!attachment) return null;
+  return {
+    id: attachment.id,
+    url: resolveStorageUrl(attachment.storagePath),
+    fileType: attachment.fileType,
+    mimeType: attachment.mimeType,
+    originalFileName: attachment.originalFileName,
+    fileSizeBytes: attachment.fileSizeBytes,
+  };
+}
+
+// Emoji-only so the conversation-list preview for a caption-less attachment
+// doesn't hardcode an English (or any single-language) word into a bilingual
+// product's stored data — the emoji itself is the language-neutral summary.
+function attachmentPreviewLabel(attachment: AttachmentPreview): string {
+  switch (attachment?.fileType) {
+    case FileType.IMAGE:
+      return "📷";
+    case FileType.AUDIO:
+      return "🎵";
+    case FileType.VIDEO:
+      return "🎥";
+    default:
+      return "📄";
+  }
 }
 
 function serializeMessage(message: {
@@ -349,27 +392,33 @@ function serializeMessage(message: {
   createdAt: Date;
   deliveredAt: Date | null;
   replyTo?: ReplyToPreview;
+  attachment?: AttachmentPreview;
 }) {
   return {
     id: message.id,
     conversationId: message.conversationId,
     senderId: message.senderId,
-    content: message.contentDeleted ? null : message.content,
+    // Empty string (an attachment sent with no caption) collapses to null,
+    // same contract as a deleted message — the client only ever sees a real
+    // caption or nothing, never an empty string it has to check for itself.
+    content: message.contentDeleted ? null : decodeFromLegacyDb(message.content) || null,
     contentDeleted: message.contentDeleted,
     status: message.status,
     replyToId: message.replyToId,
     createdAt: message.createdAt,
     deliveredAt: message.deliveredAt,
     replyTo: serializeReplyTo(message.replyTo ?? null),
+    attachment: message.contentDeleted ? null : serializeAttachment(message.attachment ?? null),
   };
 }
 
 async function sendMessage(
   senderId: string,
   conversationId: string,
-  content: string,
+  content: string | undefined,
   ctx: ServiceContext,
-  replyToId?: string
+  replyToId?: string,
+  attachmentFileId?: string
 ) {
   const { conversation } = await loadConversationForParticipant(
     conversationId,
@@ -389,8 +438,10 @@ async function sendMessage(
     );
   }
 
-  const trimmed = content.trim();
-  if (!trimmed)
+  const trimmed = (content ?? "").trim();
+  // An attachment can carry no caption at all (WhatsApp-style) — only
+  // reject empty when there's also no attachment to send.
+  if (!trimmed && !attachmentFileId)
     throw new AppError(
       "messaging/errors:messageEmpty",
       StatusCodes.BAD_REQUEST
@@ -400,6 +451,35 @@ async function sendMessage(
       "messaging/errors:messageTooLong",
       StatusCodes.BAD_REQUEST
     );
+
+  // Must belong to this sender and be an actual message-attachment upload —
+  // never trust a client-supplied file id blind, or a message could point
+  // at someone else's private file (KYC docs, receipts, etc.) via category.
+  let attachment: AttachmentPreview = null;
+  if (attachmentFileId) {
+    attachment = await prisma.file.findFirst({
+      where: {
+        id: attachmentFileId,
+        uploadedById: senderId,
+        fileCategory: FileCategory.MESSAGE_ATTACHMENT,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        storagePath: true,
+        fileType: true,
+        mimeType: true,
+        originalFileName: true,
+        fileSizeBytes: true,
+      },
+    });
+    if (!attachment) {
+      throw new AppError(
+        "messaging/errors:attachmentNotFound",
+        StatusCodes.BAD_REQUEST
+      );
+    }
+  }
 
   // Must belong to this same conversation — never trust a client-supplied
   // message id blind, or a reply could quote content from a conversation
@@ -432,28 +512,33 @@ async function sendMessage(
     }
   }
 
-  const activeKeywordRows = await prisma.filterKeyword.findMany({
-    where: { isActive: true },
-    select: { keyword: true },
-  });
-  const outcome = filterMessage(
-    trimmed,
-    activeKeywordRows.map((k) => k.keyword)
-  );
-
-  if (outcome.result !== "CLEAN") {
-    await handleBlockedMessage(
-      conversationId,
-      senderId,
+  // Only worth running the contact-info/profanity filter when there's
+  // actual text — an attachment isn't scanned (no OCR), and an
+  // attachment-only send has nothing for the filter to evaluate.
+  if (trimmed) {
+    const activeKeywordRows = await prisma.filterKeyword.findMany({
+      where: { isActive: true },
+      select: { keyword: true },
+    });
+    const outcome = filterMessage(
       trimmed,
-      outcome,
-      conversation.blockCountConversation
+      activeKeywordRows.map((k) => k.keyword)
     );
-    throw new AppError(
-      "messaging/errors:messageBlocked",
-      StatusCodes.BAD_REQUEST,
-      { result: outcome.result }
-    );
+
+    if (outcome.result !== "CLEAN") {
+      await handleBlockedMessage(
+        conversationId,
+        senderId,
+        trimmed,
+        outcome,
+        conversation.blockCountConversation
+      );
+      throw new AppError(
+        "messaging/errors:messageBlocked",
+        StatusCodes.BAD_REQUEST,
+        { result: outcome.result }
+      );
+    }
   }
 
   const message = await prisma.$transaction(async (tx) => {
@@ -461,16 +546,19 @@ async function sendMessage(
       data: {
         conversationId,
         senderId,
-        content: trimmed,
+        content: trimmed ? encodeForLegacyDb(trimmed) : "",
         status: MessageStatus.SENT,
         replyToId: replyTo?.id,
+        attachmentFileId: attachment?.id,
       },
     });
     await tx.conversation.update({
       where: { id: conversationId },
       data: {
         lastMessageAt: created.createdAt,
-        lastMessagePreview: trimmed.slice(0, 100),
+        lastMessagePreview: encodeForLegacyDb(
+          trimmed ? trimmed.slice(0, 100) : attachmentPreviewLabel(attachment)
+        ),
       },
     });
     await tx.conversationParticipant.updateMany({
@@ -495,7 +583,7 @@ async function sendMessage(
       })
     : message;
 
-  const serialized = serializeMessage({ ...finalMessage, replyTo });
+  const serialized = serializeMessage({ ...finalMessage, replyTo, attachment });
 
   emitToConversation(conversationId, "message:new", serialized);
 
@@ -600,7 +688,7 @@ async function listConversations(
       type: row.conversation.type,
       status: row.conversation.status,
       otherParticipant: otherUser ? toDisplayParticipant(otherUser) : null,
-      lastMessagePreview: row.conversation.lastMessagePreview,
+      lastMessagePreview: decodeFromLegacyDb(row.conversation.lastMessagePreview),
       lastMessageAt: row.conversation.lastMessageAt,
       unreadCount: row.unreadCount,
       booking: row.conversation.booking,
@@ -634,6 +722,16 @@ async function listMessages(
       readReceipts: true,
       replyTo: {
         select: { id: true, senderId: true, content: true, contentDeleted: true },
+      },
+      attachment: {
+        select: {
+          id: true,
+          storagePath: true,
+          fileType: true,
+          mimeType: true,
+          originalFileName: true,
+          fileSizeBytes: true,
+        },
       },
     },
   });
@@ -890,8 +988,19 @@ async function listModerationQueue(
   const hasNextPage = rows.length > limit;
   const page = hasNextPage ? rows.slice(0, limit) : rows;
 
+  const data = page.map((row) => ({
+    ...row,
+    filterBlock: row.filterBlock
+      ? {
+          ...row.filterBlock,
+          attemptedContent: decodeFromLegacyDb(row.filterBlock.attemptedContent),
+          normalisedContent: decodeFromLegacyDb(row.filterBlock.normalisedContent),
+        }
+      : null,
+  }));
+
   return {
-    data: page,
+    data,
     meta: {
       nextCursor: hasNextPage ? page[page.length - 1].id : null,
       hasNextPage,
@@ -959,7 +1068,19 @@ async function getConversationForAdmin(conversationId: string) {
       participant.user.profilePictureUrl
     );
   });
-  return conversation;
+
+  return {
+    ...conversation,
+    messages: conversation.messages.map((m) => ({
+      ...m,
+      content: decodeFromLegacyDb(m.content),
+    })),
+    filterBlocks: conversation.filterBlocks.map((b) => ({
+      ...b,
+      attemptedContent: decodeFromLegacyDb(b.attemptedContent),
+      normalisedContent: decodeFromLegacyDb(b.normalisedContent),
+    })),
+  };
 }
 
 export const MessagingService = {

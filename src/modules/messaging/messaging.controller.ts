@@ -34,7 +34,7 @@ export const messagingController = {
 
   sendMessage: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
-    const message = await MessagingService.sendMessage(ctx.userId!, req.params.id, req.body.content, ctx, req.body.replyToId);
+    const message = await MessagingService.sendMessage(ctx.userId!, req.params.id, req.body.content, ctx, req.body.replyToId, req.body.attachmentFileId);
     appResponder(StatusCodes.CREATED, { message }, res);
   }),
 
