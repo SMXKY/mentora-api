@@ -146,18 +146,21 @@ registry.registerPath({
   summary: "Add a credential (Step 3)",
   description:
     "Multipart: institutionName, qualificationType, fieldOfStudy, " +
-    "gradeOrClassification, yearAwarded, subjectIds (JSON array, min 1), and " +
-    "a document file (PDF/JPEG/PNG, max 10MB). Can be called any number of " +
-    "times — there is no cap on credentials per application.",
+    "gradeOrClassification, yearAwarded, subjects (JSON array, min 1, each " +
+    "{subjectId, levelIds: string[] (min 1)} — grade levels are selected per " +
+    "subject, since one credential can cover subjects taught at different " +
+    "levels), and a document file (PDF/JPEG/PNG, max 10MB). Can be called " +
+    "any number of times — there is no cap on credentials per application.",
   ...bearer,
   request: {
     body: {
       content: {
         "multipart/form-data": {
           schema: CredentialInputSchema.extend({
-            subjectIds: z
-              .string()
-              .openapi({ description: "JSON-encoded array of subject UUIDs" }),
+            subjects: z.string().openapi({
+              description:
+                "JSON-encoded array of {subjectId, levelIds: string[]}",
+            }),
             document: z.string().openapi({ type: "string", format: "binary" }),
           }),
         },
@@ -168,7 +171,7 @@ registry.registerPath({
     201: { description: "Credential added, PENDING review" },
     400: {
       description:
-        "No document attached, invalid subject id, or application is read-only",
+        "No document attached, invalid subject id, invalid level id, or application is read-only",
     },
   },
 });

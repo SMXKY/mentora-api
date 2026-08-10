@@ -68,6 +68,15 @@ export const KycStep2Schema = z
 export type KycStep2Input = z.infer<typeof KycStep2Schema>;
 
 // ── Step 3 — Credentials ─────────────────────────────────────
+// Each subject a credential covers carries its own grade-level selection —
+// a tutor with one credential spanning Maths + Physics might teach Maths at
+// O-Level and A-Level but Physics only at A-Level, so levels can't be a
+// single flat array shared across every subject on the credential.
+export const CredentialSubjectInputSchema = z.object({
+  subjectId: z.string().uuid(),
+  levelIds: z.array(z.string().uuid()).min(1, "kyc/errors:levelRequired"),
+});
+
 export const CredentialInputSchema = z
   .object({
     institutionName: z.string().min(1, "kyc/errors:fieldRequired"),
@@ -75,8 +84,8 @@ export const CredentialInputSchema = z
     fieldOfStudy: z.string().min(1, "kyc/errors:fieldRequired"),
     gradeOrClassification: z.string().optional(),
     yearAwarded: z.number().int().min(1950).max(new Date().getFullYear()),
-    subjectIds: z
-      .array(z.string().uuid())
+    subjects: z
+      .array(CredentialSubjectInputSchema)
       .min(1, "kyc/errors:credentialNeedsSubject"),
   })
   .openapi("CredentialInput");

@@ -27,6 +27,7 @@ export const CreateUserSchema = z
     profilePictureUrl: z.string().optional(),
     address: z.string().optional(),
     preferredLanguage: z.enum(["EN", "FR"]).optional(),
+    themePreference: z.enum(["LIGHT", "DARK", "SYSTEM"]).optional(),
     notificationsMuted: z.boolean().optional(),
     status: z
       .enum(["ACTIVE", "INACTIVE", "SUSPENDED", "DEACTIVATED", "BANNED"])
@@ -53,6 +54,7 @@ export const UpdateMeSchema = z
     address: z.string().optional(),
     cityId: z.string().uuid().optional(),
     preferredLanguage: z.enum(["EN", "FR"]).optional(),
+    themePreference: z.enum(["LIGHT", "DARK", "SYSTEM"]).optional(),
     notificationsMuted: z.boolean().optional(),
   })
   .openapi("UpdateMe");
@@ -79,6 +81,7 @@ export const UserResponseSchema = z
     profilePictureUrl: z.string().nullable().optional(),
     address: z.string().nullable().optional(),
     preferredLanguage: z.string(),
+    themePreference: z.string(),
     notificationsMuted: z.boolean(),
     status: z.string(),
     isSystem: z.boolean(),
@@ -139,6 +142,8 @@ export const MeResponseSchema = z
     cityId: z.string().uuid().nullable(),
     city: z.object({ id: z.string().uuid(), name: z.string() }).nullable(),
     preferredLanguage: z.string(),
+    themePreference: z.string(),
+    hasPassword: z.boolean(),
     notificationsMuted: z.boolean(),
     status: z.string(),
     isAccountComplete: z.boolean(),

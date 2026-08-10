@@ -37,7 +37,10 @@ registry.registerPath({
     "Mathematics, Physique<->Physics, etc.) and partial matches ('Phy' -> " +
     "Physics). Ranking is entirely by the precomputed compositeScore " +
     "column (see the nightly recompute job) — never recalculated at query " +
-    "time. Cursor-paginated, 12 per page by default. Zero results returns " +
+    "time. Cursor-paginated, 8 per page by default (infinite-scroll UI) — " +
+    "meta.totalCount is Meilisearch's estimated total match count for the " +
+    "query+filters, independent of pagination, so the UI can show 'N " +
+    "tutors found' without loading every page. Zero results returns " +
     "a graceful fallback object instead of an empty array: nearby-city " +
     "results, a 'no tutors for this subject yet' message, or the single " +
     "most restrictive filter to relax — never a bare empty page.",
@@ -45,7 +48,7 @@ registry.registerPath({
   responses: {
     200: {
       description:
-        "{ data: TutorResultCard[], meta: { nextCursor, hasNextPage, limit, refineNudge, fallback? } } " +
+        "{ data: TutorResultCard[], meta: { nextCursor, hasNextPage, limit, totalCount, refineNudge, fallback? } } " +
         "— fallback is present only on a zero-result response: " +
         "{ type: 'nearby_city', fallbackCityId, fallbackCityName } | " +
         "{ type: 'no_tutors_for_subject' } | " +
@@ -158,10 +161,49 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
+  path: `${adminBasePath}/analytics/top-queries`,
+  tags: adminTags,
+  summary: "Most-searched query text, regardless of outcome",
+  description:
+    "Complements dead-end-queries (which only surfaces queries that never " +
+    "converted to a booking) — this is raw search volume by query text, " +
+    "for spotting what people are typing overall. ?windowDays defaults to " +
+    "30, ?limit defaults to 20.",
+  ...bearer,
+  responses: { 200: { description: "[{ query, searchCount }]" } },
+});
+
+registry.registerPath({
+  method: "get",
   path: `${adminBasePath}/analytics/demand-signals`,
   tags: adminTags,
   summary: "Unmet-demand dashboard — most-requested subject/city combinations",
   description: "Sourced from DemandSignal rows captured by the zero-result 'notify me' flow.",
   ...bearer,
   responses: { 200: { description: "[{ subjectId, subjectName, cityId, cityName, count }]" } },
+});
+
+registry.registerPath({
+  method: "get",
+  path: `${adminBasePath}/analytics/demand-breakdown`,
+  tags: adminTags,
+  summary: "REQ-010-011 — search habits by subject, city, language, and teaching mode",
+  description:
+    "The recruitment-planning report: every real search's filters over " +
+    "the trailing window (?windowDays defaults to 30), tallied by subject " +
+    "and city (each split into total volume vs. the zero-result subset, " +
+    "so unmet demand is visible alongside raw demand), plus a flat " +
+    "language and teaching-mode breakdown (ONLINE_ONLY/HOME_ONLY/BOTH/" +
+    "unspecified) — answers 'do we need to recruit tutors, and for what " +
+    "subject/language/mode' directly from real user search behavior.",
+  ...bearer,
+  responses: {
+    200: {
+      description:
+        "{ windowDays, totalSearches, zeroResultSearches, " +
+        "bySubject: [{ subjectId, subjectName, total, zeroResult }], " +
+        "byCity: [{ cityId, cityName, total, zeroResult }], " +
+        "byLanguage: { [language]: count }, byMode: { [mode]: count } }",
+    },
+  },
 });

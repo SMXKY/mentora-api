@@ -6,6 +6,7 @@ import {
   SubjectVerificationStatus,
   FileCategory,
   FileType,
+  BookingStatus,
 } from "../../generated/prisma";
 import {
   UpdateMyTutorProfileInput,
@@ -54,8 +55,8 @@ function minOf(values: Array<number | null | undefined>): number | null {
 
 /** Keeps TutorProfile.minRateXaf/maxRateXaf in sync with whatever the tutor
  * actually charges across their open, approved subjects — the min/max span
- * every non-null rate field (hourly, online flat fee, home flat fee) across
- * those rows. A no-op once the tutor has typed their own number
+ * both hourly rates (online, home) across those rows. A no-op once the
+ * tutor has typed their own number
  * (rateManuallySet), and a no-op if the profile doesn't exist (e.g. called
  * from a KYC path before onboarding is complete). Called after any write
  * that could change a tutor's open+approved subject pricing — subject
@@ -75,18 +76,13 @@ async function recomputeTutorRateRange(tutorProfileId: string) {
       isOpenForBooking: true,
     },
     select: {
-      ratePerHourXaf: true,
-      ratePerOnlineSessionXaf: true,
-      ratePerHomeSessionXaf: true,
+      ratePerOnlineHourXaf: true,
+      ratePerHomeHourXaf: true,
     },
   });
 
   const rates = openSubjects
-    .flatMap((s) => [
-      s.ratePerHourXaf,
-      s.ratePerOnlineSessionXaf,
-      s.ratePerHomeSessionXaf,
-    ])
+    .flatMap((s) => [s.ratePerOnlineHourXaf, s.ratePerHomeHourXaf])
     .filter((r): r is number => r != null);
 
   await prisma.tutorProfile.update({
@@ -97,6 +93,18 @@ async function recomputeTutorRateRange(tutorProfileId: string) {
     },
   });
 }
+
+// Mirrors the set used elsewhere (e.g. UserService.getBookerProfile,
+// dashboard.service.ts) for "a session actually happened" — a real count
+// computed live, since TutorProfile.completedSessionsCount is a stored
+// column nothing in the codebase ever increments and is therefore always
+// stale/wrong to read directly.
+const COMPLETED_BOOKING_STATUSES: BookingStatus[] = [
+  BookingStatus.CONFIRMED,
+  BookingStatus.AUTO_CONFIRMED,
+  BookingStatus.RESOLVED_TUTOR_FAVOR,
+  BookingStatus.RESOLVED_PARENT_FAVOR,
+];
 
 // neighbourhood intentionally omitted — never expose more precise than
 // city-level location publicly; exact area is disclosed only through the
@@ -147,9 +155,8 @@ const PUBLIC_TUTOR_SELECT = {
     },
     select: {
       id: true,
-      ratePerOnlineSessionXaf: true,
-      ratePerHomeSessionXaf: true,
-      ratePerHourXaf: true,
+      ratePerOnlineHourXaf: true,
+      ratePerHomeHourXaf: true,
       subject: {
         select: { id: true, name: true, domain: { select: { name: true } } },
       },
@@ -317,11 +324,9 @@ export const TutorService = {
         );
       }
       const hasRate =
-        (data.ratePerOnlineSessionXaf ??
-          tutorSubject.ratePerOnlineSessionXaf) != null ||
-        (data.ratePerHomeSessionXaf ?? tutorSubject.ratePerHomeSessionXaf) !=
+        (data.ratePerOnlineHourXaf ?? tutorSubject.ratePerOnlineHourXaf) !=
           null ||
-        (data.ratePerHourXaf ?? tutorSubject.ratePerHourXaf) != null;
+        (data.ratePerHomeHourXaf ?? tutorSubject.ratePerHomeHourXaf) != null;
       if (!hasRate) {
         throw new AppError(
           "tutor/errors:subjectNeedsRateToOpen",
@@ -361,26 +366,30 @@ export const TutorService = {
     // internally and will throw its own NOT_FOUND if the profile vanished
     // between these two calls — redundant with the check above in the
     // normal case, but harmless and avoids a second bespoke existence check.
-    const [lessonPlans, reviewsPage] = await Promise.all([
+    const [lessonPlans, reviewsPage, completedSessionsCount] = await Promise.all([
       MaterialsService.getPublicLessonPlans(tutorProfileId),
-      ReviewService.listTutorReviewsByProfile(tutorProfileId, undefined, 5),
+      ReviewService.listTutorReviewsByProfile(tutorProfileId, { limit: 5 }),
+      prisma.booking.count({
+        where: {
+          tutorProfileId,
+          status: { in: COMPLETED_BOOKING_STATUSES },
+          deletedAt: null,
+        },
+      }),
     ]);
 
     const resolved = withResolvedMediaUrls(profile);
 
-    // Per-mode pricing, computed from the same approved+open subject rows
-    // already selected above — replaces the single ambiguous min/max range
-    // with numbers the UI can label honestly ("From X/hr online" etc.).
+    // Per-mode hourly pricing, computed from the same approved+open subject
+    // rows already selected above — the only two rates that exist, so the
+    // UI can label honestly ("From X/hr online" / "From X/hr home").
     // minRateXaf/maxRateXaf are left in the payload too (still used
     // elsewhere, e.g. search result cards / the booking footer).
     const minOnlineRateXaf = minOf(
-      profile.tutorSubjects.map((s) => s.ratePerOnlineSessionXaf)
+      profile.tutorSubjects.map((s) => s.ratePerOnlineHourXaf)
     );
     const minHomeRateXaf = minOf(
-      profile.tutorSubjects.map((s) => s.ratePerHomeSessionXaf)
-    );
-    const minHourlyRateXaf = minOf(
-      profile.tutorSubjects.map((s) => s.ratePerHourXaf)
+      profile.tutorSubjects.map((s) => s.ratePerHomeHourXaf)
     );
 
     return {
@@ -389,9 +398,10 @@ export const TutorService = {
         ...resolved.user,
         lastName: toPublicLastNameInitial(resolved.user.lastName),
       },
+      // Overrides the stale stored column selected via PUBLIC_TUTOR_SELECT.
+      completedSessionsCount,
       minOnlineRateXaf,
       minHomeRateXaf,
-      minHourlyRateXaf,
       reviews: reviewsPage.data,
       lessonPlans,
     };

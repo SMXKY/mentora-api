@@ -13,6 +13,7 @@ import {
   dbTimeToMinutes,
   minutesToTimeString,
   sessionStartAt,
+  isWatPastMoment,
 } from "../availability/availability.logic";
 import { BookingService } from "./booking.service";
 
@@ -73,6 +74,13 @@ async function requestReschedule(userId: string, bookingId: string, input: Reque
     if (outcome === "RELEASE_TO_TUTOR") {
       throw new AppError("booking/errors:rescheduleTooCloseToSession", StatusCodes.CONFLICT);
     }
+  }
+
+  // Same rule as booking creation — a proposed slot that's already elapsed
+  // (including "later today" once that moment has actually passed) is
+  // never a valid target, regardless of which party is requesting it.
+  if (isWatPastMoment(input.proposedDate, input.proposedStartTime)) {
+    throw new AppError("booking/errors:sessionInPast", StatusCodes.BAD_REQUEST);
   }
 
   const request = await prisma.rescheduleRequest.create({

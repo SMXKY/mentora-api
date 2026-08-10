@@ -81,9 +81,21 @@ adminRouter.get(
 );
 
 adminRouter.get(
+  "/analytics/top-queries",
+  restrictTo(permissions.analytics.demandRead),
+  tutorSearchController.getTopQueries
+);
+
+adminRouter.get(
   "/analytics/demand-signals",
   restrictTo(permissions.analytics.demandRead),
   tutorSearchController.getDemandSignals
+);
+
+adminRouter.get(
+  "/analytics/demand-breakdown",
+  restrictTo(permissions.analytics.demandRead),
+  tutorSearchController.getSearchDemandBreakdown
 );
 
 export { adminRouter as tutorSearchAdminRouter };

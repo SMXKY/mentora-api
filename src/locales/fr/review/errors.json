@@ -4,5 +4,10 @@
   "alreadySubmitted": "Vous avez déjà soumis une évaluation pour cette réservation.",
   "reviewNotFound": "Évaluation introuvable.",
   "notYourReview": "Cette évaluation ne vous concerne pas.",
-  "alreadyResponded": "Vous avez déjà répondu à cette évaluation."
+  "alreadyResponded": "Vous avez déjà répondu à cette évaluation.",
+  "responseBlocked": "Cette réponse ne peut pas être envoyée telle quelle — supprimez toute coordonnée ou lien et réessayez.",
+  "alreadyReported": "Vous avez déjà signalé cette évaluation.",
+  "reportNotFound": "Signalement introuvable.",
+  "incidentNotFound": "Signalement d'incident introuvable.",
+  "notEligibleForIncidentReport": "Cette réservation n'est pas encore éligible à un signalement d'incident — la séance doit d'abord avoir eu lieu."
 }

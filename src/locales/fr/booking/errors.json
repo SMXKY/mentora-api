@@ -8,6 +8,7 @@
   "sessionTypeNotOffered": "Ce tuteur n'offre pas ce type de session.",
   "tutorRateNotSet": "Ce tuteur n'a pas encore défini de tarif pour ce type de session.",
   "sessionCrossesMidnight": "La session ne peut pas dépasser minuit.",
+  "sessionInPast": "Cette heure est déjà passée. Veuillez choisir une heure future.",
   "slotNotAvailable": "Ce créneau n'est plus disponible. Veuillez en choisir un autre.",
   "bookingNotFound": "Réservation introuvable.",
   "notYourBooking": "Cette réservation ne vous appartient pas.",

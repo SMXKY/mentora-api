@@ -24,6 +24,7 @@ import {
   dbTimeToMinutes,
   minutesToDbTime,
   sessionStartAt,
+  isWatPastMoment,
 } from "../availability/availability.logic";
 import {
   schedulePaymentWindowJobs,
@@ -182,9 +183,8 @@ async function assertApprovedSubjectLevel(
     },
     select: {
       id: true,
-      ratePerOnlineSessionXaf: true,
-      ratePerHomeSessionXaf: true,
-      ratePerHourXaf: true,
+      ratePerOnlineHourXaf: true,
+      ratePerHomeHourXaf: true,
       isOpenForBooking: true,
       levels: { where: { levelId } },
     },
@@ -207,23 +207,23 @@ async function assertApprovedSubjectLevel(
   return tutorSubject;
 }
 
-/** Hourly billing takes priority when the tutor has set a per-hour rate —
- * otherwise falls back to the flat per-session fee for the chosen type. */
+/** The tutor's hourly rate for the chosen session type (online vs. home —
+ * always a distinct rate per mode, never a shared/ambiguous one), scaled to
+ * the actual session length. Returns null if that mode's rate isn't set. */
 function computeAgreedRateXaf(
   tutorSubject: {
-    ratePerHourXaf: number | null;
-    ratePerOnlineSessionXaf: number | null;
-    ratePerHomeSessionXaf: number | null;
+    ratePerOnlineHourXaf: number | null;
+    ratePerHomeHourXaf: number | null;
   },
   sessionType: SessionType,
   durationMinutes: number
 ) {
-  if (tutorSubject.ratePerHourXaf != null) {
-    return Math.round((tutorSubject.ratePerHourXaf * durationMinutes) / 60);
-  }
-  return sessionType === "ONLINE"
-    ? tutorSubject.ratePerOnlineSessionXaf
-    : tutorSubject.ratePerHomeSessionXaf;
+  const hourlyRate =
+    sessionType === "ONLINE"
+      ? tutorSubject.ratePerOnlineHourXaf
+      : tutorSubject.ratePerHomeHourXaf;
+  if (hourlyRate == null) return null;
+  return Math.round((hourlyRate * durationMinutes) / 60);
 }
 
 function assertSessionTypeAllowed(
@@ -349,6 +349,17 @@ async function createBookingRequest(
     );
   }
   const sessionEndTime = minutesToTimeString(endMinutes);
+
+  // Checked explicitly (not just left to isWindowAvailable naturally
+  // excluding elapsed slots) so the rejection reason is unambiguous rather
+  // than the generic "not available" a stale client-side slot list would
+  // otherwise surface.
+  if (isWatPastMoment(input.sessionDate, input.sessionStartTime)) {
+    throw new AppError(
+      "booking/errors:sessionInPast",
+      StatusCodes.BAD_REQUEST
+    );
+  }
 
   const available = await AvailabilityService.isWindowAvailable(
     input.tutorProfileId,

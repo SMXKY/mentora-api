@@ -197,6 +197,8 @@ export class UserService extends BaseService<
       cityId: user.cityId, // NEW
       city: user.city, // NEW
       preferredLanguage: user.preferredLanguage,
+      themePreference: user.themePreference,
+      hasPassword: !!user.password,
       notificationsMuted: user.notificationsMuted,
       status: user.status,
       isAccountComplete: user.isAccountComplete,
@@ -219,6 +221,29 @@ export class UserService extends BaseService<
    * information a tutor gets for free just by guessing a user id.
    */
   async getBookerProfile(viewerUserId: string, targetUserId: string) {
+    await this.assertBookerRelationship(viewerUserId, targetUserId);
+    return this.buildBookerProfile(targetUserId);
+  }
+
+  /** Full, paginated/sortable/filterable reviews list behind the same
+   * tutor-only relationship gate as getBookerProfile — powers a "see all
+   * reviews" screen for a booker's profile the way listTutorReviews does
+   * for a tutor's public one. */
+  async getBookerProfileReviews(
+    viewerUserId: string,
+    targetUserId: string,
+    options: { cursor?: string; limit: number; sort?: import("../review/review.types").ReviewSortOption; rating?: number; wouldRebook?: boolean }
+  ) {
+    await this.assertBookerRelationship(viewerUserId, targetUserId);
+    const subjectRole = await this.resolveBookerSubjectRole(targetUserId);
+    if (!subjectRole) return { data: [], meta: { nextCursor: null, hasNextPage: false, limit: options.limit } };
+    return ReviewService.listReviewsForSubject(targetUserId, subjectRole, options);
+  }
+
+  /** Same relationship gate getBookerProfile enforces — a tutor may view a
+   * booker's redacted profile/reviews only if they share a booking or an
+   * active conversation. */
+  private async assertBookerRelationship(viewerUserId: string, targetUserId: string) {
     const viewerTutorProfile = await prisma.tutorProfile.findFirst({
       where: { userId: viewerUserId, deletedAt: null },
       select: { id: true },
@@ -251,7 +276,44 @@ export class UserService extends BaseService<
     if (!hasBooking && !hasConversation) {
       throw new AppError("auth/errors:userNotFound", StatusCodes.NOT_FOUND);
     }
+  }
 
+  /** Same STUDENT/PARENT/null resolution buildBookerProfile computes for
+   * its own "role" field, extracted so the reviews endpoint can pick the
+   * right ReviewSubjectRole without re-fetching/re-deriving the full profile. */
+  private async resolveBookerSubjectRole(targetUserId: string): Promise<ReviewSubjectRole | null> {
+    const [ownStudentProfile, guardedCount] = await Promise.all([
+      prisma.studentProfile.findFirst({ where: { userId: targetUserId, deletedAt: null }, select: { id: true } }),
+      prisma.studentProfile.count({ where: { guardianId: targetUserId, deletedAt: null } }),
+    ]);
+    if (ownStudentProfile) return ReviewSubjectRole.STUDENT;
+    if (guardedCount > 0) return ReviewSubjectRole.PARENT;
+    return null;
+  }
+
+  /**
+   * Same redacted shape a tutor sees via getBookerProfile, but for the
+   * booker viewing themselves — no relationship gate needed since it's
+   * their own data, deliberately still redacted (last-name initial, no
+   * children's names) so "preview my profile" shows the real thing others
+   * see rather than their full private record.
+   */
+  async previewMyBookerProfile(userId: string) {
+    return this.buildBookerProfile(userId);
+  }
+
+  /** Self-preview counterpart to getBookerProfileReviews — no relationship
+   * gate needed, same reasoning as previewMyBookerProfile. */
+  async previewMyBookerProfileReviews(
+    userId: string,
+    options: { cursor?: string; limit: number; sort?: import("../review/review.types").ReviewSortOption; rating?: number; wouldRebook?: boolean }
+  ) {
+    const subjectRole = await this.resolveBookerSubjectRole(userId);
+    if (!subjectRole) return { data: [], meta: { nextCursor: null, hasNextPage: false, limit: options.limit } };
+    return ReviewService.listReviewsForSubject(userId, subjectRole, options);
+  }
+
+  private async buildBookerProfile(targetUserId: string) {
     const user = await prisma.user.findFirst({
       where: { id: targetUserId, deletedAt: null },
       select: {
@@ -318,7 +380,7 @@ export class UserService extends BaseService<
         },
       }),
       subjectRole
-        ? ReviewService.listReviewsForSubject(targetUserId, subjectRole, undefined, 5)
+        ? ReviewService.listReviewsForSubject(targetUserId, subjectRole, { limit: 5 })
         : Promise.resolve({ data: [] as unknown[] }),
       subjectRole
         ? prisma.review.count({

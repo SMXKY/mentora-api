@@ -5,6 +5,7 @@ import NotificationService from "../../services/notification/notification.servic
 import { KycAdminService } from "../kyc";
 import { DashboardResponse } from "./dashboard.schema";
 import { watStartOfDay, watStartOfWeek, watStartOfMonth } from "../availability/availability.logic";
+import { resolveStorageUrl } from "../../services/media";
 
 // Short TTL only — the spec calls stale-within-reason acceptable for
 // everything except the live-updated counters, which mobile refreshes
@@ -29,9 +30,14 @@ function toBookingSummary(b: {
   sessionStartTime: Date;
   sessionType: string;
   status: string;
-  tutorProfile?: { user: { firstName: string | null; lastName: string | null } } | null;
-  booker?: { firstName: string | null; lastName: string | null } | null;
-  studentProfile?: { firstName: string } | null;
+  tutorProfile?: {
+    user: { firstName: string | null; lastName: string | null; profilePictureUrl: string | null };
+  } | null;
+  booker?: { firstName: string | null; lastName: string | null; profilePictureUrl: string | null } | null;
+  // A guardian-managed child has no login of their own (see StudentProfile.userId
+  // comment) and so no photo to show — `user` is only present for self-registered
+  // students, in which case their own picture takes priority over the booker's.
+  studentProfile?: { firstName: string; user?: { profilePictureUrl: string | null } | null } | null;
   subject: { name: string };
 }) {
   const tutorName = b.tutorProfile
@@ -41,10 +47,19 @@ function toBookingSummary(b: {
     b.studentProfile?.firstName ??
     (b.booker ? [b.booker.firstName, b.booker.lastName].filter(Boolean).join(" ") || null : null);
 
+  const tutorProfilePictureUrl = b.tutorProfile
+    ? resolveStorageUrl(b.tutorProfile.user.profilePictureUrl)
+    : null;
+  const studentProfilePictureUrl = resolveStorageUrl(
+    b.studentProfile?.user?.profilePictureUrl ?? b.booker?.profilePictureUrl ?? null
+  );
+
   return {
     id: b.id,
     tutorName,
     studentName,
+    tutorProfilePictureUrl,
+    studentProfilePictureUrl,
     subject: b.subject?.name ?? null,
     sessionDate: b.sessionDate.toISOString(),
     sessionStartTime: b.sessionStartTime.toISOString(),
@@ -77,8 +92,12 @@ async function commonUnreadCounts(userId: string) {
 
 async function buildParentDashboard(userId: string): Promise<DashboardResponse> {
   const bookingInclude = {
-    tutorProfile: { include: { user: { select: { firstName: true, lastName: true } } } },
-    studentProfile: { select: { firstName: true } },
+    tutorProfile: {
+      include: { user: { select: { firstName: true, lastName: true, profilePictureUrl: true } } },
+    },
+    studentProfile: {
+      select: { firstName: true, user: { select: { profilePictureUrl: true } } },
+    },
     subject: { select: { name: true } },
   };
 
@@ -143,7 +162,9 @@ async function buildParentDashboard(userId: string): Promise<DashboardResponse> 
 
 async function buildStudentDashboard(userId: string): Promise<DashboardResponse> {
   const bookingInclude = {
-    tutorProfile: { include: { user: { select: { firstName: true, lastName: true } } } },
+    tutorProfile: {
+      include: { user: { select: { firstName: true, lastName: true, profilePictureUrl: true } } },
+    },
     subject: { select: { name: true } },
   };
 
@@ -207,6 +228,7 @@ async function buildTutorDashboard(userId: string): Promise<DashboardResponse> {
     return {
       role: "TUTOR",
       ...common,
+      tutorProfileId: null,
       pendingBookingRequests: [],
       upcomingConfirmedSessions: [],
       earnings: { totalEarnedXaf: 0, pendingEscrowXaf: 0, balanceXaf: 0, monthlyEarnedXaf: 0 },
@@ -220,8 +242,10 @@ async function buildTutorDashboard(userId: string): Promise<DashboardResponse> {
   }
 
   const bookingInclude = {
-    booker: { select: { firstName: true, lastName: true } },
-    studentProfile: { select: { firstName: true } },
+    booker: { select: { firstName: true, lastName: true, profilePictureUrl: true } },
+    studentProfile: {
+      select: { firstName: true, user: { select: { profilePictureUrl: true } } },
+    },
     subject: { select: { name: true } },
   };
   const startOfMonth = watStartOfMonth();
@@ -272,6 +296,7 @@ async function buildTutorDashboard(userId: string): Promise<DashboardResponse> {
   return {
     role: "TUTOR",
     ...common,
+    tutorProfileId: tutorProfile.id,
     pendingBookingRequests: pending.map(toBookingSummary),
     upcomingConfirmedSessions: upcoming.map(toBookingSummary),
     earnings: {

@@ -10,11 +10,11 @@ import { CredentialInputSchema, AdditionalSubjectSchema } from "./kyc.types";
 /** Multipart text fields arrive as strings; numeric/array fields need
  * coercion before Zod validation, which JSON body routes get for free. */
 function parseCredentialBody(body: Record<string, any>) {
-  let subjectIds: string[];
+  let subjects: { subjectId: string; levelIds: string[] }[];
   try {
-    subjectIds = Array.isArray(body.subjectIds)
-      ? body.subjectIds
-      : JSON.parse(body.subjectIds ?? "[]");
+    subjects = Array.isArray(body.subjects)
+      ? body.subjects
+      : JSON.parse(body.subjects ?? "[]");
   } catch {
     throw new AppError(
       "kyc/errors:invalidSubjectIdsFormat",
@@ -27,7 +27,7 @@ function parseCredentialBody(body: Record<string, any>) {
     fieldOfStudy: body.fieldOfStudy,
     gradeOrClassification: body.gradeOrClassification || undefined,
     yearAwarded: Number(body.yearAwarded),
-    subjectIds,
+    subjects,
   };
 }
 

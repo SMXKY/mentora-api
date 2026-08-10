@@ -3,7 +3,18 @@ import { z } from "zod";
 import { reviewController } from "./review.controller";
 import { validate } from "../../middlewares/validate.middleware";
 import protect from "../../middlewares/protect.middleware";
-import { SubmitReviewSchema, ListTutorReviewsQuerySchema } from "./review.types";
+import restrictTo from "../../middlewares/restrictTo.middleware";
+import { permissions } from "../../data/permission.data";
+import {
+  SubmitReviewSchema,
+  ListTutorReviewsQuerySchema,
+  ReportReviewSchema,
+  ReviewReviewReportSchema,
+  ListReviewReportsQuerySchema,
+  SubmitIncidentReportSchema,
+  ReviewIncidentReportSchema,
+  ListIncidentReportsQuerySchema,
+} from "./review.types";
 
 const router = Router();
 
@@ -23,6 +34,22 @@ router.post(
   reviewController.respond
 );
 
+router.post(
+  "/:id/report",
+  protect,
+  validate(z.object({ id: z.string().uuid() }), "params"),
+  validate(ReportReviewSchema),
+  reviewController.report
+);
+
+router.post(
+  "/bookings/:bookingId/incident-report",
+  protect,
+  validate(z.object({ bookingId: z.string().uuid() }), "params"),
+  validate(SubmitIncidentReportSchema),
+  reviewController.submitIncidentReport
+);
+
 // Public — anyone can read a tutor's revealed reviews.
 router.get(
   "/tutors/:tutorProfileId",
@@ -31,4 +58,42 @@ router.get(
   reviewController.listForTutor
 );
 
+const adminRouter = Router();
+adminRouter.use(protect);
+
+adminRouter.get(
+  "/reports",
+  restrictTo(permissions.reviews.reportsRead),
+  validate(ListReviewReportsQuerySchema, "query"),
+  reviewController.listReviewReports
+);
+adminRouter.post(
+  "/reports/:id/review",
+  restrictTo(permissions.reviews.reportsReview),
+  validate(z.object({ id: z.string().uuid() }), "params"),
+  validate(ReviewReviewReportSchema),
+  reviewController.reviewReport
+);
+
+adminRouter.get(
+  "/incidents",
+  restrictTo(permissions.reviews.incidentsRead),
+  validate(ListIncidentReportsQuerySchema, "query"),
+  reviewController.listIncidentReports
+);
+adminRouter.get(
+  "/incidents/:id",
+  restrictTo(permissions.reviews.incidentsRead),
+  validate(z.object({ id: z.string().uuid() }), "params"),
+  reviewController.getIncidentReport
+);
+adminRouter.post(
+  "/incidents/:id/review",
+  restrictTo(permissions.reviews.incidentsReview),
+  validate(z.object({ id: z.string().uuid() }), "params"),
+  validate(ReviewIncidentReportSchema),
+  reviewController.reviewIncidentReport
+);
+
+export { adminRouter as reviewAdminRouter };
 export default router;

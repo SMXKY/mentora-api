@@ -54,6 +54,19 @@ services:
       - "7881:7881"
       - "50000-50010:50000-50010/udp"
 
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    container_name: mentora_meilisearch
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set, no default key allowed}
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili_data:/meili_data
+
 volumes:
   postgres_data:
   redis_data:
+  meili_data:

@@ -77,6 +77,23 @@ router.patch(
   userController.updateMyProfilePicture
 );
 
+// Self-service preview of the same redacted profile a tutor sees via
+// getBookerProfile — must be registered before "/:id/booker-profile" below,
+// otherwise Express would try to treat "me" as an :id value there too.
+router.get(
+  "/me/booker-profile",
+  protect,
+  userController.previewMyBookerProfile
+);
+
+// Full, paginated/sortable/filterable reviews list — same self-preview
+// reasoning as /me/booker-profile above, must also precede "/:id/..." below.
+router.get(
+  "/me/booker-profile/reviews",
+  protect,
+  userController.previewMyBookerProfileReviews
+);
+
 // Tutor-only, relationship-gated (booking or conversation) — see
 // UserService.getBookerProfile. Registered before the admin "/:id" route
 // below, though the extra path segment means there's no pattern collision
@@ -86,6 +103,15 @@ router.get(
   protect,
   validate(ParamsId, "params"),
   userController.getBookerProfile
+);
+
+// Full, paginated/sortable/filterable reviews list behind the same gate —
+// powers a "see all reviews" screen for a booker's profile.
+router.get(
+  "/:id/booker-profile/reviews",
+  protect,
+  validate(ParamsId, "params"),
+  userController.getBookerProfileReviews
 );
 
 // Chat-only block/unblock — any authenticated user, no special permission,

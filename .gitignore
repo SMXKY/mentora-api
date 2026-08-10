@@ -10,3 +10,7 @@ coverage/
 .env.prod
 .env.prod
 .env.bak
+
+# MaxMind GeoLite2 database, proprietary/licensed data, not source, see
+# docs/services/tutor-search.doc.md for where to download it.
+geoip/*.mmdb

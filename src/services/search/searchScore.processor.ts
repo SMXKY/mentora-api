@@ -9,6 +9,7 @@ import {
 } from "./compositeScore";
 import { getRankingWeights, getNewTutorBoostConfig } from "./searchConfig";
 import { bumpSearchCacheVersion } from "./searchCache";
+import { indexTutor } from "./meilisearchTutorIndex";
 
 const connection = {
   host: process.env.REDIS_HOST || "127.0.0.1",
@@ -148,6 +149,20 @@ export async function recomputeTutorScore(tutorProfileId: string): Promise<void>
   });
 
   await bumpSearchCacheVersion(profile.cityId);
+
+  // Every mutation path that feeds the composite score (profile edits,
+  // subject approval, availability, ratings, KYC status) already funnels
+  // through this function via queueScoreRecompute(), so this is the one
+  // place that needs to also keep the Meilisearch document in sync, no
+  // separate webhook or polling needed. A Meilisearch outage should not
+  // fail score recomputation itself, hence the catch.
+  await indexTutor(tutorProfileId).catch((err) => {
+    console.error({
+      event: "meilisearch_tutor_index_failed",
+      tutorProfileId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
 }
 
 export async function sweepAllActiveTutors(): Promise<{ recomputed: number }> {

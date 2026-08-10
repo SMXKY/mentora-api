@@ -13,6 +13,7 @@ import {
   updateNewTutorBoostConfig,
 } from "../../services/search/searchConfig";
 import prisma from "../../config/database.config";
+import { resolveSearchOrigin } from "../../services/search/searchOrigin.resolver";
 
 export const tutorSearchController = {
   searchTutors: catchAsync(
@@ -28,11 +29,17 @@ export const tutorSearchController = {
         searcherCityId = user?.cityId ?? null;
       }
 
+      // Only actually used when this is a home-session search, see
+      // shouldApplyGeoSort() in tutorSearch.service.ts, resolved here
+      // regardless so the service stays a plain function of its inputs.
+      const searchOrigin = await resolveSearchOrigin(req);
+
       const result: any = await TutorSearchService.searchTutors(
         req.query as any,
         {
           userId: ctx.userId,
           searcherCityId,
+          searchOrigin,
         }
       );
 
@@ -117,9 +124,28 @@ export const tutorSearchController = {
     }
   ),
 
+  getTopQueries: catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const result = await TutorSearchService.getTopQueries(
+        req.query.windowDays ? Number(req.query.windowDays) : undefined,
+        req.query.limit ? Number(req.query.limit) : undefined
+      );
+      appResponder(StatusCodes.OK, result, res);
+    }
+  ),
+
   getDemandSignals: catchAsync(
     async (req: Request, res: Response): Promise<void> => {
       const result = await TutorSearchService.getDemandSignals();
+      appResponder(StatusCodes.OK, result, res);
+    }
+  ),
+
+  getSearchDemandBreakdown: catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const result = await TutorSearchService.getSearchDemandBreakdown(
+        req.query.windowDays ? Number(req.query.windowDays) : undefined
+      );
       appResponder(StatusCodes.OK, result, res);
     }
   ),

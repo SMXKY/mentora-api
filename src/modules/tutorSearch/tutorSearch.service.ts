@@ -1,11 +1,13 @@
 import prisma from "../../config/database.config";
+import meilisearch from "../../config/meilisearch.config";
 import { resolveStorageUrl } from "../../services/media";
-import { expandSearchTerms } from "../../services/search/searchSynonyms";
 import {
   buildSearchCacheKey,
   getCachedSearchResult,
   setCachedSearchResult,
 } from "../../services/search/searchCache";
+import { TUTOR_INDEX_UID } from "../../services/search/meilisearchTutorIndex";
+import { SearchOrigin } from "../../services/search/searchOrigin.resolver";
 import {
   KycStatus,
   SubjectVerificationStatus,
@@ -21,8 +23,7 @@ import {
 
 const BIO_EXCERPT_LENGTH = 120;
 const REFINE_NUDGE_THRESHOLD = 50;
-const FUZZY_SIMILARITY_THRESHOLD = 0.3;
-const TEXT_CANDIDATE_POOL_SIZE = 500;
+const CANDIDATE_POOL_SIZE = 500;
 
 type TutorRow = Awaited<ReturnType<typeof fetchCandidatePage>>[number];
 
@@ -179,125 +180,145 @@ async function fetchCandidatePage(
   });
 }
 
-interface TextMatchRank {
-  matchRank: number; // 0 exact subject, 1 prefix subject, 2 substring/synonym/level/name/bio/city, 3 fuzzy typo
-  similarity: number;
+// Meilisearch equivalent of a Prisma boolean-safe `has: undefined` check —
+// a language filter with an undefined value throws there too, so this
+// list is built conditionally the same way the old raw-SQL path did.
+function buildMeilisearchFilter(query: SearchTutorsQueryInput): string[] {
+  const filter: string[] = [];
+
+  if (query.cityId) filter.push(`cityId = "${query.cityId}"`);
+  if (query.subjectId) filter.push(`subjectIds = "${query.subjectId}"`);
+  if (query.levelId) filter.push(`levelIds = "${query.levelId}"`);
+  if (query.language) filter.push(`languages = "${query.language}"`);
+  if (query.gender) filter.push(`gender = "${query.gender}"`);
+  if (query.minPrice !== undefined) filter.push(`maxRateXaf >= ${query.minPrice}`);
+  if (query.maxPrice !== undefined) filter.push(`minRateXaf <= ${query.maxPrice}`);
+
+  if (query.mode) {
+    filter.push(
+      query.mode === TeachingMode.BOTH
+        ? `teachingMode = "${TeachingMode.BOTH}"`
+        : `(teachingMode = "${query.mode}" OR teachingMode = "${TeachingMode.BOTH}")`
+    );
+  }
+
+  return filter;
+}
+
+// Geo only ever applies to an explicit home-session search — an ONLINE_ONLY
+// or unset mode has no meaningful "distance" concept, and BOTH means "I
+// don't mind either," not "I want in-person," so it stays out of geo sort
+// too per the approved plan.
+function shouldApplyGeoSort(query: SearchTutorsQueryInput): boolean {
+  return query.mode === TeachingMode.HOME_ONLY;
 }
 
 /**
- * Tiered relevance for a free-text query: exact subject-name match beats
- * prefix beats substring/synonym beats fuzzy-typo-only. Tutors matched only
- * via name/bio/city/level text (not a subject name) land in tier 2 as well
- * — "good enough to show, not as precise as a subject match" — so a search
- * for "Jean" still surfaces tutors named Jean-Paul without pretending
- * that's as strong a signal as an exact subject match.
+ * The single ranked candidate pool for a search, sourced from Meilisearch
+ * instead of the old raw-SQL trigram-similarity query. Meilisearch's own
+ * typo tolerance, French accent/stemming handling, and synonyms setting
+ * (seeded from the old static dictionary, see meilisearchTutorIndex.ts)
+ * replace the old tiered matchRank logic entirely. Proximity sort is
+ * layered in ahead of compositeScore/boostScore only for home-session
+ * searches with a resolved origin, see shouldApplyGeoSort().
  */
-async function rankTextMatches(
-  rawQuery: string
-): Promise<Map<string, TextMatchRank>> {
-  const q = rawQuery.trim().toLowerCase();
-  const synonymTerms = expandSearchTerms(rawQuery);
+async function searchCandidatePool(
+  query: SearchTutorsQueryInput,
+  searchOrigin: SearchOrigin | null
+): Promise<{ ids: string[]; estimatedTotalHits: number }> {
+  const filter = buildMeilisearchFilter(query);
+  const applyGeo = shouldApplyGeoSort(query) && searchOrigin !== null;
 
-  const subjectRows = await prisma.$queryRaw<
-    { tutor_profile_id: string; match_rank: number; sim: number }[]
-  >`
-    SELECT
-      ts.tutor_profile_id,
-      MIN(
-        CASE
-          WHEN lower(s.name) = ${q} THEN 0
-          WHEN lower(s.name) LIKE ${q + "%"} THEN 1
-          WHEN lower(s.name) LIKE ${"%" + q + "%"} THEN 2
-          WHEN lower(s.name) = ANY(${synonymTerms}) THEN 2
-          WHEN similarity(s.name, ${rawQuery}) > ${FUZZY_SIMILARITY_THRESHOLD} THEN 3
-          ELSE 9
-        END
-      ) AS match_rank,
-      MAX(similarity(s.name, ${rawQuery})) AS sim
-    FROM tutor_subjects ts
-    JOIN subjects s ON s.id = ts.subject_id
-    WHERE ts.status = 'APPROVED' AND ts.is_open_for_booking = true
-      AND (
-        lower(s.name) LIKE ${"%" + q + "%"}
-        OR lower(s.name) = ANY(${synonymTerms})
-        OR similarity(s.name, ${rawQuery}) > ${FUZZY_SIMILARITY_THRESHOLD}
-      )
-    GROUP BY ts.tutor_profile_id
-  `;
-
-  const ranks = new Map<string, TextMatchRank>(
-    subjectRows.map((r) => [
-      r.tutor_profile_id,
-      { matchRank: r.match_rank, similarity: r.sim ?? 0 },
-    ])
-  );
-
-  // Build the OR clause conditionally — a language filter with `has:
-  // undefined` is rejected by Prisma outright, it must be omitted from
-  // the array entirely when the query isn't literally "EN" or "FR",
-  // not included with an undefined value.
-  const upperQuery = rawQuery.trim().toUpperCase();
-  const isLanguageCode = upperQuery === "EN" || upperQuery === "FR";
-
-  const secondaryOr: any[] = [
-    { user: { firstName: { contains: rawQuery, mode: "insensitive" } } },
-    { bio: { contains: rawQuery, mode: "insensitive" } },
-    { city: { name: { contains: rawQuery, mode: "insensitive" } } },
-    {
-      tutorSubjects: {
-        some: {
-          status: SubjectVerificationStatus.APPROVED,
-          isOpenForBooking: true,
-          levels: {
-            some: {
-              level: { name: { contains: rawQuery, mode: "insensitive" } },
-            },
-          },
-        },
-      },
-    },
-  ];
-  if (isLanguageCode) {
-    secondaryOr.push({ languages: { has: upperQuery } });
+  let result;
+  try {
+    result = await meilisearch.index(TUTOR_INDEX_UID).search(query.q ?? "", {
+      filter: filter.length > 0 ? filter.join(" AND ") : undefined,
+      sort: applyGeo ? [`_geoPoint(${searchOrigin!.lat}, ${searchOrigin!.lng}):asc`] : undefined,
+      limit: CANDIDATE_POOL_SIZE,
+      attributesToRetrieve: ["id"],
+    });
+  } catch (err) {
+    // The shared global error handler (error.controller.ts) logs the
+    // wrapped AppError's own stack, not this original error, so without
+    // this the real Meilisearch failure (index missing, connection
+    // refused, bad filter syntax) never actually reaches the console.
+    console.error({
+      event: "meilisearch_search_failed",
+      indexUid: TUTOR_INDEX_UID,
+      query: query.q,
+      filter,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
   }
 
-  const secondaryRows = await prisma.tutorProfile.findMany({
+  return {
+    ids: result.hits.map((hit: any) => hit.id),
+    estimatedTotalHits: result.estimatedTotalHits,
+  };
+}
+
+/** Availability is time-relative ("this week" moves every day), so it is
+ * deliberately not baked into the Meilisearch document as a static field
+ * that would go stale between recomputes — it stays a Postgres post-filter
+ * over the already-ranked Meilisearch candidate pool, same shape as the
+ * old code's availability WHERE clause, just applied after ranking instead
+ * of before. */
+async function filterCandidatesByAvailability(
+  candidateIds: string[],
+  query: SearchTutorsQueryInput
+): Promise<Set<string>> {
+  if (!query.availability && !(query.availabilityFrom && query.availabilityTo)) {
+    return new Set(candidateIds);
+  }
+
+  const range = query.availability
+    ? availabilityPresetRange(query.availability)
+    : { from: new Date(query.availabilityFrom!), to: new Date(query.availabilityTo!) };
+
+  const rows = await prisma.tutorProfile.findMany({
     where: {
-      ...hardVisibilityFilter(),
-      OR: secondaryOr,
+      id: { in: candidateIds },
+      availabilitySlots: {
+        some: {
+          isActive: true,
+          OR: [
+            { slotType: AvailabilitySlotType.RECURRING },
+            {
+              slotType: AvailabilitySlotType.SPECIFIC_DATE,
+              specificDate: { gte: range.from, lte: range.to },
+            },
+          ],
+        },
+      },
     },
     select: { id: true },
   });
 
-  for (const row of secondaryRows) {
-    if (!ranks.has(row.id)) ranks.set(row.id, { matchRank: 2, similarity: 0 });
-  }
-
-  return ranks;
+  return new Set(rows.map((r) => r.id));
 }
 
-async function fetchCandidatePageWithTextRank(
-  structuredWhere: any,
-  ranks: Map<string, TextMatchRank>,
+/** Slices the ranked id pool at the cursor, fetches full rows for just
+ * that page from Postgres (Meilisearch only returns ids here, see
+ * attributesToRetrieve above), then restores Meilisearch's rank order —
+ * `id: { in: [...] }` does not guarantee result order matches the input
+ * array. */
+async function fetchPageForCandidateIds(
+  rankedIds: string[],
   cursor: string | undefined,
   limit: number
-) {
-  const candidates = await prisma.tutorProfile.findMany({
-    where: { ...structuredWhere, id: { in: Array.from(ranks.keys()) } },
+): Promise<TutorRow[]> {
+  const startIndex = cursor ? rankedIds.indexOf(cursor) + 1 : 0;
+  const pageIds = rankedIds.slice(startIndex, startIndex + limit + 1);
+  if (pageIds.length === 0) return [];
+
+  const rows = await prisma.tutorProfile.findMany({
+    where: { id: { in: pageIds } },
     select: CANDIDATE_SELECT,
-    take: TEXT_CANDIDATE_POOL_SIZE,
   });
 
-  const sorted = candidates.sort((a, b) => {
-    const ra = ranks.get(a.id)!;
-    const rb = ranks.get(b.id)!;
-    if (ra.matchRank !== rb.matchRank) return ra.matchRank - rb.matchRank;
-    if (ra.similarity !== rb.similarity) return rb.similarity - ra.similarity;
-    return (Number(b.compositeScore) || 0) - (Number(a.compositeScore) || 0);
-  });
-
-  const startIndex = cursor ? sorted.findIndex((c) => c.id === cursor) + 1 : 0;
-  return sorted.slice(startIndex, startIndex + limit + 1);
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  return pageIds.map((id) => rowById.get(id)).filter((r): r is TutorRow => !!r);
 }
 
 function computeAvailabilityStatus(
@@ -450,7 +471,11 @@ async function recordZeroResultEvent(
 export const TutorSearchService = {
   async searchTutors(
     query: SearchTutorsQueryInput,
-    context: { userId?: string; searcherCityId?: string | null } = {}
+    context: {
+      userId?: string;
+      searcherCityId?: string | null;
+      searchOrigin?: SearchOrigin | null;
+    } = {}
   ) {
     const effectiveQuery = { ...query };
     const isUnfiltered =
@@ -468,53 +493,27 @@ export const TutorSearchService = {
       effectiveQuery.cityId = context.searcherCityId;
     }
 
-    const structuredWhere = buildStructuredWhere({
-      ...effectiveQuery,
-      q: undefined,
-    } as any);
-
-    // Text-ranked path — deliberately uncached (a ranked Map isn't cheap
-    // to serialize/rehydrate correctly, and typed queries are cheap to
-    // recompute); structured-only searches keep using Redis as before.
-    if (effectiveQuery.q) {
-      const ranks = await rankTextMatches(effectiveQuery.q);
-      if (ranks.size === 0) {
-        return this.buildZeroResultResponse(effectiveQuery, context.userId);
-      }
-
-      const candidates = await fetchCandidatePageWithTextRank(
-        structuredWhere,
-        ranks,
-        query.cursor,
-        query.limit
-      );
-      const hasNextPage = candidates.length > query.limit;
-      const page = hasNextPage ? candidates.slice(0, query.limit) : candidates;
-
-      if (page.length === 0) {
-        return this.buildZeroResultResponse(effectiveQuery, context.userId);
-      }
-
-      return {
-        data: page.map(toResultCard),
-        meta: {
-          nextCursor: hasNextPage ? page[page.length - 1].id : null,
-          hasNextPage,
-          limit: query.limit,
-          refineNudge: ranks.size > REFINE_NUDGE_THRESHOLD,
-        },
-      };
-    }
-
     const cacheKey = await buildSearchCacheKey(
       effectiveQuery.cityId ?? null,
-      effectiveQuery as any
+      { ...effectiveQuery, hasGeoOrigin: !!context.searchOrigin } as any
     );
     const cached = await getCachedSearchResult<any>(cacheKey);
     if (cached) return cached;
 
-    const candidates = await fetchCandidatePage(
-      structuredWhere,
+    const pool = await searchCandidatePool(effectiveQuery, context.searchOrigin ?? null);
+    if (pool.ids.length === 0) {
+      return this.buildZeroResultResponse(effectiveQuery, context.userId);
+    }
+
+    const eligibleIds = await filterCandidatesByAvailability(pool.ids, effectiveQuery);
+    const rankedEligibleIds = pool.ids.filter((id) => eligibleIds.has(id));
+
+    if (rankedEligibleIds.length === 0) {
+      return this.buildZeroResultResponse(effectiveQuery, context.userId);
+    }
+
+    const candidates = await fetchPageForCandidateIds(
+      rankedEligibleIds,
       query.cursor,
       query.limit
     );
@@ -522,17 +521,10 @@ export const TutorSearchService = {
     const page = hasNextPage ? candidates.slice(0, query.limit) : candidates;
 
     if (page.length === 0) {
-      const result = await this.buildZeroResultResponse(
-        effectiveQuery,
-        context.userId
-      );
+      const result = await this.buildZeroResultResponse(effectiveQuery, context.userId);
       await setCachedSearchResult(cacheKey, result);
       return result;
     }
-
-    const totalMatching = await prisma.tutorProfile.count({
-      where: structuredWhere,
-    });
 
     const result = {
       data: page.map(toResultCard),
@@ -540,7 +532,11 @@ export const TutorSearchService = {
         nextCursor: hasNextPage ? page[page.length - 1].id : null,
         hasNextPage,
         limit: query.limit,
-        refineNudge: totalMatching > REFINE_NUDGE_THRESHOLD,
+        // Meilisearch's own estimate for the query+filters, independent of
+        // the availability post-filter — lets the UI show "N tutors found"
+        // up front while the list itself still loads/scrolls page by page.
+        totalCount: pool.estimatedTotalHits,
+        refineNudge: pool.estimatedTotalHits > REFINE_NUDGE_THRESHOLD,
       },
     };
     await setCachedSearchResult(cacheKey, result);
@@ -573,6 +569,7 @@ export const TutorSearchService = {
               nextCursor: null,
               hasNextPage: false,
               limit: query.limit,
+              totalCount: nearbyResults.length,
               refineNudge: false,
             },
             fallback: {
@@ -599,6 +596,7 @@ export const TutorSearchService = {
             nextCursor: null,
             hasNextPage: false,
             limit: query.limit,
+            totalCount: 0,
             refineNudge: false,
           },
           fallback: { type: "no_tutors_for_subject" as const },
@@ -613,6 +611,7 @@ export const TutorSearchService = {
         nextCursor: null,
         hasNextPage: false,
         limit: query.limit,
+        totalCount: 0,
         refineNudge: false,
       },
       fallback: restrictiveFilter
@@ -704,6 +703,28 @@ export const TutorSearchService = {
     return rows;
   },
 
+  /** Most-searched query text, regardless of outcome — complements
+   *  getDeadEndQueries (which only surfaces queries that never converted).
+   *  Answers "what are people typing" for recruitment/content planning. */
+  async getTopQueries(windowDays = 30, limit = 20) {
+    const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+    const submitted = await prisma.searchAnalyticsEvent.groupBy({
+      by: ["query"],
+      where: {
+        eventType: SearchEventType.QUERY_SUBMITTED,
+        query: { not: null },
+        createdAt: { gte: since },
+      },
+      _count: { _all: true },
+    });
+
+    return submitted
+      .filter((s) => s.query)
+      .sort((a, b) => b._count._all - a._count._all)
+      .slice(0, limit)
+      .map((s) => ({ query: s.query, searchCount: s._count._all }));
+  },
+
   async getDeadEndQueries(windowDays = 30, limit = 20) {
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
     const [submitted, booked] = await Promise.all([
@@ -772,6 +793,100 @@ export const TutorSearchService = {
       cityName: s.cityId ? cityById.get(s.cityId) ?? null : null,
       count: s._count._all,
     }));
+  },
+
+  /**
+   * REQ-010-011 — the actual "should we recruit, and for what" report:
+   * every real search's filters (subject, language, teaching mode, city)
+   * tallied over a window, split into total volume vs. the zero-result
+   * subset so admins can see both raw demand AND unmet demand per
+   * dimension. `filters` is stored as an arbitrary JSON blob (see
+   * RecordSearchEventSchema) — it's the exact same shape SearchScreen
+   * sends on every QUERY_SUBMITTED/ZERO_RESULTS event, so no separate
+   * aggregation table is needed; this just tallies it in memory.
+   */
+  async getSearchDemandBreakdown(windowDays = 30) {
+    const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+    const events = await prisma.searchAnalyticsEvent.findMany({
+      where: {
+        eventType: { in: [SearchEventType.QUERY_SUBMITTED, SearchEventType.ZERO_RESULTS] },
+        createdAt: { gte: since },
+      },
+      select: { eventType: true, filters: true },
+    });
+
+    const subjectCounts = new Map<string, { total: number; zeroResult: number }>();
+    const cityCounts = new Map<string, { total: number; zeroResult: number }>();
+    const languageCounts: Record<string, number> = {};
+    const modeCounts: Record<string, number> = {};
+    let zeroResultSearches = 0;
+
+    for (const event of events) {
+      const isZero = event.eventType === SearchEventType.ZERO_RESULTS;
+      if (isZero) zeroResultSearches++;
+      const filters = (event.filters as Record<string, unknown> | null) ?? {};
+
+      const subjectId = typeof filters.subjectId === "string" ? filters.subjectId : null;
+      if (subjectId) {
+        const entry = subjectCounts.get(subjectId) ?? { total: 0, zeroResult: 0 };
+        entry.total++;
+        if (isZero) entry.zeroResult++;
+        subjectCounts.set(subjectId, entry);
+      }
+
+      const cityId = typeof filters.cityId === "string" ? filters.cityId : null;
+      if (cityId) {
+        const entry = cityCounts.get(cityId) ?? { total: 0, zeroResult: 0 };
+        entry.total++;
+        if (isZero) entry.zeroResult++;
+        cityCounts.set(cityId, entry);
+      }
+
+      const language = typeof filters.language === "string" ? filters.language : "unspecified";
+      languageCounts[language] = (languageCounts[language] ?? 0) + 1;
+
+      const mode = typeof filters.mode === "string" ? filters.mode : "unspecified";
+      modeCounts[mode] = (modeCounts[mode] ?? 0) + 1;
+    }
+
+    const [subjects, cities] = await Promise.all([
+      subjectCounts.size
+        ? prisma.subject.findMany({
+            where: { id: { in: Array.from(subjectCounts.keys()) } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      cityCounts.size
+        ? prisma.city.findMany({
+            where: { id: { in: Array.from(cityCounts.keys()) } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const subjectNameById = new Map(subjects.map((s) => [s.id, s.name]));
+    const cityNameById = new Map(cities.map((c) => [c.id, c.name]));
+
+    return {
+      windowDays,
+      totalSearches: events.length,
+      zeroResultSearches,
+      bySubject: Array.from(subjectCounts.entries())
+        .map(([subjectId, counts]) => ({
+          subjectId,
+          subjectName: subjectNameById.get(subjectId) ?? null,
+          ...counts,
+        }))
+        .sort((a, b) => b.total - a.total),
+      byCity: Array.from(cityCounts.entries())
+        .map(([cityId, counts]) => ({
+          cityId,
+          cityName: cityNameById.get(cityId) ?? null,
+          ...counts,
+        }))
+        .sort((a, b) => b.total - a.total),
+      byLanguage: languageCounts,
+      byMode: modeCounts,
+    };
   },
 };
 

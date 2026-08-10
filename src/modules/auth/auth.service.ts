@@ -552,7 +552,6 @@ export class AuthService {
           { phoneNumber: identifier },
           { username: identifier },
         ],
-        deletedAt: null,
       },
       select: {
         id: true,
@@ -560,11 +559,26 @@ export class AuthService {
         firstName: true,
         password: true,
         status: true,
+        deletedAt: true,
         passwordChangedAt: true,
       },
     });
 
-    if (!user) {
+    // A DEACTIVATED user still has deletedAt set (that's what makes them
+    // invisible to every other query in the app), but unlike a genuine
+    // admin-deleted account, this one has a real way back in — the
+    // `redirect` meta survives into the production error response (see
+    // error.controller.ts) so the frontend can route to the reactivation
+    // screen instead of just showing "invalid credentials" with no path
+    // forward. Any other deletedAt (admin-deleted, not self-deactivated)
+    // stays fully indistinguishable from "no such user", exactly as before.
+    if (user?.status === UserStatus.DEACTIVATED && user.deletedAt) {
+      throw new AppError("auth/errors:accountDeactivated", StatusCodes.FORBIDDEN, {
+        redirect: "reactivate-account",
+      });
+    }
+
+    if (!user || user.deletedAt) {
       if (ip) await recordFailedIpAttempt(ip);
       throw new AppError(
         "auth/errors:invalidCredentials",
@@ -1046,6 +1060,7 @@ export class AuthService {
         isEmailVerified: user.isEmailVerified,
         isAccountComplete: user.isAccountComplete,
         preferredLanguage: user.preferredLanguage,
+        themePreference: user.themePreference,
         gender: user.gender,
         profilePictureUrl: resolveStorageUrl(user.profilePictureUrl),
         roles: user.userRoles,
@@ -1071,6 +1086,7 @@ export class AuthService {
         phoneNumber: true,
         profilePictureUrl: true,
         preferredLanguage: true,
+        themePreference: true,
         isEmailVerified: true,
         isAccountComplete: true,
         userRoles: {

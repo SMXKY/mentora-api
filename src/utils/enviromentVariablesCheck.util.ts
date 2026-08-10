@@ -155,6 +155,17 @@ if (!process.env.BREVO_API_KEY)
 if (!process.env.RESET_TOKEN_EXPIRY)
   throw new Error("RESET_TOKEN_EXPIRY environment variable not set");
 
+// Meilisearch (tutor search)
+if (!process.env.MEILI_HOST)
+  throw new Error("MEILI_HOST environment variable not set");
+if (!process.env.MEILI_MASTER_KEY)
+  throw new Error("MEILI_MASTER_KEY environment variable not set");
+
+// GeoLite2 (IP-based location fallback for home-tutor geo search).
+// Optional on purpose: if unset, searchOrigin.resolver.ts falls back to
+// no geo origin instead of blocking search, since IP-based location is a
+// nice-to-have signal, not a requirement.
+
 // =============================================
 // Typed exports — use these throughout the app
 // never use process.env directly outside this file
@@ -220,3 +231,8 @@ export const REGISTRATION_TOKEN_EXPIRY = process.env.REGISTRATION_TOKEN_EXPIRY;
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 export const BREVO_API_KEY = process.env.BREVO_API_KEY;
 export const RESET_TOKEN_EXPIRY = process.env.RESET_TOKEN_EXPIRY;
+
+export const MEILI_HOST = process.env.MEILI_HOST!;
+export const MEILI_MASTER_KEY = process.env.MEILI_MASTER_KEY!;
+// Optional, see the check block above for why this has no required-env check.
+export const GEOLITE2_DB_PATH = process.env.GEOLITE2_DB_PATH;

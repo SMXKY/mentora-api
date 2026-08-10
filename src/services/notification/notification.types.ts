@@ -448,6 +448,12 @@ export const notificationRegistry: Record<
     isTransactional: false,
     defaultChannels: inAppPush,
   },
+  REVIEW_REMOVED: {
+    titleCode: "notifications/messages:review_removed.title",
+    bodyCode: "notifications/messages:review_removed.body",
+    isTransactional: false,
+    defaultChannels: inAppPush,
+  },
 
   ACCOUNT_FLAGGED: {
     titleCode: "notifications/messages:account_flagged.title",

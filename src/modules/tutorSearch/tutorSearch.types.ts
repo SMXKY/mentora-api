@@ -26,8 +26,13 @@ export const SearchTutorsQuerySchema = z
     availability: AvailabilityPresetEnum.optional(),
     availabilityFrom: z.string().datetime().optional(),
     availabilityTo: z.string().datetime().optional(),
+    // GPS origin for home-session geo sort, sent by the client when it
+    // has location permission. See searchOrigin.resolver.ts, this is the
+    // highest-priority tier ahead of the IP-based fallback.
+    lat: z.coerce.number().min(-90).max(90).optional(),
+    lng: z.coerce.number().min(-180).max(180).optional(),
     cursor: z.string().uuid().optional(),
-    limit: z.coerce.number().int().min(1).max(50).optional().default(12),
+    limit: z.coerce.number().int().min(1).max(50).optional().default(8),
   })
   .openapi("SearchTutorsQuery");
 export type SearchTutorsQueryInput = z.infer<typeof SearchTutorsQuerySchema>;

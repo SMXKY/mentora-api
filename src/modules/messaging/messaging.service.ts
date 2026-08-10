@@ -16,7 +16,7 @@ import {
 import { ServiceContext } from "../../base/base.types";
 import { AuditService } from "../../utils/logUserActivity.util";
 import { NotificationService } from "../../services/notification/notification.service";
-import { emitToConversation, isUserOnline } from "../../socket/index";
+import { emitToConversation, emitToUser, isUserOnline } from "../../socket/index";
 import { filterMessage } from "../../services/messaging/contentFilter";
 import { messagingConfig } from "../../services/messaging/messagingConfig";
 import { resolveStorageUrl } from "../../services/media";
@@ -344,6 +344,7 @@ type ReplyToPreview = {
   senderId: string;
   content: string;
   contentDeleted: boolean;
+  attachment?: AttachmentPreview;
 } | null;
 
 function serializeReplyTo(replyTo: ReplyToPreview) {
@@ -353,6 +354,10 @@ function serializeReplyTo(replyTo: ReplyToPreview) {
     senderId: replyTo.senderId,
     content: replyTo.contentDeleted ? null : decodeFromLegacyDb(replyTo.content),
     contentDeleted: replyTo.contentDeleted,
+    // So the reply preview (composer bar + in-bubble quote) can show a
+    // thumbnail/filename instead of going blank when the quoted message
+    // was media with no caption.
+    attachment: replyTo.contentDeleted ? null : serializeAttachment(replyTo.attachment ?? null),
   };
 }
 
@@ -453,9 +458,23 @@ async function sendMessage(
   // Chat-only block enforcement — checked on every send (not just at
   // conversation-open time) so a block taken mid-conversation takes effect
   // immediately in both directions, socket or REST.
+  //
+  // The two directions are handled very differently on purpose:
+  //  - Sender blocked the recipient (blockedByA): a loud, immediate error —
+  //    the sender already knows about their own block, nothing to hide.
+  //  - Recipient blocked the sender (blockedByB): WhatsApp-style silent
+  //    block. The send proceeds through every normal step below (content
+  //    validation, filter, persistence) and reports success to the sender
+  //    exactly like any other message — but the created row is flagged
+  //    hiddenFromRecipient and never reaches the recipient in any form
+  //    (no realtime event, no notification, no unread bump, no listMessages
+  //    visibility). Revealing the block to the sender via an error would
+  //    let them confirm they'd been blocked, which is exactly what this
+  //    behavior exists to prevent.
   const otherParticipant = conversation.participants.find(
     (p) => p.userId !== senderId
   );
+  let hiddenFromRecipient = false;
   if (otherParticipant) {
     const { blockedByA, blockedByB } = await userService.getBlockStatus(
       senderId,
@@ -467,12 +486,7 @@ async function sendMessage(
         StatusCodes.FORBIDDEN
       );
     }
-    if (blockedByB) {
-      throw new AppError(
-        "messaging/errors:blockedByRecipient",
-        StatusCodes.FORBIDDEN
-      );
-    }
+    hiddenFromRecipient = blockedByB;
   }
 
   const trimmed = (content ?? "").trim();
@@ -525,7 +539,22 @@ async function sendMessage(
   if (replyToId) {
     replyTo = await prisma.message.findFirst({
       where: { id: replyToId, conversationId, deletedAt: null },
-      select: { id: true, senderId: true, content: true, contentDeleted: true },
+      select: {
+        id: true,
+        senderId: true,
+        content: true,
+        contentDeleted: true,
+        attachment: {
+          select: {
+            id: true,
+            storagePath: true,
+            fileType: true,
+            mimeType: true,
+            originalFileName: true,
+            fileSizeBytes: true,
+          },
+        },
+      },
     });
     if (!replyTo) {
       throw new AppError(
@@ -587,21 +616,31 @@ async function sendMessage(
         status: MessageStatus.SENT,
         replyToId: replyTo?.id,
         attachmentFileId: attachment?.id,
+        hiddenFromRecipient,
       },
     });
-    await tx.conversation.update({
-      where: { id: conversationId },
-      data: {
-        lastMessageAt: created.createdAt,
-        lastMessagePreview: encodeForLegacyDb(
-          trimmed ? trimmed.slice(0, 100) : attachmentPreviewLabel(attachment)
-        ),
-      },
-    });
-    await tx.conversationParticipant.updateMany({
-      where: { conversationId, userId: { not: senderId }, removedAt: null },
-      data: { unreadCount: { increment: 1 } },
-    });
+    // A hidden message must never surface anywhere the recipient can see it
+    // — including the conversation list preview, which is shared by both
+    // participants (there's no per-participant preview field). Skipping
+    // this update means the sender's own conversation-list row also won't
+    // reflect the new message until a later, non-hidden message updates it
+    // — an accepted, low-visibility trade-off against the alternative of
+    // leaking the send to the blocking recipient's list.
+    if (!hiddenFromRecipient) {
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: {
+          lastMessageAt: created.createdAt,
+          lastMessagePreview: encodeForLegacyDb(
+            trimmed ? trimmed.slice(0, 100) : attachmentPreviewLabel(attachment)
+          ),
+        },
+      });
+      await tx.conversationParticipant.updateMany({
+        where: { conversationId, userId: { not: senderId }, removedAt: null },
+        data: { unreadCount: { increment: 1 } },
+      });
+    }
     return created;
   });
 
@@ -609,18 +648,31 @@ async function sendMessage(
     (p) => p.userId !== senderId
   );
 
-  const onlineFlags = await Promise.all(
-    recipients.map((r) => isUserOnline(r.userId))
-  );
-  const anyRecipientOnline = onlineFlags.some(Boolean);
-  const finalMessage = anyRecipientOnline
-    ? await prisma.message.update({
-        where: { id: message.id },
-        data: { status: MessageStatus.DELIVERED, deliveredAt: new Date() },
-      })
-    : message;
+  // Delivery-status tracking is meaningless for a message the recipient
+  // will never receive — skip the online check and leave it SENT, which is
+  // also exactly the status the sender is supposed to see either way.
+  let finalMessage = message;
+  if (!hiddenFromRecipient) {
+    const onlineFlags = await Promise.all(
+      recipients.map((r) => isUserOnline(r.userId))
+    );
+    const anyRecipientOnline = onlineFlags.some(Boolean);
+    finalMessage = anyRecipientOnline
+      ? await prisma.message.update({
+          where: { id: message.id },
+          data: { status: MessageStatus.DELIVERED, deliveredAt: new Date() },
+        })
+      : message;
+  }
 
   const serialized = serializeMessage({ ...finalMessage, replyTo, attachment });
+
+  if (hiddenFromRecipient) {
+    // Only the sender's own other sessions/devices get the realtime echo —
+    // never the conversation room, which the blocking recipient is also in.
+    emitToUser(senderId, "message:new", serialized);
+    return serialized;
+  }
 
   emitToConversation(conversationId, "message:new", serialized);
 
@@ -766,14 +818,35 @@ async function listMessages(
   await loadConversationForParticipant(conversationId, userId);
 
   const rows = await prisma.message.findMany({
-    where: { conversationId, deletedAt: null },
+    where: {
+      conversationId,
+      deletedAt: null,
+      // A message hidden from its recipient (silent block, see sendMessage)
+      // is only ever visible to the sender who sent it.
+      OR: [{ hiddenFromRecipient: false }, { senderId: userId }],
+    },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     take: limit + 1,
     include: {
       readReceipts: true,
       replyTo: {
-        select: { id: true, senderId: true, content: true, contentDeleted: true },
+        select: {
+          id: true,
+          senderId: true,
+          content: true,
+          contentDeleted: true,
+          attachment: {
+            select: {
+              id: true,
+              storagePath: true,
+              fileType: true,
+              mimeType: true,
+              originalFileName: true,
+              fileSizeBytes: true,
+            },
+          },
+        },
       },
       attachment: {
         select: {

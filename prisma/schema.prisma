@@ -342,6 +342,12 @@ enum Languages {
   FR
 }
 
+enum ThemePreference {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
 model User {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
@@ -356,6 +362,12 @@ model User {
   isEmailVerified Boolean @default(false) @map("is_email_verified")
 
   phoneNumber String? @map("phone_number") @db.VarChar(20)
+  // Stored separately so a bare local number ("677700900") typed at login
+  // can be normalized to the full E.164 form before lookup without any
+  // frontend change — see normalizePhone.util.ts. phoneNumber itself keeps
+  // storing the full "+237..." form unchanged, this is additive metadata,
+  // not a replacement for it.
+  phoneCountryCode String @default("+237") @map("phone_country_code") @db.VarChar(5)
 
   whatsappNumber    String?   @map("whatsapp_number") @db.VarChar(20)
   whatsappOptIn     Boolean   @default(false) @map("whatsapp_opt_in")
@@ -367,7 +379,8 @@ model User {
   profilePictureUrl String?    @map("profile_picture_url") @db.VarChar(500)
   address           String?    @db.VarChar(500)
 
-  preferredLanguage Languages @default(EN) @map("preferred_language")
+  preferredLanguage Languages      @default(EN) @map("preferred_language")
+  themePreference   ThemePreference @default(SYSTEM) @map("theme_preference")
 
   notificationsMuted Boolean @default(false) @map("notifications_muted")
 
@@ -766,6 +779,14 @@ model City {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
+  // Centroid coordinates, used as the geo point for every tutor in this
+  // city on the Meilisearch tutor index (tutor search does not use
+  // per-tutor precision, see docs/services/tutor-search.doc.md). Nullable
+  // because existing rows need a backfill pass before every city has a
+  // value (see cli/backfillCityCoordinates.ts).
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+
   region          Region           @relation(fields: [regionId], references: [id])
   tutorProfiles   TutorProfile[]
   kycApplications KycApplication[]
@@ -984,9 +1005,14 @@ model TutorSubject {
   approvedAt            DateTime?                 @map("approved_at")
   rejectedReason        String?                   @map("rejected_reason")
 
-  ratePerOnlineSessionXaf Int?     @map("rate_per_online_session_xaf")
-  ratePerHomeSessionXaf   Int?     @map("rate_per_home_session_xaf")
-  ratePerHourXaf          Int?     @map("rate_per_hour_xaf")
+  // The only two prices a tutor sets for this subject — always hourly,
+  // never a flat per-session fee, so cost scales consistently with session
+  // duration regardless of mode. Booking cost = hourlyRate(mode) * minutes / 60
+  // (see computeAgreedRateXaf in booking.service.ts) — there is no separate
+  // mode-agnostic rate; online and home visits are priced independently
+  // since a home visit typically carries a travel/time premium.
+  ratePerOnlineHourXaf Int?     @map("rate_per_online_hour_xaf")
+  ratePerHomeHourXaf   Int?     @map("rate_per_home_hour_xaf")
   // Gates both bookability (booking.service.ts) and public visibility of this
   // subject (tutor.service.ts, tutorSearch.service.ts) — independent of
   // `status`, so a tutor can pause a still-APPROVED subject without losing
@@ -2032,6 +2058,7 @@ enum NotificationType {
   REVIEW_WINDOW_OPENED
   REVIEW_RECEIVED
   REVIEW_RESPONSE_SUBMITTED
+  REVIEW_REMOVED
 
   ACCOUNT_FLAGGED
   REAUTH_REQUIRED
@@ -2843,6 +2870,13 @@ model Message {
   replyToId         String?       @map("reply_to_id") @db.Uuid
   attachmentFileId  String?       @map("attachment_file_id") @db.Uuid
   status            MessageStatus @default(SENT)
+  // WhatsApp-style silent block: set true when the recipient had blocked
+  // the sender at send time. The row is still persisted (so the sender's
+  // own devices see it as sent, and it's recoverable for moderation), but
+  // it must never be visible to the recipient — see MessagingService.
+  // sendMessage/listMessages. A permanent snapshot of block state at send
+  // time, not re-evaluated if the block is later lifted.
+  hiddenFromRecipient Boolean     @default(false) @map("hidden_from_recipient")
   deliveredAt       DateTime?     @map("delivered_at")
   deletedById       String?       @map("deleted_by") @db.Uuid
   deletedAt         DateTime?     @map("deleted_at")
@@ -2867,6 +2901,7 @@ model Message {
   @@index([conversationId, createdAt], map: "idx_messages_conv_time")
   @@index([conversationId, status], map: "idx_messages_conv_status")
   @@index([deletedAt])
+  @@index([conversationId, hiddenFromRecipient], map: "idx_messages_conv_hidden")
   @@map("messages")
 }
 
@@ -3187,6 +3222,7 @@ model IncidentReport {
   reportedBy      User    @relation("IncidentReportedBy", fields: [reportedById], references: [id])
   reportedAgainst User    @relation("IncidentReportedAgainst", fields: [reportedAgainstId], references: [id])
   reviewedBy      User?   @relation("IncidentReviewedBy", fields: [reviewedById], references: [id])
+  evidenceSnapshot IncidentReportEvidenceSnapshot?
 
   @@index([bookingId])
   @@index([reportedById])
@@ -3196,6 +3232,22 @@ model IncidentReport {
   @@index([reportedAgainstId, createdAt], map: "idx_incident_against_time")
   @@index([reportedById, createdAt], map: "idx_incident_by_time")
   @@map("incident_reports")
+}
+
+model IncidentReportEvidenceSnapshot {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  incidentReportId     String   @unique @map("incident_report_id") @db.Uuid
+  bookingSnapshot      Json     @map("booking_snapshot")
+  sessionDataSnapshot  Json     @map("session_data_snapshot")
+  conversationSnapshot Json     @map("conversation_snapshot")
+  sessionChatSnapshot  Json     @map("session_chat_snapshot")
+  assembledAt          DateTime @default(now()) @map("assembled_at")
+  assemblyDurationMs   Int?     @map("assembly_duration_ms")
+
+  incidentReport IncidentReport @relation(fields: [incidentReportId], references: [id])
+
+  @@index([assembledAt])
+  @@map("incident_report_evidence_snapshots")
 }
 
 enum ReviewAuthorRole {
@@ -3237,6 +3289,7 @@ enum ReviewFraudSignalType {
   COORDINATED_REVIEW_BURST
   ZERO_BOOKING_HISTORY_CLUSTER
   EXCESSIVE_REPORTS_BY_ACCOUNT
+  EXCESSIVE_REMOVALS_BY_ACCOUNT
 }
 
 model ReviewWindow {

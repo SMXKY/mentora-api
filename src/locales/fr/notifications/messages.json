@@ -235,6 +235,10 @@
     "title": "Réponse à votre avis",
     "body": "Une réponse a été publiée à votre avis."
   },
+  "review_removed": {
+    "title": "Votre avis a été supprimé",
+    "body": "Un modérateur a supprimé un avis que vous aviez publié pour non-respect de nos règles."
+  },
   "account_flagged": {
     "title": "Compte signalé",
     "body": "Votre compte a été signalé pour examen. Certaines fonctionnalités peuvent être limitées."

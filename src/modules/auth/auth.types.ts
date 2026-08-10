@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
+import { normalizePhoneIfLocal } from "./utils/normalizePhone.util";
 
 extendZodWithOpenApi(z);
 
@@ -33,6 +34,7 @@ export const SessionStatusResponseSchema = z
         isEmailVerified: z.boolean(),
         isAccountComplete: z.boolean(),
         preferredLanguage: z.enum(["EN", "FR"]),
+        themePreference: z.enum(["LIGHT", "DARK", "SYSTEM"]),
         roles: z.any(),
         status: z.string(),
         gender: z.string(),
@@ -44,13 +46,13 @@ export const SessionStatusResponseSchema = z
 
 export const RequestPhoneOtpSchema = z
   .object({
-    phone: z.string().min(1, "auth/errors:phoneRequired"),
+    phone: z.string().min(1, "auth/errors:phoneRequired").transform(normalizePhoneIfLocal),
   })
   .openapi("RequestPhoneOtp");
 
 export const VerifyPhoneOtpSchema = z
   .object({
-    phone: z.string().min(1, "auth/errors:phoneRequired"),
+    phone: z.string().min(1, "auth/errors:phoneRequired").transform(normalizePhoneIfLocal),
     code: z.string().length(6, "auth/errors:invalidOtpLength"),
   })
   .openapi("VerifyPhoneOtp");
@@ -97,7 +99,7 @@ export const GoogleAuthSchema = z
 
 export const LoginSchema = z
   .object({
-    identifier: z.string().min(1, "auth/errors:identifierRequired"),
+    identifier: z.string().min(1, "auth/errors:identifierRequired").transform(normalizePhoneIfLocal),
     password: z.string().min(1, "auth/errors:passwordRequired"),
   })
   .openapi("Login");
@@ -116,13 +118,13 @@ export const ChangePasswordSchema = z
 
 export const ForgotPasswordSchema = z
   .object({
-    identity: z.string().min(1, "auth/errors:identifierRequired"),
+    identity: z.string().min(1, "auth/errors:identifierRequired").transform(normalizePhoneIfLocal),
   })
   .openapi("ForgotPassword");
 
 export const VerifyResetOtpSchema = z
   .object({
-    identity: z.string().min(1, "auth/errors:identifierRequired"),
+    identity: z.string().min(1, "auth/errors:identifierRequired").transform(normalizePhoneIfLocal),
     code: z.string().length(6, "auth/errors:invalidOtpLength"),
   })
   .openapi("VerifyResetOtp");
@@ -190,7 +192,7 @@ export const DeactivateAccountSchema = z
 
 export const ReactivateAccountSchema = z
   .object({
-    identifier: z.string().min(1, "auth/errors:identifierRequired"),
+    identifier: z.string().min(1, "auth/errors:identifierRequired").transform(normalizePhoneIfLocal),
     password: z.string().optional(),
     otpCode: z.string().length(6, "auth/errors:invalidOtpLength").optional(),
   })

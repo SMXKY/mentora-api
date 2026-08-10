@@ -32,6 +32,7 @@ services:
       - clamav
       - livekit
       - redis
+      - meilisearch
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${PORT:-3000}/health"]
       interval: 30s
@@ -85,6 +86,29 @@ services:
     volumes:
       - redis_data:/data
 
+  # Tutor search only (see docs/services/tutor-search.doc.md). Not exposed
+  # to the host on purpose, unlike the dev compose file — the app reaches
+  # it over the internal Docker network at http://meilisearch:7700
+  # (MEILI_HOST in .env), there is no reason for Meilisearch's HTTP API to
+  # be reachable from outside this VPS.
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    container_name: mentora_meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set, no default key allowed}
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: "true"
+    expose:
+      - "7700"
+    volumes:
+      - meili_data:/meili_data
+    # No healthcheck: the official Meilisearch image is a minimal build and
+    # I could not confirm wget/curl are actually present in it without
+    # running the container, which this environment can't do. Add one back
+    # once that's verified against the real image rather than guessed.
+
 volumes:
   clamav_data:
   redis_data:
+  meili_data:

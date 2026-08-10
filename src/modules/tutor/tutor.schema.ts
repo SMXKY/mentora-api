@@ -32,16 +32,14 @@ export type UpdateMyTutorProfileInput = z.infer<typeof UpdateMyTutorProfileSchem
 
 export const UpdateSubjectPricingSchema = z
   .object({
-    ratePerOnlineSessionXaf: z.number().int().min(0).optional(),
-    ratePerHomeSessionXaf: z.number().int().min(0).optional(),
-    ratePerHourXaf: z.number().int().min(0).optional(),
+    ratePerOnlineHourXaf: z.number().int().min(0).optional(),
+    ratePerHomeHourXaf: z.number().int().min(0).optional(),
     isOpenForBooking: z.boolean().optional(),
   })
   .refine(
     (d) =>
-      d.ratePerOnlineSessionXaf !== undefined ||
-      d.ratePerHomeSessionXaf !== undefined ||
-      d.ratePerHourXaf !== undefined ||
+      d.ratePerOnlineHourXaf !== undefined ||
+      d.ratePerHomeHourXaf !== undefined ||
       d.isOpenForBooking !== undefined,
     { message: "tutor/errors:atLeastOneRateRequired" }
   )

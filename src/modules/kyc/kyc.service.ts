@@ -122,7 +122,24 @@ export const KycService = {
     const application = await getOrCreateApplication(profile.id);
     const credentials = await prisma.tutorCredential.findMany({
       where: { tutorProfileId: profile.id },
-      include: { subjectLinks: { include: { subject: true } } },
+      include: {
+        subjectLinks: {
+          include: {
+            subject: {
+              include: {
+                // Scoped to this tutor — levels live on TutorSubject (a
+                // de-duplicated tutor+subject pairing), not on the credential
+                // or the link itself, since the same subject can accumulate
+                // levels across multiple credentials over time.
+                tutorSubjects: {
+                  where: { tutorProfileId: profile.id },
+                  include: { levels: { include: { level: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
       orderBy: { createdAt: "asc" },
     });
     const rejectionFlags =
@@ -134,9 +151,28 @@ export const KycService = {
         : [];
 
     return {
-      application,
-      credentials,
-      kycStatus: profile.kycStatus,
+      // The frontend's KycApplication type expects a flat shape (see
+      // services/kyc.ts) — nest under `application` here and every consumer
+      // (Step 1/2 resume-prefill, Step 4 review) silently reads undefined.
+      ...application,
+      status: profile.kycStatus,
+      credentials: credentials.map((cr) => ({
+        id: cr.id,
+        institutionName: cr.institutionName,
+        qualificationType: cr.qualificationType,
+        fieldOfStudy: cr.fieldOfStudy,
+        gradeOrClassification: cr.gradeOrClassification,
+        yearAwarded: cr.yearAwarded,
+        status: cr.status,
+        subjects: cr.subjectLinks.map((link) => ({
+          id: link.subject.id,
+          name: link.subject.name,
+          levels: (link.subject.tutorSubjects[0]?.levels ?? []).map((lv) => ({
+            id: lv.level.id,
+            name: lv.level.name,
+          })),
+        })),
+      })),
       rejectionFlags,
     };
   },
@@ -244,13 +280,27 @@ export const KycService = {
       );
     }
 
+    const subjectIds = data.subjects.map((s) => s.subjectId);
     const subjects = await prisma.subject.findMany({
-      where: { id: { in: data.subjectIds } },
-      select: { id: true },
+      where: { id: { in: subjectIds } },
+      select: { id: true, name: true },
     });
-    if (subjects.length !== data.subjectIds.length) {
+    if (subjects.length !== subjectIds.length) {
       throw new AppError("kyc/errors:invalidSubject", StatusCodes.BAD_REQUEST);
     }
+
+    const allLevelIds = Array.from(
+      new Set(data.subjects.flatMap((s) => s.levelIds))
+    );
+    const levels = await prisma.level.findMany({
+      where: { id: { in: allLevelIds }, isActive: true },
+      select: { id: true, name: true },
+    });
+    if (levels.length !== allLevelIds.length) {
+      throw new AppError("kyc/errors:invalidLevel", StatusCodes.BAD_REQUEST);
+    }
+    const levelById = new Map(levels.map((l) => [l.id, l]));
+    const subjectById = new Map(subjects.map((s) => [s.id, s]));
 
     const [uploaded] = await MediaService.upload(
       [{ tempFilePath: file.path, originalFileName: file.originalname }],
@@ -266,7 +316,7 @@ export const KycService = {
       }
     );
 
-    return prisma.$transaction(async (tx) => {
+    const credential = await prisma.$transaction(async (tx) => {
       const credential = await tx.tutorCredential.create({
         data: {
           tutorProfileId: profile.id,
@@ -281,24 +331,40 @@ export const KycService = {
       });
 
       await tx.credentialSubjectLink.createMany({
-        data: data.subjectIds.map((subjectId) => ({
+        data: subjectIds.map((subjectId) => ({
           credentialId: credential.id,
           subjectId,
         })),
       });
 
-      for (const subjectId of data.subjectIds) {
-        await tx.tutorSubject.upsert({
+      for (const { subjectId, levelIds } of data.subjects) {
+        const tutorSubject = await tx.tutorSubject.upsert({
           where: {
             tutorProfileId_subjectId: { tutorProfileId: profile.id, subjectId },
           },
           create: { tutorProfileId: profile.id, subjectId },
           update: {},
         });
+        await tx.tutorSubjectLevel.createMany({
+          data: levelIds.map((levelId) => ({
+            tutorSubjectId: tutorSubject.id,
+            levelId,
+          })),
+          skipDuplicates: true,
+        });
       }
 
       return credential;
     });
+
+    return {
+      ...credential,
+      subjects: data.subjects.map(({ subjectId, levelIds }) => ({
+        id: subjectId,
+        name: subjectById.get(subjectId)!.name,
+        levels: levelIds.map((levelId) => levelById.get(levelId)!),
+      })),
+    };
   },
 
   async removeCredential(userId: string, credentialId: string) {

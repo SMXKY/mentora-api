@@ -235,6 +235,10 @@
     "title": "Response to your review",
     "body": "A response was posted to your review."
   },
+  "review_removed": {
+    "title": "Your review was removed",
+    "body": "A moderator removed a review you posted for violating our policies."
+  },
   "account_flagged": {
     "title": "Account flagged",
     "body": "Your account has been flagged for review. Some features may be limited."

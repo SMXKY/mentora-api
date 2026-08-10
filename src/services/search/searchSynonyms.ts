@@ -1,10 +1,16 @@
 /**
- * Static EN/FR subject-name synonym table plus common Cameroonian spelling
- * variants — resolved before the query ever hits the DB rather than via
- * full-text-search infra. Each key maps to every term that should be
- * treated as an equivalent match; lookups are case/accent-insensitive.
+ * DEPRECATED. Tutor search (tutorSearch.service.ts) no longer calls
+ * expandSearchTerms(), it queries Meilisearch instead, whose typo
+ * tolerance and native synonyms feature replace this file's job. The
+ * SYNONYM_GROUPS data itself is still the seed for Meilisearch's synonym
+ * settings, see buildSynonymsSettings() in meilisearchTutorIndex.ts, so it
+ * is exported and kept here rather than deleted. expandSearchTerms() has
+ * no remaining callers in the app and is kept only so this file still
+ * documents the original static-dictionary approach it replaced. Safe to
+ * delete both once the Meilisearch-backed search has been running in
+ * production long enough to be confident there is no rollback need.
  */
-const SYNONYM_GROUPS: string[][] = [
+export const SYNONYM_GROUPS: string[][] = [
   ["mathematics", "maths", "math", "mathematiques", "mathématiques"],
   ["physics", "physique"],
   ["chemistry", "chimie"],

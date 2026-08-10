@@ -36,6 +36,7 @@ const LoginResponseSchema = z
       phoneNumber: z.string().nullable(),
       profilePictureUrl: z.string().nullable(),
       preferredLanguage: z.enum(["EN", "FR"]),
+      themePreference: z.enum(["LIGHT", "DARK", "SYSTEM"]),
       isEmailVerified: z.boolean(),
       isAccountComplete: z.boolean(),
       roles: z.array(z.string()),

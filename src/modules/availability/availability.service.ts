@@ -11,6 +11,8 @@ import {
   dbTimeToMinutes,
   minutesToDbTime,
   subtractBookedWindows,
+  watCalendarDate,
+  watMinutesOfDay,
   MinuteWindow,
 } from "./availability.logic";
 import { CreateAvailabilitySlotInput, UpdateAvailabilitySlotInput } from "./availability.types";
@@ -137,6 +139,11 @@ async function getAvailableWindows(tutorProfileId: string, date: string) {
   const dayOfWeek = dayOfWeekFromDateString(date);
   const specificDate = new Date(`${date}T00:00:00.000Z`);
 
+  // A wholly past WAT calendar day has nothing left to offer — never even
+  // worth querying slots/bookings for.
+  const today = watCalendarDate();
+  if (specificDate.getTime() < today.getTime()) return [];
+
   const slots = await prisma.availabilitySlot.findMany({
     where: {
       tutorProfileId,
@@ -174,7 +181,19 @@ async function getAvailableWindows(tutorProfileId: string, date: string) {
     bufferMinutes,
   }));
 
-  const openWindows = subtractBookedWindows(rawWindows, booked);
+  let openWindows = subtractBookedWindows(rawWindows, booked);
+
+  // For "today" specifically, clip (or drop) any window that's already
+  // partly or fully elapsed — nobody can book a time that's already passed,
+  // whether that's the initial booking flow or picking a same-day
+  // reschedule time later than the current moment.
+  if (specificDate.getTime() === today.getTime()) {
+    const nowMinutes = watMinutesOfDay();
+    openWindows = openWindows
+      .map((w) => ({ startMinutes: Math.max(w.startMinutes, nowMinutes), endMinutes: w.endMinutes }))
+      .filter((w) => w.endMinutes > w.startMinutes);
+  }
+
   return openWindows.map((w) => ({
     startTime: minutesToTimeString(w.startMinutes),
     endTime: minutesToTimeString(w.endMinutes),

@@ -89,11 +89,61 @@ export class UserRepository extends BaseRepository<any> {
     return records.map((r) => this.flattenRoles(r));
   }
 
+  // ============================================================
+  // FAMILY CONTEXT ON EVERY ADMIN USER FETCH
+  // Admin viewing user records also needs to see the family relationship
+  // either direction: a parent's associated students
+  // (studentProfilesGuarded), and a guardian-managed student's parent
+  // (studentProfiles[].guardian). Applied to both the single-record reads
+  // (findById/findDeletedById) and the list/search reads (findMany/
+  // findManyCursor/findDeleted) — the nested selects are already scoped to
+  // a handful of fields (see familyInclude below), so the per-row payload
+  // cost on a list is small relative to the value of not requiring a
+  // second round-trip per parent row in the admin UI.
+  // ============================================================
+
+  private readonly familyInclude = {
+    studentProfiles: {
+      where: { deletedAt: null },
+      include: {
+        guardian: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true,
+          },
+        },
+      },
+    },
+    studentProfilesGuarded: {
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        userId: true,
+        firstName: true,
+        dob: true,
+        levelId: true,
+        schoolType: true,
+      },
+    },
+  };
+
+  private withFamilyInclude(
+    include?: Record<string, boolean | object>
+  ): Record<string, boolean | object> {
+    return { ...(include ?? {}), ...this.familyInclude };
+  }
+
   async findById(
     id: string,
     include?: Record<string, boolean | object>
   ): Promise<any> {
-    const record = await super.findById(id, this.withRolesInclude(include));
+    const record = await super.findById(
+      id,
+      this.withFamilyInclude(this.withRolesInclude(include))
+    );
     return this.flattenRoles(this.omitPassword(record));
   }
 
@@ -117,7 +167,9 @@ export class UserRepository extends BaseRepository<any> {
     options: OffsetFindOptions = {}
   ): Promise<OffsetPaginatedResult<any>> {
     const result = await super.findMany(
-      options.select ? options : { ...options, include: this.withRolesInclude(options.include) }
+      options.select
+        ? options
+        : { ...options, include: this.withFamilyInclude(this.withRolesInclude(options.include)) }
     );
     return { ...result, data: this.flattenRolesFromList(this.omitPasswordFromList(result.data)) };
   }
@@ -126,7 +178,9 @@ export class UserRepository extends BaseRepository<any> {
     options: CursorFindOptions = {}
   ): Promise<CursorPaginatedResult<any>> {
     const result = await super.findManyCursor(
-      options.select ? options : { ...options, include: this.withRolesInclude(options.include) }
+      options.select
+        ? options
+        : { ...options, include: this.withFamilyInclude(this.withRolesInclude(options.include)) }
     );
     return { ...result, data: this.flattenRolesFromList(this.omitPasswordFromList(result.data)) };
   }
@@ -135,7 +189,9 @@ export class UserRepository extends BaseRepository<any> {
     options: OffsetFindOptions = {}
   ): Promise<OffsetPaginatedResult<any>> {
     const result = await super.findDeleted(
-      options.select ? options : { ...options, include: this.withRolesInclude(options.include) }
+      options.select
+        ? options
+        : { ...options, include: this.withFamilyInclude(this.withRolesInclude(options.include)) }
     );
     return { ...result, data: this.flattenRolesFromList(this.omitPasswordFromList(result.data)) };
   }
@@ -144,7 +200,10 @@ export class UserRepository extends BaseRepository<any> {
     id: string,
     include?: Record<string, boolean | object>
   ): Promise<any> {
-    const record = await super.findDeletedById(id, this.withRolesInclude(include));
+    const record = await super.findDeletedById(
+      id,
+      this.withFamilyInclude(this.withRolesInclude(include))
+    );
     return this.flattenRoles(this.omitPassword(record));
   }
 

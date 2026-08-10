@@ -8,6 +8,7 @@
   "sessionTypeNotOffered": "This tutor doesn't offer that session type.",
   "tutorRateNotSet": "This tutor hasn't set a rate for this session type yet.",
   "sessionCrossesMidnight": "The session can't extend past midnight.",
+  "sessionInPast": "That time has already passed. Please pick a time in the future.",
   "slotNotAvailable": "That time is no longer available. Please pick another slot.",
   "bookingNotFound": "Booking not found.",
   "notYourBooking": "This booking doesn't belong to you.",

@@ -9,6 +9,8 @@ const BookingSummarySchema = z.object({
   id: z.string().uuid(),
   tutorName: z.string().nullable(),
   studentName: z.string().nullable(),
+  tutorProfilePictureUrl: z.string().nullable(),
+  studentProfilePictureUrl: z.string().nullable(),
   subject: z.string().nullable(),
   sessionDate: z.string().datetime(),
   sessionStartTime: z.string(),
@@ -81,6 +83,7 @@ const StudentDashboardSchema = CommonFieldsSchema.extend({
 
 const TutorDashboardSchema = CommonFieldsSchema.extend({
   role: z.literal("TUTOR"),
+  tutorProfileId: z.string().uuid().nullable(),
   pendingBookingRequests: z.array(BookingSummarySchema),
   upcomingConfirmedSessions: z.array(BookingSummarySchema),
   earnings: z.object({

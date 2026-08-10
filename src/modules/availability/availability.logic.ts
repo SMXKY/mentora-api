@@ -118,6 +118,22 @@ export function watStartOfDay(now: Date = new Date()): Date {
   return new Date(watCalendarDate(now).getTime() - WAT_OFFSET_HOURS * 60 * 60 * 1000);
 }
 
+/** The current WAT wall-clock minutes-of-day (0–1439) — see watStartOfDay. */
+export function watMinutesOfDay(now: Date = new Date()): number {
+  const shifted = new Date(now.getTime() + WAT_OFFSET_HOURS * 60 * 60 * 1000);
+  return shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
+}
+
+/** True if a "YYYY-MM-DD" date + "HH:mm" wall-clock WAT moment has already
+ * happened relative to `now` — used to reject booking/reschedule requests
+ * for a time slot that's already elapsed. */
+export function isWatPastMoment(dateStr: string, timeStr: string, now: Date = new Date()): boolean {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dateOnly = new Date(Date.UTC(y, m - 1, d));
+  const instant = watWallClockToInstant(dateOnly, minutesToDbTime(timeStringToMinutes(timeStr)));
+  return instant.getTime() < now.getTime();
+}
+
 /** Start of the WAT week (Sunday), as a true instant — see watStartOfDay. */
 export function watStartOfWeek(now: Date = new Date()): Date {
   const shifted = new Date(now.getTime() + WAT_OFFSET_HOURS * 60 * 60 * 1000);

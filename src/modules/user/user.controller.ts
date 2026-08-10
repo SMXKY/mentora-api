@@ -57,6 +57,44 @@ export class UserController extends BaseController<any> {
     }
   );
 
+  previewMyBookerProfile = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const result = await this.service.previewMyBookerProfile(ctx.userId!);
+      appResponder(StatusCodes.OK, result, res);
+    }
+  );
+
+  previewMyBookerProfileReviews = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const { cursor, limit, sort, rating, wouldRebook } = req.query as any;
+      const result = await this.service.previewMyBookerProfileReviews(ctx.userId!, {
+        cursor,
+        limit: Number(limit) || 20,
+        sort,
+        rating: rating !== undefined ? Number(rating) : undefined,
+        wouldRebook: wouldRebook !== undefined ? wouldRebook === "true" || wouldRebook === true : undefined,
+      });
+      appResponder(StatusCodes.OK, result.data, res, result.meta);
+    }
+  );
+
+  getBookerProfileReviews = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const { cursor, limit, sort, rating, wouldRebook } = req.query as any;
+      const result = await this.service.getBookerProfileReviews(ctx.userId!, req.params.id, {
+        cursor,
+        limit: Number(limit) || 20,
+        sort,
+        rating: rating !== undefined ? Number(rating) : undefined,
+        wouldRebook: wouldRebook !== undefined ? wouldRebook === "true" || wouldRebook === true : undefined,
+      });
+      appResponder(StatusCodes.OK, result.data, res, result.meta);
+    }
+  );
+
   blockUser = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
     const result = await this.service.blockUser(ctx.userId!, req.params.id);

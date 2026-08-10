@@ -166,9 +166,8 @@ function tutorSubjectRow(overrides: Partial<any> = {}) {
     tutorProfileId: "profile-1",
     status: SubjectVerificationStatus.APPROVED,
     isOpenForBooking: true,
-    ratePerOnlineSessionXaf: null,
-    ratePerHomeSessionXaf: null,
-    ratePerHourXaf: null,
+    ratePerOnlineHourXaf: null,
+    ratePerHomeHourXaf: null,
     ...overrides,
   };
 }
@@ -191,11 +190,11 @@ describe("TutorService.recomputeTutorRateRange", () => {
     expect(mockPrisma.tutorProfile.update).not.toHaveBeenCalled();
   });
 
-  it("picks the min/max across mixed rate types (hourly, online, home) on open+approved subjects", async () => {
+  it("picks the min/max across both hourly rates (online, home) on open+approved subjects", async () => {
     mockPrisma.tutorProfile.findUnique.mockResolvedValue({ rateManuallySet: false });
     mockPrisma.tutorSubject.findMany.mockResolvedValue([
-      { ratePerHourXaf: 3000, ratePerOnlineSessionXaf: null, ratePerHomeSessionXaf: null },
-      { ratePerHourXaf: null, ratePerOnlineSessionXaf: 8000, ratePerHomeSessionXaf: 10000 },
+      { ratePerOnlineHourXaf: 3000, ratePerHomeHourXaf: null },
+      { ratePerOnlineHourXaf: 8000, ratePerHomeHourXaf: 10000 },
     ]);
 
     await TutorService.recomputeTutorRateRange("profile-1");
@@ -238,7 +237,7 @@ describe("TutorService.updateSubjectPricing — open-for-booking gating", () => 
 
   it("rejects opening a subject that isn't APPROVED", async () => {
     mockPrisma.tutorSubject.findUnique.mockResolvedValue(
-      tutorSubjectRow({ status: SubjectVerificationStatus.PENDING, isOpenForBooking: false, ratePerHourXaf: 3000 })
+      tutorSubjectRow({ status: SubjectVerificationStatus.PENDING, isOpenForBooking: false, ratePerOnlineHourXaf: 3000 })
     );
 
     await expect(
@@ -262,22 +261,22 @@ describe("TutorService.updateSubjectPricing — open-for-booking gating", () => 
     mockPrisma.tutorSubject.findUnique.mockResolvedValue(
       tutorSubjectRow({ isOpenForBooking: false })
     );
-    mockPrisma.tutorSubject.update.mockResolvedValue(tutorSubjectRow({ ratePerHourXaf: 5000 }));
+    mockPrisma.tutorSubject.update.mockResolvedValue(tutorSubjectRow({ ratePerOnlineHourXaf: 5000 }));
 
     await TutorService.updateSubjectPricing("user-1", "subject-1", {
       isOpenForBooking: true,
-      ratePerHourXaf: 5000,
+      ratePerOnlineHourXaf: 5000,
     });
 
     expect(mockPrisma.tutorSubject.update).toHaveBeenCalledWith({
       where: { id: "ts-1" },
-      data: { isOpenForBooking: true, ratePerHourXaf: 5000 },
+      data: { isOpenForBooking: true, ratePerOnlineHourXaf: 5000 },
     });
   });
 
   it("allows opening when a rate was already set on a prior call", async () => {
     mockPrisma.tutorSubject.findUnique.mockResolvedValue(
-      tutorSubjectRow({ isOpenForBooking: false, ratePerOnlineSessionXaf: 4000 })
+      tutorSubjectRow({ isOpenForBooking: false, ratePerOnlineHourXaf: 4000 })
     );
     mockPrisma.tutorSubject.update.mockResolvedValue(tutorSubjectRow());
 
@@ -294,11 +293,11 @@ describe("TutorService.updateSubjectPricing — open-for-booking gating", () => 
     mockPrisma.tutorSubject.update.mockResolvedValue(tutorSubjectRow());
 
     await expect(
-      TutorService.updateSubjectPricing("user-1", "subject-1", { ratePerHomeSessionXaf: 6000 })
+      TutorService.updateSubjectPricing("user-1", "subject-1", { ratePerHomeHourXaf: 6000 })
     ).resolves.toBeDefined();
     expect(mockPrisma.tutorSubject.update).toHaveBeenCalledWith({
       where: { id: "ts-1" },
-      data: { ratePerHomeSessionXaf: 6000 },
+      data: { ratePerHomeHourXaf: 6000 },
     });
   });
 });

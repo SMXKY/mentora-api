@@ -95,15 +95,15 @@ registry.registerPath({
   description:
     "Only works on a subject the tutor has already claimed via a KYC credential " +
     "submission — pricing never creates the claim itself, it only prices an " +
-    "existing one (approved or still pending review). ratePerHourXaf is a " +
-    "third pricing option alongside the two existing flat per-session fees " +
-    "— when set, a booking's price is ratePerHourXaf × duration instead of " +
-    "the flat fee for that session type. isOpenForBooking gates both whether " +
+    "existing one (approved or still pending review). Exactly two rates exist, " +
+    "both hourly: ratePerOnlineHourXaf and ratePerHomeHourXaf — a booking's " +
+    "price is always hourlyRate(sessionType) × duration / 60, there is no " +
+    "flat per-session fee. isOpenForBooking gates both whether " +
     "students can book this subject and whether it appears on the tutor's " +
     "public profile/search results; it can only be set true on an APPROVED " +
-    "subject that already has at least one rate configured. Any change here " +
-    "also recomputes the tutor's profile-level minRateXaf/maxRateXaf (unless " +
-    "the tutor has manually overridden them via PATCH /me).",
+    "subject that already has at least one of the two rates configured. Any " +
+    "change here also recomputes the tutor's profile-level minRateXaf/" +
+    "maxRateXaf (unless the tutor has manually overridden them via PATCH /me).",
   ...bearer,
   request: {
     params: z.object({ subjectId: z.string().uuid() }),
