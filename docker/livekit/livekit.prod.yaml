@@ -48,3 +48,6 @@ turn:
 
 logging:
   level: info
+
+redis:
+  address: 127.0.0.1:6379
