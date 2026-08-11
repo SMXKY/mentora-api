@@ -70,8 +70,17 @@ services:
     restart: unless-stopped
     command: --config /etc/livekit.yaml
     network_mode: host
-    env_file:
-      - .env
+    # Deliberately no env_file here. LiveKit needs nothing from the app's
+    # .env — its API key/secret are already hardcoded in livekit.prod.yaml's
+    # keys: block, and Redis/TURN/everything else comes from the mounted
+    # config + cert volumes below. Loading the full .env used to also hand
+    # it REDIS_HOST/REDIS_PORT (meant for the app's own split-var redis
+    # client), which LiveKit's built-in env auto-detection read as a single
+    # address with no port and silently took priority over the YAML redis:
+    # block below — that's what caused rooms to stop being created. Giving
+    # LiveKit the whole app .env was also unnecessary blast-radius (DB
+    # password, payment keys, etc. for a media server process that needs
+    # none of it).
     volumes:
       - ./docker/livekit/livekit.prod.yaml:/etc/livekit.yaml:ro
       # TURN's cert_file/key_file (see livekit.prod.yaml) point into this —
