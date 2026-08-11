@@ -27,18 +27,31 @@ webhook:
   urls:
     - https://mentora.api.tallamichael.online/api/v1/webhooks/livekit
 
-# TURN over TLS on 443 — required for clients on carrier NAT (MTN/Orange
-# mobile data, symmetric NAT) where direct/srflx ICE candidates can't
-# traverse and the call would otherwise never connect or drop immediately.
+# TURN over TLS — required for clients on carrier NAT (MTN/Orange mobile
+# data, symmetric NAT) where direct/srflx ICE candidates can't traverse and
+# the call would otherwise never connect or drop immediately.
 # https://docs.livekit.io/home/self-hosting/deployment/#turn-server
+#
+# tls_port is 5349 (the standard alternate TURNS port), NOT 443, despite the
+# whole point of TURN-over-TLS normally being to use 443 so it survives
+# networks that block everything else outbound. nginx already owns 443 on
+# this VPS for the other HTTPS vhosts (the "nothing else owns 443" comment
+# below used to be true when this port was picked and stopped being true at
+# some point — it wasn't caught until LiveKit failed to bind and rooms
+# stopped being created). Getting back onto 443 properly needs nginx's
+# stream module doing SNI-passthrough to this port (peek the ClientHello's
+# SNI, forward turn.tallamichael.online's raw TCP through un-decrypted,
+# everything else keeps hitting the existing HTTP-block vhosts) — that's a
+# real nginx restructuring, deliberately not done as part of an incident fix.
+# Until that's done, clients on the most restrictive carrier NATs (443-only
+# egress) may fail to connect; UDP TURN (below) and direct/srflx ICE are
+# unaffected and cover everyone else.
 turn:
   enabled: true
   domain: turn.tallamichael.online
-  tls_port: 443
+  tls_port: 5349
   udp_port: 3478
-  # Issued via certbot on the host (see HOSTING.md) — LiveKit terminates TLS
-  # itself here since nothing else owns 443 on this VPS, so external_tls is
-  # left unset/false.
+  # Issued via certbot on the host (see HOSTING.md).
   cert_file: /etc/letsencrypt/live/turn.tallamichael.online/fullchain.pem
   key_file: /etc/letsencrypt/live/turn.tallamichael.online/privkey.pem
   # Reuses the same UDP range as rtc.port_range above so there's only one
