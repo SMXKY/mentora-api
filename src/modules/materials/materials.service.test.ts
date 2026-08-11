@@ -43,6 +43,8 @@ const mockPrisma: any = {
   auditLog: { create: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
   platformConfig: { findUnique: jest.fn(), upsert: jest.fn() },
   materialReview: { create: jest.fn(), findMany: jest.fn() },
+  booking: { findFirst: jest.fn() },
+  savedCollection: { findUnique: jest.fn() },
   $transaction: jest.fn(async (ops: any) =>
     Array.isArray(ops) ? Promise.all(ops) : ops()
   ),
@@ -51,6 +53,14 @@ const mockPrisma: any = {
 jest.mock("../../config/database.config", () => ({
   __esModule: true,
   default: mockPrisma,
+}));
+
+const mockHasActiveOrUpcomingBookingAccess = jest.fn();
+jest.mock("../../services/booking/bookingAccess.service", () => ({
+  BookingAccessService: {
+    hasActiveOrUpcomingBookingAccess: (...args: unknown[]) =>
+      mockHasActiveOrUpcomingBookingAccess(...args),
+  },
 }));
 
 jest.mock("../../services/media/media.service", () => ({
@@ -344,7 +354,7 @@ describe("MaterialsService.getPublicCollectionPreview", () => {
     ).rejects.toMatchObject(new AppError("materials/errors:collectionNotFound", 404));
   });
 
-  it("only returns free-preview sections/materials, resolving file URLs and written-note content", async () => {
+  it("shows the full structure (sections/materials) to a guest, but withholds all content — a tutor's isFreePreview flag no longer bypasses this", async () => {
     mockPrisma.collection.findFirst.mockResolvedValue({
       id: "collection-1",
       name: "Algebra Basics",
@@ -357,8 +367,20 @@ describe("MaterialsService.getPublicCollectionPreview", () => {
           id: "section-1",
           name: "Chapter 1",
           description: null,
+          // isFreePreview: true here must NOT unlock content for a guest —
+          // that's the exact loophole this behavior closes (a tutor could
+          // otherwise put contact info in a "free preview" item and it'd be
+          // visible to anyone, no booking required).
+          isFreePreview: true,
           materials: [
-            { id: "m1", name: "Video 1", materialType: MaterialType.VIDEO, fileId: "file-1", contentJson: null },
+            {
+              id: "m1",
+              name: "Video 1",
+              materialType: MaterialType.VIDEO,
+              fileId: "file-1",
+              contentJson: null,
+              isFreePreview: true,
+            },
           ],
         },
       ],
@@ -369,6 +391,7 @@ describe("MaterialsService.getPublicCollectionPreview", () => {
           materialType: MaterialType.WRITTEN_NOTE,
           fileId: null,
           contentJson: { type: "doc", content: [] },
+          isFreePreview: true,
         },
       ],
     });
@@ -376,12 +399,147 @@ describe("MaterialsService.getPublicCollectionPreview", () => {
 
     const preview = await MaterialsService.getPublicCollectionPreview("collection-1");
 
+    // Structure is visible — the section and both materials are present...
     expect(preview.sections[0].materials[0]).toEqual(
-      expect.objectContaining({ id: "m1", fileUrl: "https://cdn.example/file-1", content: null })
+      expect.objectContaining({ id: "m1", name: "Video 1", locked: true })
     );
     expect(preview.materials[0]).toEqual(
-      expect.objectContaining({ id: "m2", content: { type: "doc", content: [] }, fileUrl: null })
+      expect.objectContaining({ id: "m2", name: "Note 1", locked: true })
     );
+    // ...but content is withheld regardless of isFreePreview.
+    expect(preview.sections[0].materials[0].fileUrl).toBeNull();
+    expect(preview.sections[0].materials[0].content).toBeNull();
+    expect(preview.materials[0].fileUrl).toBeNull();
+    expect(preview.materials[0].content).toBeNull();
+    expect(MediaService.getFileUrl).not.toHaveBeenCalled();
     expect(preview.tutor).toEqual({ tutorProfileId: "tutor-1", firstName: "Ada", lastName: "L." });
+  });
+
+  it("resolves actual content/fileUrl once access is FULL (owner path), proving the gate isn't just always-locked", async () => {
+    mockPrisma.collection.findFirst
+      .mockResolvedValueOnce({
+        // resolveViewerAccess's own lookup — just enough to identify the owner.
+        tutorProfileId: "tutor-profile-1",
+        tutorProfile: { userId: "tutor-user-1" },
+      })
+      .mockResolvedValueOnce({
+        // buildCollectionView's full-shape lookup.
+        id: "collection-1",
+        name: "Algebra Basics",
+        description: null,
+        subject: { id: "subject-1", name: "Mathematics" },
+        level: { id: "level-1", name: "Form 3" },
+        tutorProfile: { id: "tutor-profile-1", user: { firstName: "Ada", lastName: "L." } },
+        lessonPlan: null,
+        sections: [],
+        materials: [
+          {
+            id: "m2",
+            name: "Note 1",
+            materialType: MaterialType.WRITTEN_NOTE,
+            fileId: null,
+            contentJson: { type: "doc", content: [] },
+            isFreePreview: false,
+          },
+        ],
+      });
+    mockPrisma.savedCollection.findUnique.mockResolvedValue(null);
+
+    const owner = await MaterialsService.getCollectionForViewer("collection-1", "tutor-user-1");
+
+    expect(owner.accessLevel).toBe("FULL");
+    expect(owner.materials[0]).toEqual(
+      expect.objectContaining({ id: "m2", locked: false, content: { type: "doc", content: [] } })
+    );
+  });
+});
+
+describe("MaterialsService.getCollectionForViewer — time-bound access + saved-collection escape hatch", () => {
+  const collectionForResolve = {
+    tutorProfileId: "tutor-profile-1",
+    tutorProfile: { userId: "tutor-user-1" },
+  };
+  const collectionForBuild = {
+    id: "collection-1",
+    name: "Algebra Basics",
+    description: null,
+    subject: { id: "subject-1", name: "Mathematics" },
+    level: { id: "level-1", name: "Form 3" },
+    tutorProfile: { id: "tutor-profile-1", user: { firstName: "Ada", lastName: "L." } },
+    lessonPlan: null,
+    sections: [],
+    materials: [],
+  };
+
+  it("grants FULL to the collection's owner without running any booking check", async () => {
+    mockPrisma.collection.findFirst
+      .mockResolvedValueOnce(collectionForResolve)
+      .mockResolvedValueOnce(collectionForBuild);
+    mockPrisma.savedCollection.findUnique.mockResolvedValue(null);
+
+    const view = await MaterialsService.getCollectionForViewer("collection-1", "tutor-user-1");
+
+    expect(view.accessLevel).toBe("FULL");
+    expect(view.everHadAccess).toBe(true);
+    expect(mockHasActiveOrUpcomingBookingAccess).not.toHaveBeenCalled();
+    expect(mockPrisma.booking.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("grants FULL when the viewer has a live active/upcoming booking", async () => {
+    mockPrisma.collection.findFirst
+      .mockResolvedValueOnce(collectionForResolve)
+      .mockResolvedValueOnce(collectionForBuild);
+    mockHasActiveOrUpcomingBookingAccess.mockResolvedValue(true);
+    mockPrisma.booking.findFirst.mockResolvedValue({ id: "booking-1" });
+    mockPrisma.savedCollection.findUnique.mockResolvedValue(null);
+
+    const view = await MaterialsService.getCollectionForViewer("collection-1", "student-1");
+
+    expect(view.accessLevel).toBe("FULL");
+    expect(mockHasActiveOrUpcomingBookingAccess).toHaveBeenCalledWith("student-1", "tutor-user-1");
+  });
+
+  it("grants FULL when live access has lapsed but the viewer once qualified AND saved the collection", async () => {
+    mockPrisma.collection.findFirst
+      .mockResolvedValueOnce(collectionForResolve)
+      .mockResolvedValueOnce(collectionForBuild);
+    mockHasActiveOrUpcomingBookingAccess.mockResolvedValue(false);
+    mockPrisma.booking.findFirst.mockResolvedValue({ id: "booking-old" });
+    mockPrisma.savedCollection.findUnique.mockResolvedValue({ id: "saved-1" });
+
+    const view = await MaterialsService.getCollectionForViewer("collection-1", "student-1");
+
+    expect(view.accessLevel).toBe("FULL");
+    expect(view.isSaved).toBe(true);
+    expect(view.everHadAccess).toBe(true);
+  });
+
+  it("drops to PREVIEW_ONLY when live access has lapsed and the viewer never saved the collection", async () => {
+    mockPrisma.collection.findFirst
+      .mockResolvedValueOnce(collectionForResolve)
+      .mockResolvedValueOnce(collectionForBuild);
+    mockHasActiveOrUpcomingBookingAccess.mockResolvedValue(false);
+    mockPrisma.booking.findFirst.mockResolvedValue({ id: "booking-old" });
+    mockPrisma.savedCollection.findUnique.mockResolvedValue(null);
+
+    const view = await MaterialsService.getCollectionForViewer("collection-1", "student-1");
+
+    expect(view.accessLevel).toBe("PREVIEW_ONLY");
+    expect(view.everHadAccess).toBe(true);
+  });
+
+  it("keeps a viewer at PREVIEW_ONLY even if saved, when they've never had a qualifying booking (saving alone unlocks nothing)", async () => {
+    mockPrisma.collection.findFirst
+      .mockResolvedValueOnce(collectionForResolve)
+      .mockResolvedValueOnce(collectionForBuild);
+    mockHasActiveOrUpcomingBookingAccess.mockResolvedValue(false);
+    mockPrisma.booking.findFirst.mockResolvedValue(null);
+    mockPrisma.savedCollection.findUnique.mockResolvedValue({ id: "saved-1" });
+
+    const view = await MaterialsService.getCollectionForViewer("collection-1", "student-1");
+
+    expect(view.accessLevel).toBe("PREVIEW_ONLY");
+    expect(view.isSaved).toBe(true);
+    expect(view.everHadAccess).toBe(false);
   });
 });

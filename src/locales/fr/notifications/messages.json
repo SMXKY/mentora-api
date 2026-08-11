@@ -68,24 +68,24 @@
     "body": "Votre demande pour enseigner cette matière n'a pas été approuvée."
   },
   "booking_requested": {
-    "title": "Nouvelle demande de réservation",
-    "body": "Vous avez une nouvelle demande de réservation en attente de réponse."
+    "title": "Nouvelle demande de réservation de {{bookerName}}",
+    "body": "{{bookerName}} vous a envoyé une nouvelle demande de réservation en attente de réponse."
   },
   "booking_accepted": {
     "title": "Réservation acceptée",
-    "body": "Votre demande de réservation a été acceptée."
+    "body": "{{tutorName}} a accepté votre demande de réservation."
   },
   "booking_rejected": {
     "title": "Réservation refusée",
-    "body": "Votre demande de réservation a été refusée."
+    "body": "{{tutorName}} a refusé votre demande de réservation."
   },
   "booking_cancelled_by_tutor": {
     "title": "Réservation annulée par le tuteur",
-    "body": "Votre tuteur a annulé la réservation. Vous ne serez pas facturé."
+    "body": "{{tutorName}} a annulé la réservation. Vous ne serez pas facturé."
   },
   "booking_cancelled_by_parent": {
     "title": "Réservation annulée",
-    "body": "La réservation a été annulée par le parent."
+    "body": "{{bookerName}} a annulé la réservation."
   },
   "booking_cancelled_unpaid": {
     "title": "Réservation annulée — paiement non reçu",
@@ -96,16 +96,16 @@
     "body": "Votre réservation est en attente de paiement. Finalisez le paiement pour la confirmer."
   },
   "reschedule_requested": {
-    "title": "Report demandé",
-    "body": "Un report a été demandé pour votre séance."
+    "title": "Report demandé par {{requesterName}}",
+    "body": "{{requesterName}} a demandé un nouvel horaire pour votre séance."
   },
   "reschedule_accepted": {
     "title": "Report accepté",
-    "body": "Votre demande de report a été acceptée."
+    "body": "{{responderName}} a accepté votre demande de report."
   },
   "reschedule_rejected": {
     "title": "Report refusé",
-    "body": "Votre demande de report a été refusée. L'horaire initial est maintenu."
+    "body": "{{responderName}} a refusé votre demande de report. L'horaire initial est maintenu."
   },
   "session_reminder_24hr": {
     "title": "Séance demain",
@@ -208,8 +208,8 @@
     "body": "La leçon a été confirmée automatiquement après la fermeture de la fenêtre de validation."
   },
   "dispute_opened": {
-    "title": "Litige ouvert",
-    "body": "Un litige a été ouvert sur l'une de vos séances."
+    "title": "Litige ouvert par {{openerName}}",
+    "body": "{{openerName}} a ouvert un litige sur l'une de vos séances."
   },
   "dispute_tutor_response_reminder": {
     "title": "Réponse au litige attendue",
@@ -228,8 +228,8 @@
     "body": "Votre séance est terminée — partagez votre expérience en laissant un avis."
   },
   "review_received": {
-    "title": "Nouvel avis reçu",
-    "body": "Vous avez reçu un nouvel avis."
+    "title": "Nouvel avis de {{authorName}}",
+    "body": "Vous avez reçu un nouvel avis de {{authorName}}."
   },
   "review_response_submitted": {
     "title": "Réponse à votre avis",
@@ -276,8 +276,8 @@
     "body": "Mentora sera brièvement indisponible pour une maintenance planifiée."
   },
   "new_message_received": {
-    "title": "Nouveau message",
-    "body": "Vous avez un nouveau message."
+    "title": "Nouveau message de {{senderName}}",
+    "body": "Vous avez un nouveau message de {{senderName}}."
   },
   "other": {
     "title": "Notification",

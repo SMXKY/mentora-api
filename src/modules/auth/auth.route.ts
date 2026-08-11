@@ -8,6 +8,7 @@ import {
   RequestEmailOtpSchema,
   VerifyEmailOtpSchema,
   GoogleAuthSchema,
+  GoogleCallbackQuerySchema,
   CompleteRegistrationSchema,
   CreateAdminSchema,
   ForgotPasswordSchema,
@@ -64,6 +65,15 @@ router.post(
 );
 
 router.post("/google", validate(GoogleAuthSchema), authController.googleAuth);
+
+// Mobile OAuth redirect bridge: Google's server-side redirect target after
+// the user consents in-browser. Public (Google, not our own client, calls
+// this), and query-validated rather than body-validated since it's a GET.
+router.get(
+  "/google/callback",
+  validate(GoogleCallbackQuerySchema, "query"),
+  authController.googleCallback
+);
 
 router.post(
   "/register/complete",

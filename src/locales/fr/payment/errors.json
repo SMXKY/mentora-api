@@ -21,6 +21,7 @@
   "reconciliationNotFound": "Enregistrement de rapprochement introuvable.",
   "reconciliationAlreadyResolved": "Ce rapprochement a déjà été résolu.",
   "receiptNotFound": "Reçu introuvable.",
+  "transactionNotFound": "Transaction introuvable.",
   "notYourWallet": "Ce portefeuille ne vous appartient pas.",
   "insufficientCommissionBalance": "Le solde de commission de la plateforme est insuffisant pour ce retrait."
 }

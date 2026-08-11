@@ -5,6 +5,14 @@ if (!process.env.PORT) throw new Error("PORT environment variable not set");
 if (!process.env.FRONTEND_URL)
   throw new Error("FRONTEND_URL environment variable not set");
 
+// This server's own externally-reachable base URL — used to build the
+// Google OAuth callback's redirect_uri, which must byte-for-byte match both
+// what the mobile app sends Google and what's registered as an authorized
+// redirect in Google Cloud Console (a Web-application-type OAuth client
+// only accepts https:// domains there, never a custom app scheme).
+if (!process.env.API_PUBLIC_URL)
+  throw new Error("API_PUBLIC_URL environment variable not set");
+
 if (!process.env.CORS_ORIGINS)
   throw new Error("CORS_ORIGINS environment variable not set");
 
@@ -150,6 +158,12 @@ if (!process.env.REGISTRATION_TOKEN_EXPIRY)
 if (!process.env.GOOGLE_CLIENT_ID)
   throw new Error("GOOGLE_CLIENT_ID environment variable not set");
 
+// Only needed for the mobile OAuth redirect bridge's server-side code
+// exchange (googleOAuthCallback) — the existing ID-token verification path
+// (googleAuth) never needed a secret. Never sent to or embedded in the app.
+if (!process.env.GOOGLE_CLIENT_SECRET)
+  throw new Error("GOOGLE_CLIENT_SECRET environment variable not set");
+
 if (!process.env.BREVO_API_KEY)
   throw new Error("BREVO_API_KEY environment variable not set");
 if (!process.env.RESET_TOKEN_EXPIRY)
@@ -177,6 +191,7 @@ export const NODE_ENV = process.env.NODE_ENV as
   | "test";
 export const PORT = Number(process.env.PORT);
 export const FRONTEND_URL = process.env.FRONTEND_URL!;
+export const API_PUBLIC_URL = process.env.API_PUBLIC_URL!;
 
 export const DATABASE_URL = process.env.DATABASE_URL!;
 export const REDIS_URL = process.env.REDIS_URL!;
@@ -229,6 +244,7 @@ export const AT_USERNAME = process.env.AT_USERNAME;
 export const AT_SANDBOX = process.env.AT_SANDBOX;
 export const REGISTRATION_TOKEN_EXPIRY = process.env.REGISTRATION_TOKEN_EXPIRY;
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 export const BREVO_API_KEY = process.env.BREVO_API_KEY;
 export const RESET_TOKEN_EXPIRY = process.env.RESET_TOKEN_EXPIRY;
 

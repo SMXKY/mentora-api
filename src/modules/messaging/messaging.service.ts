@@ -23,6 +23,7 @@ import { resolveStorageUrl } from "../../services/media";
 import { encodeForLegacyDb, decodeFromLegacyDb } from "../../utils/legacyTextEncoding.util";
 import { UserService } from "../user/user.service";
 import { ReportCategory } from "./messaging.types";
+import { BookingAccessService } from "../../services/booking/bookingAccess.service";
 
 const userService = new UserService();
 
@@ -195,7 +196,10 @@ async function upgradeToActiveForBooking(
   });
 }
 
-/** REQ — booking completed/cancelled/resolved-dispute archives the conversation (read-only, permanent). */
+/** REQ — booking completed/cancelled/resolved-dispute archives the conversation
+ * (moves it to the inbox's "archived" tab) and stamps quotaResetAt so the
+ * pair's next message starts a fresh 10-message quota cycle instead of being
+ * evaluated against every message ever sent during the (now-ended) booking. */
 async function archiveForBooking(bookingId: string) {
   const conversation = await prisma.conversation.findFirst({
     where: { bookingId },
@@ -204,7 +208,7 @@ async function archiveForBooking(bookingId: string) {
   if (conversation.status === ConversationStatus.ARCHIVED) return conversation;
   return prisma.conversation.update({
     where: { id: conversation.id },
-    data: { status: ConversationStatus.ARCHIVED },
+    data: { status: ConversationStatus.ARCHIVED, quotaResetAt: new Date() },
   });
 }
 
@@ -339,6 +343,43 @@ async function handleBlockedMessage(
   }
 }
 
+// Catches contact info deliberately split across several short messages
+// (e.g. "671" then "234" then "567") — none of which are individually
+// phone-shaped enough to trip the single-message filter above. Pulls this
+// sender's own recent messages in this conversation and glues them to the
+// message being sent right now, so the same filterMessage() re-run over
+// the combined text reunites adjacent fragments (Layer 2's
+// separator-stripping merges them back into one digit run). Only this
+// sender's own messages are pulled in — mixing in the other participant's
+// text risks gluing two people's unrelated digit mentions together.
+async function buildRecentSenderWindowText(
+  conversationId: string,
+  senderId: string,
+  currentContent: string
+): Promise<string> {
+  const { contactFilterWindowMessages, contactFilterWindowSeconds } =
+    await messagingConfig.getAll();
+  const windowStart = new Date(
+    Date.now() - contactFilterWindowSeconds * 1000
+  );
+  const priorMessages = await prisma.message.findMany({
+    where: {
+      conversationId,
+      senderId,
+      contentDeleted: false,
+      createdAt: { gte: windowStart },
+    },
+    orderBy: { createdAt: "desc" },
+    take: Math.max(contactFilterWindowMessages - 1, 0),
+    select: { content: true },
+  });
+  const priorTexts = priorMessages
+    .reverse()
+    .map((m) => decodeFromLegacyDb(m.content))
+    .filter(Boolean);
+  return [...priorTexts, currentContent].join(" ");
+}
+
 type ReplyToPreview = {
   id: string;
   senderId: string;
@@ -448,12 +489,11 @@ async function sendMessage(
       StatusCodes.FORBIDDEN
     );
   }
-  if (conversation.status === ConversationStatus.ARCHIVED) {
-    throw new AppError(
-      "messaging/errors:conversationArchived",
-      StatusCodes.FORBIDDEN
-    );
-  }
+  // ARCHIVED (set by archiveForBooking when a booking ends) is deliberately
+  // NOT a hard block here — it now only means "not in the active inbox tab".
+  // A pair whose booking has lapsed can still message under the same
+  // no-booking-access quota as a pair that's never booked (see the
+  // hasBookingAccess check below), rather than being locked out entirely.
 
   // Chat-only block enforcement — checked on every send (not just at
   // conversation-open time) so a block taken mid-conversation takes effect
@@ -489,6 +529,15 @@ async function sendMessage(
     hiddenFromRecipient = blockedByB;
   }
 
+  // Shared by both the attachment gate and the message-quota gate below —
+  // one live booking query per send, not two.
+  const hasBookingAccess = otherParticipant
+    ? await BookingAccessService.hasActiveOrUpcomingBookingAccess(
+        senderId,
+        otherParticipant.userId
+      )
+    : false;
+
   const trimmed = (content ?? "").trim();
   // An attachment can carry no caption at all (WhatsApp-style) — only
   // reject empty when there's also no attachment to send.
@@ -508,6 +557,12 @@ async function sendMessage(
   // at someone else's private file (KYC docs, receipts, etc.) via category.
   let attachment: AttachmentPreview = null;
   if (attachmentFileId) {
+    if (!hasBookingAccess) {
+      throw new AppError(
+        "messaging/errors:attachmentRequiresBooking",
+        StatusCodes.FORBIDDEN
+      );
+    }
     attachment = await prisma.file.findFirst({
       where: {
         id: attachmentFileId,
@@ -564,10 +619,41 @@ async function sendMessage(
     }
   }
 
-  const { inquiryMessageLimit } = await messagingConfig.getAll();
-  if (conversation.type === ConversationType.INQUIRY) {
+  if (!hasBookingAccess) {
+    const { inquiryMessageLimit } = await messagingConfig.getAll();
+
+    // windowStart marks where the CURRENT free-tier quota cycle started
+    // counting from — quotaResetAt is stamped to "now" every time this
+    // pair's booking access lapses (archiveForBooking), so a pair who
+    // exchanged hundreds of messages during a past active booking isn't
+    // stuck at 0 forever afterward; each cycle gets a fresh 10.
+    let windowStart = conversation.quotaResetAt ?? conversation.createdAt;
+
+    // Self-heal: a conversation that was upgraded to DIRECT by a past
+    // booking (type stays DIRECT permanently once set) but never went
+    // through archiveForBooking yet — e.g. a PAID booking whose session
+    // time passed with no check-in, and therefore no status-transition
+    // cron ever ran — has quotaResetAt still null even though access has
+    // in fact lapsed (hasBookingAccess is false, or we wouldn't be here).
+    // Stamp the reset point now, the first time this is observed. This one
+    // message is still evaluated against the old unbounded count below (so
+    // it always goes through), but every message after it is correctly
+    // bounded — a one-time, one-message leak per lapse, not a recurring one.
+    if (!conversation.quotaResetAt && conversation.type === ConversationType.DIRECT) {
+      const stamped = await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { quotaResetAt: new Date() },
+        select: { quotaResetAt: true },
+      });
+      windowStart = stamped.quotaResetAt!;
+    }
+
     const messageCount = await prisma.message.count({
-      where: { conversationId, contentDeleted: false },
+      where: {
+        conversationId,
+        contentDeleted: false,
+        createdAt: { gte: windowStart },
+      },
     });
     if (messageCount >= inquiryMessageLimit) {
       throw new AppError(
@@ -586,10 +672,31 @@ async function sendMessage(
       where: { isActive: true },
       select: { keyword: true },
     });
-    const outcome = filterMessage(
-      trimmed,
-      activeKeywordRows.map((k) => k.keyword)
-    );
+    const activeKeywords = activeKeywordRows.map((k) => k.keyword);
+
+    let outcome = filterMessage(trimmed, activeKeywords);
+
+    if (outcome.result === "CLEAN") {
+      // Clean on its own — check whether it completes a phone/contact
+      // fragment split across this sender's recent messages.
+      const windowText = await buildRecentSenderWindowText(
+        conversationId,
+        senderId,
+        trimmed
+      );
+      if (windowText !== trimmed) {
+        const windowOutcome = filterMessage(windowText, activeKeywords);
+        if (windowOutcome.result !== "CLEAN") {
+          outcome = {
+            ...windowOutcome,
+            matchedPattern: windowOutcome.matchedPattern
+              ? `window:${windowOutcome.matchedPattern}`
+              : windowOutcome.matchedPattern,
+            normalisedContent: windowText,
+          };
+        }
+      }
+    }
 
     if (outcome.result !== "CLEAN") {
       await handleBlockedMessage(
@@ -676,6 +783,12 @@ async function sendMessage(
 
   emitToConversation(conversationId, "message:new", serialized);
 
+  const sender = await prisma.user.findUnique({
+    where: { id: senderId },
+    select: { firstName: true, lastName: true },
+  });
+  const senderName = sender ? `${sender.firstName} ${sender.lastName}`.trim() : "";
+
   await Promise.all(
     recipients.map((r) =>
       NotificationService.send({
@@ -683,6 +796,7 @@ async function sendMessage(
         target: { kind: "user", userId: r.userId },
         resourceType: NotificationResourceType.MESSAGE,
         resourceId: finalMessage.id,
+        data: { senderName },
       })
     )
   );
@@ -709,13 +823,37 @@ async function getConversationSummaryForUser(
       other?.user.profilePictureUrl
     );
 
+  // mediaAllowed and messagesRemaining both key off the same live
+  // active-or-upcoming-booking check as sendMessage — type-agnostic (no
+  // longer INQUIRY-only), so a pair whose booking has lapsed sees the
+  // capped state again here too, not just on the next failed send.
   let messagesRemaining: number | null = null;
-  if (conversation.type === ConversationType.INQUIRY) {
-    const { inquiryMessageLimit } = await messagingConfig.getAll();
-    const messageCount = await prisma.message.count({
-      where: { conversationId, contentDeleted: false },
-    });
-    messagesRemaining = Math.max(inquiryMessageLimit - messageCount, 0);
+  let mediaAllowed = true;
+  if (other?.user) {
+    const hasAccess = await BookingAccessService.hasActiveOrUpcomingBookingAccess(
+      userId,
+      other.user.id
+    );
+    mediaAllowed = hasAccess;
+    if (!hasAccess) {
+      const { inquiryMessageLimit } = await messagingConfig.getAll();
+      // Read-only here — no quotaResetAt stamping side effect on a summary
+      // fetch; the stamp (and any self-heal) happens on the next actual
+      // sendMessage. This can show a slightly stale/lifetime-since-creation
+      // count for a conversation that's only ever been viewed, never sent
+      // to, right after a lapse — cosmetic only, self-corrects on first send.
+      const windowStart = conversation.quotaResetAt ?? conversation.createdAt;
+      const messageCount = await prisma.message.count({
+        where: {
+          conversationId,
+          contentDeleted: false,
+          createdAt: { gte: windowStart },
+        },
+      });
+      messagesRemaining = Math.max(inquiryMessageLimit - messageCount, 0);
+    }
+  } else {
+    mediaAllowed = false;
   }
 
   // Both are cheap enough to always compute for a single open conversation
@@ -737,6 +875,7 @@ async function getConversationSummaryForUser(
       ? { ...toDisplayParticipant(other.user), isOnline }
       : null,
     messagesRemaining,
+    mediaAllowed,
     iBlockedThem: blockStatus.blockedByA,
     theyBlockedMe: blockStatus.blockedByB,
   };

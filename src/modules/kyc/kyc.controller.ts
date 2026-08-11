@@ -10,7 +10,11 @@ import { CredentialInputSchema, AdditionalSubjectSchema } from "./kyc.types";
 /** Multipart text fields arrive as strings; numeric/array fields need
  * coercion before Zod validation, which JSON body routes get for free. */
 function parseCredentialBody(body: Record<string, any>) {
-  let subjects: { subjectId: string; levelIds: string[] }[];
+  let subjects: {
+    subjectId?: string;
+    newSubject?: Record<string, any>;
+    levelIds: string[];
+  }[];
   try {
     subjects = Array.isArray(body.subjects)
       ? body.subjects

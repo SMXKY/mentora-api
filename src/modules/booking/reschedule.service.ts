@@ -98,11 +98,20 @@ async function requestReschedule(userId: string, bookingId: string, input: Reque
   void ctx;
   const otherPartyUserId = isTutor ? booking.bookerId : booking.tutorProfile.userId;
   if (otherPartyUserId) {
+    const requester = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true },
+    });
     await NotificationService.send({
       type: NotificationType.RESCHEDULE_REQUESTED,
       target: { kind: "user", userId: otherPartyUserId },
       resourceType: NotificationResourceType.BOOKING,
       resourceId: bookingId,
+      data: {
+        requesterName: requester
+          ? `${requester.firstName} ${requester.lastName}`.trim()
+          : "",
+      },
     });
   }
 
@@ -143,6 +152,14 @@ async function respondToReschedule(
   }
   void ctx;
 
+  const responder = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { firstName: true, lastName: true },
+  });
+  const responderName = responder
+    ? `${responder.firstName} ${responder.lastName}`.trim()
+    : "";
+
   if (!accept) {
     const updated = await prisma.rescheduleRequest.update({
       where: { id: requestId },
@@ -153,6 +170,7 @@ async function respondToReschedule(
       target: { kind: "user", userId: request.requestedById },
       resourceType: NotificationResourceType.BOOKING,
       resourceId: request.bookingId,
+      data: { responderName },
     });
     return serializeRescheduleRequest(updated);
   }
@@ -190,6 +208,7 @@ async function respondToReschedule(
     target: { kind: "user", userId: request.requestedById },
     resourceType: NotificationResourceType.BOOKING,
     resourceId: request.bookingId,
+    data: { responderName },
   });
 
   return serializeRescheduleRequest(updatedRequest);

@@ -97,6 +97,18 @@ export const GoogleAuthSchema = z
   })
   .openapi("GoogleAuth");
 
+// Mobile OAuth redirect bridge: Google redirects here with either `code`
+// (success) or `error` (user cancelled / denied consent) — never both.
+export const GoogleCallbackQuerySchema = z
+  .object({
+    code: z.string().optional(),
+    error: z.string().optional(),
+    state: z.string().optional(),
+  })
+  .openapi("GoogleCallbackQuery");
+
+export type GoogleCallbackQueryInput = z.infer<typeof GoogleCallbackQuerySchema>;
+
 export const LoginSchema = z
   .object({
     identifier: z.string().min(1, "auth/errors:identifierRequired").transform(normalizePhoneIfLocal),

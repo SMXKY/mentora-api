@@ -397,11 +397,18 @@ async function createBookingRequest(
     eventType: "booking_requested",
   });
 
+  const booker = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { firstName: true, lastName: true },
+  });
   await NotificationService.send({
     type: NotificationType.BOOKING_REQUESTED,
     target: { kind: "user", userId: tutor.userId },
     resourceType: NotificationResourceType.BOOKING,
     resourceId: booking.id,
+    data: {
+      bookerName: booker ? `${booker.firstName} ${booker.lastName}`.trim() : "",
+    },
   });
 
   return serializeBooking(booking);
@@ -460,6 +467,9 @@ async function acceptBooking(
       target: { kind: "user", userId: booking.bookerId },
       resourceType: NotificationResourceType.BOOKING,
       resourceId: booking.id,
+      data: {
+        tutorName: `${booking.tutorProfile.user.firstName} ${booking.tutorProfile.user.lastName}`.trim(),
+      },
     });
   }
 
@@ -497,6 +507,9 @@ async function rejectBooking(
       target: { kind: "user", userId: booking.bookerId },
       resourceType: NotificationResourceType.BOOKING,
       resourceId: booking.id,
+      data: {
+        tutorName: `${booking.tutorProfile.user.firstName} ${booking.tutorProfile.user.lastName}`.trim(),
+      },
     });
   }
 
@@ -584,6 +597,9 @@ async function cancelByTutor(
       target: { kind: "user", userId: booking.bookerId },
       resourceType: NotificationResourceType.BOOKING,
       resourceId: booking.id,
+      data: {
+        tutorName: `${booking.tutorProfile.user.firstName} ${booking.tutorProfile.user.lastName}`.trim(),
+      },
     });
   }
 
@@ -656,6 +672,11 @@ async function cancelByParent(
     target: { kind: "user", userId: booking.tutorProfile.userId },
     resourceType: NotificationResourceType.BOOKING,
     resourceId: booking.id,
+    data: {
+      bookerName: booking.booker
+        ? `${booking.booker.firstName} ${booking.booker.lastName}`.trim()
+        : "",
+    },
   });
 
   await MessagingService.archiveForBooking(booking.id).catch((err) =>

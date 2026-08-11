@@ -20,6 +20,18 @@ export const messagingConfig = createConfigGroup({
     description: "Blocked-message attempts across all of a user's conversations within 24h that trigger a Trust & Safety flag",
     default: 5,
   },
+  contactFilterWindowMessages: {
+    key: "messaging.contact_filter_window_messages",
+    category: ConfigCategory.SECURITY,
+    description: "Number of a sender's own recent messages (including the one just sent) concatenated together to catch contact info deliberately split across several short messages",
+    default: 6,
+  },
+  contactFilterWindowSeconds: {
+    key: "messaging.contact_filter_window_seconds",
+    category: ConfigCategory.SECURITY,
+    description: "How far back (in seconds) the split-message contact filter looks for a sender's own prior messages to combine with the new one",
+    default: 180,
+  },
 });
 
 export type MessagingConfig = Awaited<ReturnType<typeof messagingConfig.getAll>>;

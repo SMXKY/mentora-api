@@ -13,6 +13,7 @@
   "messageNotFound": "Message not found.",
   "replyToNotFound": "The message you're replying to isn't available anymore.",
   "attachmentNotFound": "That attachment couldn't be found. Please try attaching it again.",
+  "attachmentRequiresBooking": "You can only send photos, files, and voice notes once you have an active or upcoming booking with this person.",
   "youBlockedRecipient": "You've blocked this user. Unblock them to send a message.",
   "blockedByRecipient": "This message couldn't be delivered.",
   "moderationReviewNotFound": "Moderation review not found.",

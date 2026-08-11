@@ -25,6 +25,7 @@ import {
   CredentialInput,
   AdditionalSubjectInput,
   UpdateSubjectLevelsInput,
+  NewSubjectProposalInput,
 } from "./kyc.types";
 
 const IMAGE_TYPES: FileTypeSpec[] = [
@@ -57,6 +58,54 @@ async function assertProfileComplete(userId: string): Promise<void> {
       missing: completion.missing,
     });
   }
+}
+
+/**
+ * Resolves a tutor's proposal for a subject that isn't in the taxonomy yet
+ * into a usable subjectId — reused by both the initial KYC credentials step
+ * (addCredential) and the post-approval "apply for a new subject" flow
+ * (addAdditionalSubject), so a subject proposed either way goes through the
+ * exact same near-duplicate check and lands in the same admin review queue.
+ * Checked for a near-duplicate first so the taxonomy doesn't fill up with
+ * copies of the same subject under slightly different casing/domain choices.
+ */
+async function resolveNewSubjectProposal(
+  userId: string,
+  proposal: NewSubjectProposalInput
+): Promise<{ id: string; name: string }> {
+  const existingMatch = await prisma.subject.findFirst({
+    where: {
+      domainId: proposal.domainId,
+      name: { equals: proposal.name, mode: "insensitive" },
+      status: SubjectVerificationStatus.APPROVED,
+      isActive: true,
+    },
+    select: { id: true, name: true },
+  });
+  if (existingMatch) return existingMatch;
+
+  const domain = await prisma.subjectDomain.findUnique({
+    where: { id: proposal.domainId },
+    select: { id: true },
+  });
+  if (!domain) {
+    throw new AppError(
+      "kyc/errors:invalidSubjectDomain",
+      StatusCodes.BAD_REQUEST
+    );
+  }
+
+  return prisma.subject.create({
+    data: {
+      name: proposal.name,
+      description: proposal.description,
+      domainId: proposal.domainId,
+      status: SubjectVerificationStatus.PENDING,
+      isActive: false,
+      submittedById: userId,
+    },
+    select: { id: true, name: true },
+  });
 }
 
 /**
@@ -280,17 +329,51 @@ export const KycService = {
       );
     }
 
-    const subjectIds = data.subjects.map((s) => s.subjectId);
-    const subjects = await prisma.subject.findMany({
-      where: { id: { in: subjectIds } },
-      select: { id: true, name: true },
-    });
-    if (subjects.length !== subjectIds.length) {
+    // Each subject entry is either an existing catalog subjectId, or a
+    // proposal for a subject not yet on the platform — resolved via the same
+    // helper the post-approval "apply for a new subject" flow uses, so a
+    // tutor whose subject simply isn't listed yet isn't blocked from
+    // finishing KYC over it.
+    const existingSubjectIds = data.subjects
+      .filter((s) => s.subjectId)
+      .map((s) => s.subjectId!);
+    const existingSubjects = existingSubjectIds.length
+      ? await prisma.subject.findMany({
+          where: { id: { in: existingSubjectIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const existingSubjectById = new Map(existingSubjects.map((s) => [s.id, s]));
+    if (existingSubjects.length !== new Set(existingSubjectIds).size) {
       throw new AppError("kyc/errors:invalidSubject", StatusCodes.BAD_REQUEST);
     }
 
+    // A tutor might select an existing subject AND propose a near-duplicate
+    // that resolves to that same existing subject — merge by resolved id so
+    // the credential doesn't try to link the same subject twice.
+    const bySubjectId = new Map<
+      string,
+      { id: string; name: string; levelIds: Set<string> }
+    >();
+    for (const entry of data.subjects) {
+      const resolved = entry.subjectId
+        ? existingSubjectById.get(entry.subjectId)!
+        : await resolveNewSubjectProposal(userId, entry.newSubject!);
+      const existing = bySubjectId.get(resolved.id);
+      if (existing) {
+        entry.levelIds.forEach((id) => existing.levelIds.add(id));
+      } else {
+        bySubjectId.set(resolved.id, {
+          id: resolved.id,
+          name: resolved.name,
+          levelIds: new Set(entry.levelIds),
+        });
+      }
+    }
+    const resolvedSubjects = Array.from(bySubjectId.values());
+
     const allLevelIds = Array.from(
-      new Set(data.subjects.flatMap((s) => s.levelIds))
+      new Set(resolvedSubjects.flatMap((s) => Array.from(s.levelIds)))
     );
     const levels = await prisma.level.findMany({
       where: { id: { in: allLevelIds }, isActive: true },
@@ -300,7 +383,6 @@ export const KycService = {
       throw new AppError("kyc/errors:invalidLevel", StatusCodes.BAD_REQUEST);
     }
     const levelById = new Map(levels.map((l) => [l.id, l]));
-    const subjectById = new Map(subjects.map((s) => [s.id, s]));
 
     const [uploaded] = await MediaService.upload(
       [{ tempFilePath: file.path, originalFileName: file.originalname }],
@@ -331,22 +413,25 @@ export const KycService = {
       });
 
       await tx.credentialSubjectLink.createMany({
-        data: subjectIds.map((subjectId) => ({
+        data: resolvedSubjects.map((s) => ({
           credentialId: credential.id,
-          subjectId,
+          subjectId: s.id,
         })),
       });
 
-      for (const { subjectId, levelIds } of data.subjects) {
+      for (const s of resolvedSubjects) {
         const tutorSubject = await tx.tutorSubject.upsert({
           where: {
-            tutorProfileId_subjectId: { tutorProfileId: profile.id, subjectId },
+            tutorProfileId_subjectId: {
+              tutorProfileId: profile.id,
+              subjectId: s.id,
+            },
           },
-          create: { tutorProfileId: profile.id, subjectId },
+          create: { tutorProfileId: profile.id, subjectId: s.id },
           update: {},
         });
         await tx.tutorSubjectLevel.createMany({
-          data: levelIds.map((levelId) => ({
+          data: Array.from(s.levelIds).map((levelId) => ({
             tutorSubjectId: tutorSubject.id,
             levelId,
           })),
@@ -359,10 +444,10 @@ export const KycService = {
 
     return {
       ...credential,
-      subjects: data.subjects.map(({ subjectId, levelIds }) => ({
-        id: subjectId,
-        name: subjectById.get(subjectId)!.name,
-        levels: levelIds.map((levelId) => levelById.get(levelId)!),
+      subjects: resolvedSubjects.map((s) => ({
+        id: s.id,
+        name: s.name,
+        levels: Array.from(s.levelIds).map((levelId) => levelById.get(levelId)!),
       })),
     };
   },
@@ -574,9 +659,7 @@ export const KycService = {
     }
 
     // Resolve the subject: either an existing, approved one, or a brand-new
-    // proposal the tutor is submitting for admin review (checked for a
-    // near-duplicate first so the taxonomy doesn't fill up with copies of
-    // the same subject under slightly different casing/domain choices).
+    // proposal the tutor is submitting for admin review.
     let subjectId: string;
     if (data.subjectId) {
       const subject = await prisma.subject.findFirst({
@@ -592,41 +675,8 @@ export const KycService = {
       }
       subjectId = subject.id;
     } else {
-      const proposal = data.newSubject!;
-      const existingMatch = await prisma.subject.findFirst({
-        where: {
-          domainId: proposal.domainId,
-          name: { equals: proposal.name, mode: "insensitive" },
-          status: SubjectVerificationStatus.APPROVED,
-          isActive: true,
-        },
-        select: { id: true },
-      });
-      if (existingMatch) {
-        subjectId = existingMatch.id;
-      } else {
-        const domain = await prisma.subjectDomain.findUnique({
-          where: { id: proposal.domainId },
-          select: { id: true },
-        });
-        if (!domain) {
-          throw new AppError(
-            "kyc/errors:invalidSubjectDomain",
-            StatusCodes.BAD_REQUEST
-          );
-        }
-        const created = await prisma.subject.create({
-          data: {
-            name: proposal.name,
-            description: proposal.description,
-            domainId: proposal.domainId,
-            status: SubjectVerificationStatus.PENDING,
-            isActive: false,
-            submittedById: userId,
-          },
-        });
-        subjectId = created.id;
-      }
+      subjectId = (await resolveNewSubjectProposal(userId, data.newSubject!))
+        .id;
     }
 
     const existingClaim = await prisma.tutorSubject.findUnique({

@@ -172,20 +172,26 @@ async function directMomoCheckout(userId: string, bookingId: string, phone: stri
     externalId: bookingId,
     message: "Mentora booking payment",
   });
-  const status = await FapshiService.paymentStatus(initiated.transId);
+  // Same polling-to-terminal-status wait wallet top-up uses — a single
+  // immediate status check almost always still reads CREATED, since the
+  // user hasn't had time to approve the MoMo/OM prompt on their phone yet,
+  // which meant this path nearly always fell into the PENDING/reconciliation
+  // branch below even when the payment ultimately succeeded seconds later.
+  const status = await FapshiService.waitForFinalStatus(initiated.transId);
 
-  if (status.status === "FAILED" || status.status === "EXPIRED") {
+  if (status?.status === "FAILED" || status?.status === "EXPIRED") {
     throw new AppError("payment/errors:directPayFailed", StatusCodes.BAD_GATEWAY, { status: status.status });
   }
 
-  if (status.status !== "SUCCESSFUL") {
-    // Genuinely async (live mode only) — park it for the reconciliation job.
+  if (status?.status !== "SUCCESSFUL") {
+    // Still not terminal after the polling window — park it for the
+    // reconciliation job rather than block the request indefinitely.
     const reconciliation = await prisma.paymentReconciliation.create({
       data: {
         userId,
         bookingId,
         providerTransactionId: initiated.transId,
-        providerStatus: status.status,
+        providerStatus: status?.status ?? "CREATED",
       },
     });
     await scheduleReconciliationCheck(reconciliation.id);

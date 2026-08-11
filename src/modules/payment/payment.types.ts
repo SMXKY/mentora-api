@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
+import { LedgerOperation } from "../../generated/prisma";
 
 extendZodWithOpenApi(z);
 
@@ -50,3 +51,29 @@ export const CommissionWithdrawSchema = z
   })
   .openapi("CommissionWithdraw");
 export type CommissionWithdrawInput = z.infer<typeof CommissionWithdrawSchema>;
+
+// ── Transaction history (wallet dashboard) ──────────────────
+export const ListTransactionsQuerySchema = z
+  .object({
+    cursor: z.string().uuid().optional(),
+    // 10 at a time, matching the wallet dashboard's infinite-scroll spec —
+    // deliberately a smaller default than ListBookingsQuerySchema's 20.
+    limit: z.coerce.number().int().min(1).max(50).optional().default(10),
+    operation: z.nativeEnum(LedgerOperation).optional(),
+    dateFrom: z.string().date().optional(),
+    dateTo: z.string().date().optional(),
+    subjectId: z.string().uuid().optional(),
+    tutorProfileId: z.string().uuid().optional(),
+    search: z.string().min(1).max(100).optional(),
+    sortBy: z.enum(["date", "amount"]).optional().default("date"),
+    sortDir: z.enum(["asc", "desc"]).optional().default("desc"),
+  })
+  .openapi("ListTransactionsQuery");
+export type ListTransactionsQueryInput = z.infer<typeof ListTransactionsQuerySchema>;
+
+export const TransactionSummaryQuerySchema = z
+  .object({
+    months: z.coerce.number().int().min(1).max(24).optional().default(6),
+  })
+  .openapi("TransactionSummaryQuery");
+export type TransactionSummaryQueryInput = z.infer<typeof TransactionSummaryQuerySchema>;

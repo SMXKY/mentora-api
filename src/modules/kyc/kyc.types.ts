@@ -67,15 +67,44 @@ export const KycStep2Schema = z
   .openapi("KycStep2");
 export type KycStep2Input = z.infer<typeof KycStep2Schema>;
 
+// A tutor applying for a subject that isn't in the taxonomy yet proposes it
+// here (name/description/domain) instead of picking an existing subjectId —
+// it's created PENDING and inactive until an admin reviews it alongside the
+// subject-verification queue (see kycAdmin.service's approveSubject/
+// rejectSubject). Reused by both the initial KYC credentials step below and
+// the post-approval "apply for a new subject" flow further down.
+export const NewSubjectProposalSchema = z
+  .object({
+    name: z.string().min(2, "kyc/errors:fieldRequired").max(100),
+    description: z
+      .string()
+      .min(10, "kyc/errors:subjectDescriptionTooShort")
+      .max(1000),
+    domainId: z.string().uuid("kyc/errors:fieldRequired"),
+  })
+  .openapi("NewSubjectProposal");
+export type NewSubjectProposalInput = z.infer<typeof NewSubjectProposalSchema>;
+
 // ── Step 3 — Credentials ─────────────────────────────────────
 // Each subject a credential covers carries its own grade-level selection —
 // a tutor with one credential spanning Maths + Physics might teach Maths at
 // O-Level and A-Level but Physics only at A-Level, so levels can't be a
 // single flat array shared across every subject on the credential.
-export const CredentialSubjectInputSchema = z.object({
-  subjectId: z.string().uuid(),
-  levelIds: z.array(z.string().uuid()).min(1, "kyc/errors:levelRequired"),
-});
+// A subject entry is either an existing catalog subjectId, or a proposal
+// for a subject not yet on the platform — same XOR pattern as the
+// post-approval AdditionalSubjectSchema below, so a tutor whose subject
+// simply isn't listed yet isn't blocked from finishing KYC over it.
+export const CredentialSubjectInputSchema = z
+  .object({
+    subjectId: z.string().uuid().optional(),
+    newSubject: NewSubjectProposalSchema.optional(),
+    levelIds: z.array(z.string().uuid()).min(1, "kyc/errors:levelRequired"),
+  })
+  .refine((d) => Boolean(d.subjectId) !== Boolean(d.newSubject), {
+    message: "kyc/errors:subjectXorNewSubject",
+    path: ["subjectId"],
+  });
+export type CredentialSubjectInput = z.infer<typeof CredentialSubjectInputSchema>;
 
 export const CredentialInputSchema = z
   .object({
@@ -102,23 +131,6 @@ export const KycDeclarationSchema = z
 export type KycDeclarationInput = z.infer<typeof KycDeclarationSchema>;
 
 // ── Additional-subject (post-approval lighter flow) ─────────
-// A tutor applying for a subject that isn't in the taxonomy yet proposes it
-// here (name/description/domain) instead of picking an existing subjectId —
-// it's created PENDING and inactive until an admin reviews it alongside the
-// subject-verification queue (see kycAdmin.service's approveSubject/
-// rejectSubject).
-export const NewSubjectProposalSchema = z
-  .object({
-    name: z.string().min(2, "kyc/errors:fieldRequired").max(100),
-    description: z
-      .string()
-      .min(10, "kyc/errors:subjectDescriptionTooShort")
-      .max(1000),
-    domainId: z.string().uuid("kyc/errors:fieldRequired"),
-  })
-  .openapi("NewSubjectProposal");
-export type NewSubjectProposalInput = z.infer<typeof NewSubjectProposalSchema>;
-
 export const AdditionalSubjectSchema = z
   .object({
     institutionName: z.string().min(1, "kyc/errors:fieldRequired"),

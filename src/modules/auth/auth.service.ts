@@ -23,7 +23,11 @@ import { buildPasswordChangedEmailTemplate } from "../../emailTemplates/password
 import { buildPasswordResetOtpEmailTemplate } from "../../emailTemplates/passwordResetOTP.template";
 import { sendEmail } from "../../utils/sendEmail.util";
 import { OAuth2Client, TokenPayload } from "google-auth-library";
-import { GOOGLE_CLIENT_ID } from "../../utils/enviromentVariablesCheck.util";
+import {
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  API_PUBLIC_URL,
+} from "../../utils/enviromentVariablesCheck.util";
 import argon2 from "argon2";
 import { getDeviceInfo } from "./utils/deviceFingerprint.util";
 import {
@@ -288,6 +292,47 @@ export class AuthService {
         ...(lastName && { lastName }),
       }),
     };
+  }
+
+  // Mobile OAuth redirect bridge: exchanges the authorization `code` Google
+  // sent to our backend's callback URL for an ID token, server-side (the
+  // only place safe to hold GOOGLE_CLIENT_SECRET), then delegates to the
+  // exact same googleAuth logic the web ID-token flow already uses.
+  static async googleOAuthCallback(
+    code: string,
+    userAgent?: string,
+    ip?: string
+  ): Promise<{ token: string } | { registrationToken: string }> {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      throw new Error(
+        "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET is not defined in environment variables."
+      );
+    }
+
+    const client = new OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET);
+
+    let idToken: string | null | undefined;
+    try {
+      const { tokens } = await client.getToken({
+        code,
+        redirect_uri: `${API_PUBLIC_URL}/auth/google/callback`,
+      });
+      idToken = tokens.id_token;
+    } catch {
+      throw new AppError(
+        "auth/errors:invalidGoogleToken",
+        StatusCodes.UNAUTHORIZED
+      );
+    }
+
+    if (!idToken) {
+      throw new AppError(
+        "auth/errors:invalidGoogleToken",
+        StatusCodes.UNAUTHORIZED
+      );
+    }
+
+    return AuthService.googleAuth(idToken, userAgent, ip);
   }
 
   static async completeRegistration(

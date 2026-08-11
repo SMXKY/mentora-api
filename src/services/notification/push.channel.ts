@@ -46,6 +46,18 @@ export async function sendPushChannel(
       app.messaging().send({
         token: t.fcmToken,
         notification: { title, body },
+        // Without an explicit sound field, a push delivers silently on both
+        // platforms (iOS in particular requires it — omitting aps.sound
+        // produces a "silent" push even with notification permissions
+        // granted). "default" plays the device/OS's own default
+        // notification sound, matching the "the user's default" ask rather
+        // than shipping a custom tone.
+        android: {
+          notification: { sound: "default", channelId: "default" },
+        },
+        apns: {
+          payload: { aps: { sound: "default" } },
+        },
         data: {
           type: notification.type,
           notificationId: notification.id,

@@ -32,6 +32,7 @@ import {
   TipTapDocSchema,
 } from "./materials.types";
 import { BookingStatus } from "../../generated/prisma";
+import { BookingAccessService } from "../../services/booking/bookingAccess.service";
 
 // Statuses under which a dispute is still "active" for the purposes of
 // the "material tied to an active dispute cannot be deleted" rule.
@@ -1231,23 +1232,12 @@ async function getPublicLessonPlans(tutorProfileId: string) {
   }));
 }
 
-/**
- * Resolves what a given viewer is allowed to see for a collection —
- * the single source of truth the reading UI is built around: backend
- * decides access, frontend only renders what it's handed.
- * - FULL: the tutor who owns the collection, or a user with a
- *   MaterialAccess grant for it (booked access).
- * - PREVIEW_ONLY: everyone else, including guests. Cascade-filtered to
- *   only isFreePreview items (collection > section > material override).
- *
- * NOTE: this only *reads* MaterialAccess. Something else must *write* a
- * row here once a booking reaches the right state — that grant-creation
- * logic lives outside this file (a booking-confirmation service).
- */
-// Statuses that represent a real, paid/completed engagement with the
-// tutor — not just a request that was never accepted, or one that fell
-// through before payment. A student/parent who reached any of these with
-// this tutor gets full access to their materials going forward.
+// Lifetime-scoped "has this viewer EVER reached a real, paid/completed
+// engagement with this tutor" — deliberately not time-bound, unlike
+// hasActiveOrUpcomingBookingAccess below. Used only as one half of the
+// saved-collection escape hatch: on its own it grants nothing (see
+// resolveViewerAccess) — it exists so that saving a collection you never
+// booked can't be used to unlock it for free.
 const VALID_ACCESS_BOOKING_STATUSES: BookingStatus[] = [
   BookingStatus.PAID,
   BookingStatus.IN_PROGRESS,
@@ -1259,21 +1249,49 @@ const VALID_ACCESS_BOOKING_STATUSES: BookingStatus[] = [
   BookingStatus.RESOLVED_PARENT_FAVOR,
 ];
 
+async function hasEverQualifiedBooking(
+  viewerUserId: string,
+  tutorProfileId: string
+): Promise<boolean> {
+  const booking = await prisma.booking.findFirst({
+    where: {
+      bookerId: viewerUserId,
+      tutorProfileId,
+      status: { in: VALID_ACCESS_BOOKING_STATUSES },
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+  return !!booking;
+}
+
 /**
  * Resolves what a given viewer is allowed to see for a collection —
  * the single source of truth the reading UI is built around: backend
  * decides access, frontend only renders what it's handed.
- * - FULL: the tutor who owns the collection, or a user who has ever had
- *   a valid (paid-or-further) booking with that tutor — computed live
- *   from Booking history, not a stored grant, so access can never drift
- *   out of sync with what actually happened.
- * - PREVIEW_ONLY: everyone else, including guests. Cascade-filtered to
- *   only isFreePreview items (collection > section > material override).
+ * - FULL: the tutor who owns the collection; or a viewer with a currently
+ *   active/upcoming booking with that tutor (time-bound, computed live via
+ *   BookingAccessService — same helper messaging/media gating use); or a
+ *   viewer who has EVER had a qualifying booking with that tutor AND has
+ *   saved this collection (the "keep it after the booking ends" escape
+ *   hatch — saving alone, with no booking history, grants nothing).
+ * - PREVIEW_ONLY: everyone else, including guests. Sees the collection's
+ *   structure (sections, material names/types/order) but no content —
+ *   isFreePreview no longer unlocks anything here, see isMaterialVisible's
+ *   old removed comment / buildCollectionView for why.
+ *
+ * Also returns isSaved/everQualified so callers don't need a second
+ * round-trip to answer "is this bookmarked" / "did access lapse, or did
+ * they just never book" for the UI copy.
  */
 async function resolveViewerAccess(
   collectionId: string,
   viewerUserId: string
-): Promise<"FULL" | "PREVIEW_ONLY"> {
+): Promise<{
+  access: "FULL" | "PREVIEW_ONLY";
+  isSaved: boolean;
+  everQualified: boolean;
+}> {
   const collection = await prisma.collection.findFirst({
     where: { id: collectionId, deletedAt: null },
     select: {
@@ -1287,32 +1305,41 @@ async function resolveViewerAccess(
       StatusCodes.NOT_FOUND
     );
   }
-  if (collection.tutorProfile.userId === viewerUserId) return "FULL";
 
-  const hasValidBooking = await prisma.booking.findFirst({
-    where: {
-      bookerId: viewerUserId,
-      tutorProfileId: collection.tutorProfileId,
-      status: { in: VALID_ACCESS_BOOKING_STATUSES },
-      deletedAt: null,
-    },
+  const isSavedPromise = prisma.savedCollection.findUnique({
+    where: { userId_collectionId: { userId: viewerUserId, collectionId } },
     select: { id: true },
   });
-  return hasValidBooking ? "FULL" : "PREVIEW_ONLY";
+
+  if (collection.tutorProfile.userId === viewerUserId) {
+    return { access: "FULL", isSaved: !!(await isSavedPromise), everQualified: true };
+  }
+
+  const [hasLiveAccess, everQualified, isSaved] = await Promise.all([
+    BookingAccessService.hasActiveOrUpcomingBookingAccess(
+      viewerUserId,
+      collection.tutorProfile.userId
+    ),
+    hasEverQualifiedBooking(viewerUserId, collection.tutorProfileId),
+    isSavedPromise,
+  ]);
+
+  const access: "FULL" | "PREVIEW_ONLY" =
+    hasLiveAccess || (everQualified && !!isSaved) ? "FULL" : "PREVIEW_ONLY";
+
+  return { access, isSaved: !!isSaved, everQualified };
 }
 
-// Cascade: collection-level flag overrides everything in it; otherwise a
-// section's flag overrides its own materials; otherwise fall back to the
-// material's own flag. FULL access always sees everything, cascade or not.
-function isMaterialVisible(
-  collectionFree: boolean,
-  sectionFree: boolean,
-  materialFree: boolean,
-  access: "FULL" | "PREVIEW_ONLY"
-): boolean {
-  if (access === "FULL") return true;
-  return collectionFree || sectionFree || materialFree;
-}
+// A tutor's own isFreePreview flag (collection/section/material) is
+// deliberately NEVER consulted here anymore — it used to let a tutor mark
+// specific content visible to literally anyone (including guests) with no
+// booking at all, which is exactly the loophole stakeholders flagged: a
+// tutor could put a phone number/email in a "free preview" note or image
+// and it would be visible to every visitor, no booking required, no
+// booking-access check ever run. Content visibility is now booking-access
+// only, full stop — FULL or nothing. The flags themselves are left alone in
+// the schema/authoring UI (a tutor can still toggle them), they just no
+// longer have any effect on what a non-FULL viewer can actually see.
 
 /**
  * Shared builder behind both the guest-facing and viewer-aware collection
@@ -1369,54 +1396,41 @@ async function buildCollectionView(
     );
   }
 
-  const resolveMaterial = async (material: any) => ({
-    id: material.id,
-    name: material.name,
-    materialType: material.materialType,
-    isFreePreview: material.isFreePreview,
-    content:
-      material.materialType === MaterialType.WRITTEN_NOTE
-        ? material.contentJson
-        : null,
-    fileUrl: material.fileId
-      ? await MediaService.getFileUrl(material.fileId).catch(() => null)
-      : null,
-  });
+  // Structure (names, types, order, section layout) is always shown, even
+  // to a guest with zero relationship to the tutor — that's how a prospect
+  // sees what's in a collection worth booking for. Content is the opposite:
+  // strictly FULL-access-only, no exceptions. A locked item still appears
+  // in the list (so the book's shape is visible), just with content/fileUrl
+  // withheld and `locked: true` for the UI to render a lock state instead
+  // of the actual note/file.
+  const resolveMaterial = async (material: any) => {
+    const locked = access !== "FULL";
+    return {
+      id: material.id,
+      name: material.name,
+      materialType: material.materialType,
+      locked,
+      content:
+        !locked && material.materialType === MaterialType.WRITTEN_NOTE
+          ? material.contentJson
+          : null,
+      fileUrl:
+        !locked && material.fileId
+          ? await MediaService.getFileUrl(material.fileId).catch(() => null)
+          : null,
+    };
+  };
 
-  const collectionFree = collection.isFreePreview;
+  const looseMaterials = await Promise.all(collection.materials.map(resolveMaterial));
 
-  const looseMaterials = await Promise.all(
-    collection.materials
-      .filter((m) =>
-        isMaterialVisible(collectionFree, false, m.isFreePreview, access)
-      )
-      .map(resolveMaterial)
+  const sections = await Promise.all(
+    collection.sections.map(async (section) => ({
+      id: section.id,
+      name: section.name,
+      description: section.description,
+      materials: await Promise.all(section.materials.map(resolveMaterial)),
+    }))
   );
-
-  const sections = (
-    await Promise.all(
-      collection.sections.map(async (section) => {
-        const visible = section.materials.filter((m) =>
-          isMaterialVisible(
-            collectionFree,
-            section.isFreePreview,
-            m.isFreePreview,
-            access
-          )
-        );
-        return {
-          id: section.id,
-          name: section.name,
-          description: section.description,
-          materials: await Promise.all(visible.map(resolveMaterial)),
-        };
-      })
-    )
-  ).filter((s) => access === "FULL" || s.materials.length > 0);
-  // FULL access always shows every section, even ones with zero materials
-  // yet (the tutor/booked student should see the real book structure);
-  // PREVIEW_ONLY hides sections with nothing visible in them, so a guest
-  // never sees an empty, confusing chapter heading.
 
   const topicsWithStatus = collection.lessonPlan
     ? await attachTopicStatuses(collection.lessonPlan.topics)
@@ -1462,15 +1476,22 @@ async function getPublicCollectionPreview(collectionId: string) {
   return buildCollectionView(collectionId, "PREVIEW_ONLY");
 }
 
-/** Authenticated path — owner or booked-access viewers get FULL; everyone
- * else (including a logged-in parent/student with no grant yet) still
- * gets the same PREVIEW_ONLY cascade a guest would see. */
+/** Authenticated path — owner, or a viewer with a live active/upcoming
+ * booking, or a viewer who ever qualified AND saved the collection, gets
+ * FULL; everyone else still gets the same PREVIEW_ONLY cascade a guest
+ * would see. Also surfaces isSaved/everHadAccess so the UI can tell "book
+ * to unlock" apart from "your access lapsed — save it to keep it" without
+ * a second round-trip. */
 async function getCollectionForViewer(
   collectionId: string,
   viewerUserId: string
 ) {
-  const access = await resolveViewerAccess(collectionId, viewerUserId);
-  return buildCollectionView(collectionId, access);
+  const { access, isSaved, everQualified } = await resolveViewerAccess(
+    collectionId,
+    viewerUserId
+  );
+  const view = await buildCollectionView(collectionId, access);
+  return { ...view, isSaved, everHadAccess: everQualified };
 }
 
 // ── Saved Collections ───────────────────────────────────────

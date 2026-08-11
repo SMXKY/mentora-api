@@ -57,11 +57,20 @@ export async function tryRevealWindow(reviewWindowId: string): Promise<void> {
       .filter((r) => r.subjectRole === "TUTOR")
       .map(async (r) => {
         await recomputeTutorRatingSnapshot(r.subjectId);
+        const author = await prisma.user.findUnique({
+          where: { id: r.authorId },
+          select: { firstName: true, lastName: true },
+        });
         await NotificationService.send({
           type: NotificationType.REVIEW_RECEIVED,
           target: { kind: "user", userId: r.subjectId },
           resourceType: NotificationResourceType.REVIEW,
           resourceId: r.id,
+          data: {
+            authorName: author
+              ? `${author.firstName} ${author.lastName}`.trim()
+              : "",
+          },
         });
       })
   );

@@ -99,6 +99,14 @@ async function handleTutorRemovalFromPlatform(
     select: { id: true, bookerId: true },
   });
 
+  const tutorUser = await prisma.tutorProfile.findUnique({
+    where: { id: tutorProfileId },
+    select: { user: { select: { firstName: true, lastName: true } } },
+  });
+  const tutorName = tutorUser
+    ? `${tutorUser.user.firstName} ${tutorUser.user.lastName}`.trim()
+    : "";
+
   for (const booking of pendingBookings) {
     await prisma.booking.update({
       where: { id: booking.id },
@@ -115,6 +123,7 @@ async function handleTutorRemovalFromPlatform(
         target: { kind: "user", userId: booking.bookerId },
         resourceType: NotificationResourceType.BOOKING,
         resourceId: booking.id,
+        data: { tutorName },
       }).catch(() => {});
     }
   }

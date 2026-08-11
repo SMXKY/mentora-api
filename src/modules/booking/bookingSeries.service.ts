@@ -102,11 +102,18 @@ async function createRecurringBookingRequest(userId: string, input: CreateRecurr
   }
 
   if (created.length > 0) {
+    const booker = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true },
+    });
     await NotificationService.send({
       type: NotificationType.BOOKING_REQUESTED,
       target: { kind: "user", userId: tutor.userId },
       resourceType: NotificationResourceType.BOOKING,
       resourceId: series.id,
+      data: {
+        bookerName: booker ? `${booker.firstName} ${booker.lastName}`.trim() : "",
+      },
     });
   }
 

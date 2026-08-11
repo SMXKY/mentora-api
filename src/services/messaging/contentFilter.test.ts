@@ -16,10 +16,21 @@ describe("filterMessage — Layer 1: phone numbers", () => {
   it.each([
     ["+237671234567", "cm_phone_plus237"],
     ["237671234567", "cm_phone_237"],
-    ["671234567", "cm_phone_6x"],
-    ["271234567", "cm_phone_2x"],
+    ["671234567", "cm_phone_mobile"],
+    ["271234567", "cm_phone_landline"],
     ["+14155552671", "intl_phone"],
   ])("blocks %s", (text) => {
+    const outcome = filterMessage(`call ${text} please`, KEYWORDS);
+    expect(outcome.result).toBe("BLOCKED_PHONE");
+    expect(outcome.layer).toBe(1);
+  });
+
+  it.each([
+    ["67000986", "8-digit number starting 6"],
+    ["7123456", "7-digit number starting 7"],
+    ["812345678", "9-digit number starting 8 (valid CAMEROON_PHONE_REGEX prefix, previously unmatched)"],
+    ["912345678", "9-digit number starting 9 (valid CAMEROON_PHONE_REGEX prefix, previously unmatched)"],
+  ])("blocks a short/off-length Cameroon number: %s (%s)", (text) => {
     const outcome = filterMessage(`call ${text} please`, KEYWORDS);
     expect(outcome.result).toBe("BLOCKED_PHONE");
     expect(outcome.layer).toBe(1);

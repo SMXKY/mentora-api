@@ -304,6 +304,12 @@ async function openDispute(userId: string, bookingId: string, input: OpenDispute
     eventType: "dispute_opened",
   });
 
+  const opener = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { firstName: true, lastName: true },
+  });
+  const openerName = opener ? `${opener.firstName} ${opener.lastName}`.trim() : "";
+
   const otherPartyUserId = isTutor ? booking.bookerId : booking.tutorProfile.userId;
   const notifyTargets = [
     otherPartyUserId
@@ -312,6 +318,7 @@ async function openDispute(userId: string, bookingId: string, input: OpenDispute
           target: { kind: "user", userId: otherPartyUserId },
           resourceType: NotificationResourceType.DISPUTE,
           resourceId: dispute.id,
+          data: { openerName },
         })
       : Promise.resolve(),
     NotificationService.send({
@@ -319,6 +326,7 @@ async function openDispute(userId: string, bookingId: string, input: OpenDispute
       target: { kind: "permission", permissionCode: "disputes.resolve" },
       resourceType: NotificationResourceType.DISPUTE,
       resourceId: dispute.id,
+      data: { openerName },
     }),
   ];
   await Promise.all(notifyTargets);

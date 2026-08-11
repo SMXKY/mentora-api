@@ -13,7 +13,7 @@
     "scaffold": "ts-node cli/scaffold.ts",
     "docs:build": "ts-node cli/build-docs.ts",
     "docs:watch": "nodemon --watch src --ext ts --exec npm run docs:build",
-    "search:backfill-cities": "ts-node cli/backfillCityCoordinates.ts",
+    "cc": "ts-node cli/backfillCityCoordinates.ts",
     "search:backfill-tutors": "ts-node cli/backfillMeilisearchTutors.ts",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",

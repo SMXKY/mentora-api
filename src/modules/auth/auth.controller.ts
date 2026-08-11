@@ -55,6 +55,57 @@ export class AuthController {
     }
   );
 
+  // Mobile OAuth redirect bridge's landing point — Google redirects here
+  // with `code` (or `error` if the user cancelled). Never delegates to the
+  // JSON error handler: every outcome, success or failure, must end in a
+  // redirect back into the app's own `mentora://` scheme, since there's no
+  // in-browser UI here for the mobile user to see a JSON error on.
+  googleCallback = async (req: Request, res: Response): Promise<void> => {
+    const APP_REDIRECT = "mentora://oauthredirect";
+    const { code, error } = req.query as { code?: string; error?: string };
+    const userAgent = req.headers["user-agent"];
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.socket.remoteAddress ||
+      req.ip;
+
+    if (error || !code) {
+      res.redirect(
+        `${APP_REDIRECT}?error=${encodeURIComponent(error || "access_denied")}`
+      );
+      return;
+    }
+
+    try {
+      const result = await AuthService.googleOAuthCallback(
+        code,
+        userAgent,
+        ip
+      );
+
+      if ("registrationToken" in result) {
+        res.redirect(
+          `${APP_REDIRECT}?registrationToken=${encodeURIComponent(
+            result.registrationToken
+          )}&identityType=google`
+        );
+        return;
+      }
+
+      const { token, user } = result as unknown as {
+        token: string;
+        user: unknown;
+      };
+      res.redirect(
+        `${APP_REDIRECT}?token=${encodeURIComponent(
+          token
+        )}&user=${encodeURIComponent(JSON.stringify(user))}`
+      );
+    } catch {
+      res.redirect(`${APP_REDIRECT}?error=auth_failed`);
+    }
+  };
+
   completeRegistration = catchAsync(
     async (req: Request, res: Response): Promise<void> => {
       const ctx = buildContext(req, res);

@@ -12,6 +12,7 @@ import { withIdempotency } from "../../services/payment/idempotency.util";
 import { ReceiptService } from "../../services/payment/receipt.service";
 import { PlatformCommissionService } from "../../services/payment/platformCommission.service";
 import { payOverdueFee } from "../../services/payment/monthlyFee.processor";
+import { TransactionHistoryService } from "../../services/payment/transactionHistory.service";
 
 async function inferWalletType(userId: string): Promise<WalletType> {
   const tutorProfile = await prisma.tutorProfile.findFirst({ where: { userId }, select: { id: true } });
@@ -97,6 +98,31 @@ export const paymentController = {
   getReceiptByReference: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const receipt = await ReceiptService.getReceiptByReference(req.params.referenceNumber);
     appResponder(StatusCodes.OK, { receipt }, res);
+  }),
+
+  listMyTransactions: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    const result = await TransactionHistoryService.listMyTransactions(
+      ctx.userId!,
+      req.query as any
+    );
+    appResponder(StatusCodes.OK, result.data, res, result.meta);
+  }),
+
+  getMyTransactionSummary: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    const months = (req.query as any).months as number;
+    const summary = await TransactionHistoryService.getMyTransactionSummary(ctx.userId!, months);
+    appResponder(StatusCodes.OK, summary, res);
+  }),
+
+  getTransactionReceipt: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    const result = await TransactionHistoryService.getOrCreateReceiptForLedgerEntry(
+      ctx.userId!,
+      req.params.id
+    );
+    appResponder(StatusCodes.OK, result, res);
   }),
 
   payOverdueFee: catchAsync(async (req: Request, res: Response): Promise<void> => {

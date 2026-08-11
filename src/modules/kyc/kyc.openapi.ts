@@ -147,10 +147,14 @@ registry.registerPath({
   description:
     "Multipart: institutionName, qualificationType, fieldOfStudy, " +
     "gradeOrClassification, yearAwarded, subjects (JSON array, min 1, each " +
-    "{subjectId, levelIds: string[] (min 1)} — grade levels are selected per " +
-    "subject, since one credential can cover subjects taught at different " +
-    "levels), and a document file (PDF/JPEG/PNG, max 10MB). Can be called " +
-    "any number of times — there is no cap on credentials per application.",
+    "{subjectId, levelIds: string[] (min 1)} for an existing catalog " +
+    "subject, OR {newSubject: {name, description, domainId}, levelIds} to " +
+    "propose a subject not yet on the platform — created PENDING and " +
+    "reviewed alongside the tutor's credential — grade levels are selected " +
+    "per subject, since one credential can cover subjects taught at " +
+    "different levels), and a document file (PDF/JPEG/PNG, max 10MB). Can " +
+    "be called any number of times — there is no cap on credentials per " +
+    "application.",
   ...bearer,
   request: {
     body: {
@@ -159,7 +163,8 @@ registry.registerPath({
           schema: CredentialInputSchema.extend({
             subjects: z.string().openapi({
               description:
-                "JSON-encoded array of {subjectId, levelIds: string[]}",
+                "JSON-encoded array of {subjectId, levelIds} or " +
+                "{newSubject: {name, description, domainId}, levelIds}",
             }),
             document: z.string().openapi({ type: "string", format: "binary" }),
           }),

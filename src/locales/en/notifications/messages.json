@@ -68,24 +68,24 @@
     "body": "Your application to teach this subject was not approved."
   },
   "booking_requested": {
-    "title": "New booking request",
-    "body": "You have a new booking request awaiting your response."
+    "title": "New booking request from {{bookerName}}",
+    "body": "{{bookerName}} sent you a new booking request awaiting your response."
   },
   "booking_accepted": {
     "title": "Booking accepted",
-    "body": "Your booking request was accepted."
+    "body": "{{tutorName}} accepted your booking request."
   },
   "booking_rejected": {
     "title": "Booking declined",
-    "body": "Your booking request was declined."
+    "body": "{{tutorName}} declined your booking request."
   },
   "booking_cancelled_by_tutor": {
     "title": "Booking cancelled by tutor",
-    "body": "Your tutor cancelled the booking. You will not be charged."
+    "body": "{{tutorName}} cancelled the booking. You will not be charged."
   },
   "booking_cancelled_by_parent": {
     "title": "Booking cancelled",
-    "body": "The booking was cancelled by the parent."
+    "body": "{{bookerName}} cancelled the booking."
   },
   "booking_cancelled_unpaid": {
     "title": "Booking cancelled — payment not received",
@@ -96,16 +96,16 @@
     "body": "Your booking is reserved but unpaid. Complete payment to confirm it."
   },
   "reschedule_requested": {
-    "title": "Reschedule requested",
-    "body": "A reschedule has been requested for your session."
+    "title": "Reschedule requested by {{requesterName}}",
+    "body": "{{requesterName}} requested a new time for your session."
   },
   "reschedule_accepted": {
     "title": "Reschedule accepted",
-    "body": "Your reschedule request was accepted."
+    "body": "{{responderName}} accepted your reschedule request."
   },
   "reschedule_rejected": {
     "title": "Reschedule declined",
-    "body": "Your reschedule request was declined. The original time still stands."
+    "body": "{{responderName}} declined your reschedule request. The original time still stands."
   },
   "session_reminder_24hr": {
     "title": "Session tomorrow",
@@ -208,8 +208,8 @@
     "body": "The lesson was automatically confirmed after the review window closed."
   },
   "dispute_opened": {
-    "title": "Dispute opened",
-    "body": "A dispute has been opened on one of your sessions."
+    "title": "Dispute opened by {{openerName}}",
+    "body": "{{openerName}} opened a dispute on one of your sessions."
   },
   "dispute_tutor_response_reminder": {
     "title": "Dispute response needed",
@@ -228,8 +228,8 @@
     "body": "Your session is complete — share your experience with a review."
   },
   "review_received": {
-    "title": "New review received",
-    "body": "You received a new review."
+    "title": "New review from {{authorName}}",
+    "body": "You received a new review from {{authorName}}."
   },
   "review_response_submitted": {
     "title": "Response to your review",
@@ -276,8 +276,8 @@
     "body": "Mentora will be briefly unavailable for scheduled maintenance."
   },
   "new_message_received": {
-    "title": "New message",
-    "body": "You have a new message."
+    "title": "New message from {{senderName}}",
+    "body": "You have a new message from {{senderName}}."
   },
   "other": {
     "title": "Notification",

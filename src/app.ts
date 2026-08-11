@@ -82,6 +82,20 @@ app.use(
   })
 );
 
+// Static assets (currently just the email logo) — served with an explicit
+// cross-origin CORP override, since helmet's global default
+// (Cross-Origin-Resource-Policy: same-origin) would otherwise make browsers
+// refuse to load it when embedded in a third-party page, e.g. Gmail's
+// webmail rendering an email's <img> tag from mail.google.com.
+app.use(
+  "/api/v1/assets",
+  (req: Request, res: Response, next: NextFunction) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  },
+  express.static(path.join(__dirname, "public/assets"))
+);
+
 app.use(requestId);
 app.use(resolveLocale());
 

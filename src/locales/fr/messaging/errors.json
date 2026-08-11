@@ -13,6 +13,7 @@
   "messageNotFound": "Message introuvable.",
   "replyToNotFound": "Le message auquel vous répondez n'est plus disponible.",
   "attachmentNotFound": "Cette pièce jointe est introuvable. Veuillez réessayer de la joindre.",
+  "attachmentRequiresBooking": "Vous ne pouvez envoyer des photos, fichiers ou notes vocales qu'avec une réservation active ou à venir avec cette personne.",
   "youBlockedRecipient": "Vous avez bloqué cet utilisateur. Débloquez-le pour envoyer un message.",
   "blockedByRecipient": "Ce message n'a pas pu être livré.",
   "moderationReviewNotFound": "Révision de modération introuvable.",

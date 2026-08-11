@@ -21,6 +21,7 @@
   "reconciliationNotFound": "Reconciliation record not found.",
   "reconciliationAlreadyResolved": "This reconciliation has already been resolved.",
   "receiptNotFound": "Receipt not found.",
+  "transactionNotFound": "Transaction not found.",
   "notYourWallet": "This wallet doesn't belong to you.",
   "insufficientCommissionBalance": "The platform commission balance is insufficient for this withdrawal."
 }

@@ -11,6 +11,8 @@ import {
   AddPayoutAccountSchema,
   DirectMomoCheckoutSchema,
   CommissionWithdrawSchema,
+  ListTransactionsQuerySchema,
+  TransactionSummaryQuerySchema,
 } from "./payment.types";
 
 const router = Router();
@@ -49,6 +51,22 @@ router.get(
   "/receipts/:referenceNumber",
   validate(z.object({ referenceNumber: z.string().min(1) }), "params"),
   paymentController.getReceiptByReference
+);
+
+router.get(
+  "/transactions",
+  validate(ListTransactionsQuerySchema, "query"),
+  paymentController.listMyTransactions
+);
+router.get(
+  "/transactions/summary",
+  validate(TransactionSummaryQuerySchema, "query"),
+  paymentController.getMyTransactionSummary
+);
+router.get(
+  "/transactions/:id/receipt",
+  validate(z.object({ id: z.string().uuid() }), "params"),
+  paymentController.getTransactionReceipt
 );
 
 router.post(

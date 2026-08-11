@@ -23,11 +23,20 @@ export interface FilterOutcome {
 const CLEAN: FilterOutcome = { result: "CLEAN", layer: null, matchedPattern: null, normalisedContent: null };
 
 // ── Layer 1 — explicit patterns ─────────────────────────────
+// A dialable Cameroon mobile number is exactly 9 digits starting 6-9 (see
+// CAMEROON_PHONE_REGEX in auth.service.ts) and a landline starts 2. These
+// patterns tolerate 7-9 digits, not just exactly 9: someone sharing contact
+// info sends the leading/trailing digit dropped, a typo, or a legacy
+// 8-digit-style number just as often as a perfectly-formed one, and the
+// goal here is catching contact-sharing attempts, not validating a
+// dialable number. The old exact-9-digit, 6/2-only patterns let anything
+// shorter or starting 7/8/9 (all valid per CAMEROON_PHONE_REGEX) through
+// untouched — e.g. "67000986" (8 digits) previously passed clean.
 const PHONE_PATTERNS: { name: string; re: RegExp }[] = [
-  { name: "cm_phone_plus237", re: /\+237\d{9}\b/ },
-  { name: "cm_phone_237", re: /(?<!\d)237\d{9}(?!\d)/ },
-  { name: "cm_phone_6x", re: /(?<!\d)6\d{8}(?!\d)/ },
-  { name: "cm_phone_2x", re: /(?<!\d)2\d{8}(?!\d)/ },
+  { name: "cm_phone_plus237", re: /\+237\d{7,9}\b/ },
+  { name: "cm_phone_237", re: /(?<!\d)237\d{7,9}(?!\d)/ },
+  { name: "cm_phone_mobile", re: /(?<!\d)[6-9]\d{6,8}(?!\d)/ },
+  { name: "cm_phone_landline", re: /(?<!\d)2\d{6,8}(?!\d)/ },
   { name: "intl_phone", re: /\+\d{7,15}\b/ },
 ];
 
