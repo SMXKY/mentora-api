@@ -52,7 +52,7 @@ services:
     ports:
       - "7880:7880"
       - "7881:7881"
-      - "50000-50010:50000-50010/udp"
+      - "50000-50100:50000-50100/udp"
 
   meilisearch:
     image: getmeili/meilisearch:v1.11

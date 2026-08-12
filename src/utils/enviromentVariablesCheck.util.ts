@@ -206,6 +206,13 @@ export const NOTCHPAY_WEBHOOK_SECRET = process.env.NOTCHPAY_WEBHOOK_SECRET!;
 export const LIVEKIT_URL = process.env.LIVEKIT_URL!;
 export const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY!;
 export const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET!;
+// The address clients (phones/browsers) connect to, which is not always the
+// same address the app server itself uses to reach LiveKit's control-plane
+// API (LIVEKIT_URL above) — e.g. in prod LIVEKIT_URL is host.docker.internal
+// (only resolvable from inside a container on that host), but a real client
+// needs a public wss:// hostname. Falls back to LIVEKIT_URL for envs (local
+// dev, LAN testing) where the same address genuinely reaches both.
+export const LIVEKIT_PUBLIC_URL = process.env.LIVEKIT_PUBLIC_URL || process.env.LIVEKIT_URL!;
 
 export const CDN_BASE_URL = process.env.CDN_BASE_URL!;
 export const RESEND_API_KEY = process.env.RESEND_API_KEY!;

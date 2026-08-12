@@ -17,7 +17,7 @@ import {
 } from "../../services/dispute/autoResolution.util";
 import { roomServiceClient, createAccessToken, VideoGrant } from "../../config/livekit.config";
 import { ensureLiveKitRoomExists } from "../../services/liveSession/roomProvisioning";
-import { LIVEKIT_URL } from "../../utils/enviromentVariablesCheck.util";
+import { LIVEKIT_PUBLIC_URL } from "../../utils/enviromentVariablesCheck.util";
 import { permissions } from "../../data/permission.data";
 import { emitToUser } from "../../socket/index";
 import {
@@ -265,7 +265,7 @@ async function generateToken(
 
   return {
     token,
-    url: LIVEKIT_URL,
+    url: LIVEKIT_PUBLIC_URL,
     roomName: liveRoom.roomName,
     identity: userId,
     role: access.role,
@@ -437,7 +437,7 @@ async function generateObserverToken(ctx: ServiceContext, bookingId: string) {
     eventType: "live_session_observer_token_issued",
   });
 
-  return { token, url: LIVEKIT_URL, roomName: liveRoom.roomName };
+  return { token, url: LIVEKIT_PUBLIC_URL, roomName: liveRoom.roomName };
 }
 
 async function requireTutorRoom(bookingId: string, userId: string) {
