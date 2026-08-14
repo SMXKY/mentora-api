@@ -649,12 +649,20 @@ export const KycAdminService = {
       eventType: "kyc.identity_approved",
     });
 
-    await NotificationService.send({
-      type: NotificationType.KYC_IDENTITY_APPROVED,
-      target: { kind: "user", userId: application.tutorProfile.userId },
-      resourceType: NotificationResourceType.KYC,
-      resourceId: applicationId,
-    }).catch(() => {});
+    // Transactional (bypasses notificationsMuted) — never fires for a
+    // staging-seeded tutor, see the isStagingSeed comment on the User model.
+    const identityApprovedUser = await prisma.user.findUnique({
+      where: { id: application.tutorProfile.userId },
+      select: { isStagingSeed: true },
+    });
+    if (!identityApprovedUser?.isStagingSeed) {
+      await NotificationService.send({
+        type: NotificationType.KYC_IDENTITY_APPROVED,
+        target: { kind: "user", userId: application.tutorProfile.userId },
+        resourceType: NotificationResourceType.KYC,
+        resourceId: applicationId,
+      }).catch(() => {});
+    }
 
     return history;
   },
@@ -929,11 +937,20 @@ export const KycAdminService = {
           ),
         },
       });
-      await NotificationService.send({
-        type: NotificationType.KYC_APPROVED,
-        target: { kind: "user", userId: tutorSubject.tutorProfile.userId },
-        resourceType: NotificationResourceType.KYC,
-      }).catch(() => {});
+
+      // Transactional (bypasses notificationsMuted) — never fires for a
+      // staging-seeded tutor, see the isStagingSeed comment on the User model.
+      const activatedUser = await prisma.user.findUnique({
+        where: { id: tutorSubject.tutorProfile.userId },
+        select: { isStagingSeed: true },
+      });
+      if (!activatedUser?.isStagingSeed) {
+        await NotificationService.send({
+          type: NotificationType.KYC_APPROVED,
+          target: { kind: "user", userId: tutorSubject.tutorProfile.userId },
+          resourceType: NotificationResourceType.KYC,
+        }).catch(() => {});
+      }
     }
 
     queueScoreRecompute(tutorSubject.tutorProfileId).catch(() => {});

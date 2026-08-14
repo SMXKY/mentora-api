@@ -577,25 +577,38 @@ export const KycService = {
       }),
     ]);
 
-    await NotificationService.send({
-      type: NotificationType.KYC_SUBMITTED,
-      target: { kind: "user", userId },
-      resourceType: NotificationResourceType.KYC,
-      resourceId: application.id,
-    }).catch(() => {});
+    // KYC_SUBMITTED and ADMIN_REVIEW_REQUIRED are both transactional (see
+    // notification.types.ts) — they bypass notificationsMuted and fire real
+    // email whenever NODE_ENV=production. ADMIN_REVIEW_REQUIRED in
+    // particular fans out to every real reviewer account, not just this
+    // submitter, so a staging-seeded tutor submitting KYC must never reach
+    // either send — see the isStagingSeed comment on the User model.
+    const submitter = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isStagingSeed: true },
+    });
 
-    await NotificationService.send({
-      type: NotificationType.ADMIN_REVIEW_REQUIRED,
-      target: { kind: "permission", permissionCode: permissions.kyc.queueRead },
-      resourceType: NotificationResourceType.KYC,
-      resourceId: application.id,
-      data: {
-        reviewReason: isResubmission
-          ? "kyc_resubmission"
-          : "new_kyc_application",
-        tutorProfileId: profile.id,
-      },
-    }).catch(() => {});
+    if (!submitter?.isStagingSeed) {
+      await NotificationService.send({
+        type: NotificationType.KYC_SUBMITTED,
+        target: { kind: "user", userId },
+        resourceType: NotificationResourceType.KYC,
+        resourceId: application.id,
+      }).catch(() => {});
+
+      await NotificationService.send({
+        type: NotificationType.ADMIN_REVIEW_REQUIRED,
+        target: { kind: "permission", permissionCode: permissions.kyc.queueRead },
+        resourceType: NotificationResourceType.KYC,
+        resourceId: application.id,
+        data: {
+          reviewReason: isResubmission
+            ? "kyc_resubmission"
+            : "new_kyc_application",
+          tutorProfileId: profile.id,
+        },
+      }).catch(() => {});
+    }
 
     return { applicationId: application.id, status: "PENDING" as const };
   },

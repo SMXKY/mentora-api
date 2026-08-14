@@ -6,6 +6,30 @@ extendZodWithOpenApi(z);
 
 export const SelfRegisterableRole = z.enum(["Parent", "Student", "Tutor"]);
 
+// Staging-only account factory (see auth.route.ts's conditional registration
+// and auth.service.ts's stagingCreateUser) — deliberately excludes "Super
+// Admin" from the allowed set so this endpoint can never mint another
+// account with its own privilege level.
+export const StagingAssignableRole = z.enum([
+  "Parent",
+  "Student",
+  "Tutor",
+  "Admin",
+  "Moderator",
+  "Support Agent",
+]);
+
+export const StagingCreateUserSchema = z
+  .object({
+    email: z.string().email("auth/errors:invalidEmailFormat"),
+    firstName: z.string().min(1, "auth/errors:firstNameRequired"),
+    lastName: z.string().min(1, "auth/errors:lastNameRequired"),
+    role: StagingAssignableRole,
+    password: z.string().min(8, "auth/errors:passwordTooShort"),
+  })
+  .openapi("StagingCreateUser");
+export type StagingCreateUserInput = z.infer<typeof StagingCreateUserSchema>;
+
 export const CompleteRegistrationSchema = z
   .object({
     registrationToken: z.string().min(1),

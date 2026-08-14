@@ -387,6 +387,15 @@ model User {
   status            UserStatus @default(ACTIVE)
   isSystem          Boolean    @default(false) @map("is_system")
   isAccountComplete Boolean    @default(false) @map("is_account_complete")
+  // Set only by POST /auth/staging/create (see auth.service.ts's
+  // stagingCreateUser). Gates real notification dispatch — KYC_SUBMITTED /
+  // KYC_APPROVED / the admin "review required" fan-out are all transactional
+  // (bypass notificationsMuted), so without this a bulk staging-seed run
+  // would email real reviewer accounts once per fake application. Never set
+  // for a real user; unrelated to isSystem above, which already has broad
+  // load-bearing meaning elsewhere (roles/permissions/audit) that this
+  // deliberately doesn't touch.
+  isStagingSeed     Boolean    @default(false) @map("is_staging_seed")
   cityId String? @map("city_id") @db.Uuid
   city   City?   @relation(fields: [cityId], references: [id])
 

@@ -469,26 +469,26 @@ async function resolveDispute(
   return updated;
 }
 
-async function getDisputeForUser(disputeId: string, userId: string) {
+async function getDisputeForUser(disputeId: string, userId: string, isAdminReader = false) {
   const dispute = await prisma.dispute.findUnique({
     where: { id: disputeId },
     include: { booking: { include: { tutorProfile: { select: { userId: true } } } } },
   });
   if (!dispute) throw new AppError("dispute/errors:disputeNotFound", StatusCodes.NOT_FOUND);
   const isParty = dispute.openedById === userId || dispute.booking.bookerId === userId || dispute.booking.tutorProfile.userId === userId;
-  if (!isParty) throw new AppError("dispute/errors:notYourDispute", StatusCodes.FORBIDDEN);
+  if (!isParty && !isAdminReader) throw new AppError("dispute/errors:notYourDispute", StatusCodes.FORBIDDEN);
   return dispute;
 }
 
 /** Null (not 404) when the booking simply has no dispute — this is a normal, expected state for most bookings. */
-async function getDisputeForBooking(bookingId: string, userId: string) {
+async function getDisputeForBooking(bookingId: string, userId: string, isAdminReader = false) {
   const dispute = await prisma.dispute.findUnique({
     where: { bookingId },
     include: { booking: { include: { tutorProfile: { select: { userId: true } } } } },
   });
   if (!dispute) return null;
   const isParty = dispute.openedById === userId || dispute.booking.bookerId === userId || dispute.booking.tutorProfile.userId === userId;
-  if (!isParty) throw new AppError("dispute/errors:notYourDispute", StatusCodes.FORBIDDEN);
+  if (!isParty && !isAdminReader) throw new AppError("dispute/errors:notYourDispute", StatusCodes.FORBIDDEN);
   return dispute;
 }
 

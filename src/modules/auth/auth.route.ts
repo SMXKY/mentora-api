@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { authController } from "./auth.controller";
 import protect from "../../middlewares/protect.middleware";
 import { validate } from "../../middlewares/validate.middleware";
@@ -20,9 +20,12 @@ import {
   ReactivateAccountSchema,
   RequestEmailVerificationSchema,
   ConfirmEmailVerificationSchema,
+  StagingCreateUserSchema,
 } from "./auth.types";
 import restrictTo from "../../middlewares/restrictTo.middleware";
 import { permissions } from "../../data/permission.data";
+import { AppError } from "../../utils/AppError.util";
+import { StatusCodes } from "http-status-codes";
 
 const router = Router();
 
@@ -146,6 +149,33 @@ router.post(
 // Dev/staging-only debug route — never registered in production.
 if (process.env.NODE_ENV !== "production") {
   router.get("/dev/otp", authController.devPeekOtp);
+}
+
+// Staging-only account factory — not registered at all unless STAGING_AUTH
+// is explicitly "true" (default off, same conditional-registration pattern
+// as /dev/otp above, deliberately stronger than a runtime env check since
+// the route path itself doesn't exist otherwise). Gated to the "Super
+// Admin" role specifically (checked via res.locals.user.roles, already
+// populated by protect below — see protect.middleware.ts) rather than any
+// lower admin tier. See auth.service.ts's stagingCreateUser for why this
+// sends no email/OTP.
+if (process.env.STAGING_AUTH === "true") {
+  const requireStagingAuthAdmin = (req: Request, res: Response, next: NextFunction) => {
+    const user = res.locals.user as { roles?: { name: string }[] } | undefined;
+    const isSuperAdmin = user?.roles?.some((r) => r.name === "Super Admin") ?? false;
+    if (!isSuperAdmin) {
+      return next(new AppError("auth/errors:insufficientPermissions", StatusCodes.FORBIDDEN));
+    }
+    next();
+  };
+
+  router.post(
+    "/staging/create",
+    protect,
+    requireStagingAuthAdmin,
+    validate(StagingCreateUserSchema),
+    authController.stagingCreateUser
+  );
 }
 
 export default router;

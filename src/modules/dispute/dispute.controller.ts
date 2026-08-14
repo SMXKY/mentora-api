@@ -4,6 +4,13 @@ import { buildContext } from "../../utils/buildContext.util";
 import { appResponder } from "../../utils/appResponder.util";
 import { StatusCodes } from "http-status-codes";
 import { DisputeService } from "./dispute.service";
+import { permissions } from "../../data/permission.data";
+
+// Same permission that already gates the admin "list all disputes" endpoint —
+// anyone who can list every dispute should also be able to open any one of
+// them by id, not just the three parties (opener/booker/tutor) to it.
+const isAdminDisputeReader = (res: Response): boolean =>
+  (res.locals.user?.permissions ?? []).includes(permissions.disputes.readAll);
 
 export const disputeController = {
   open: catchAsync(async (req: Request, res: Response): Promise<void> => {
@@ -38,13 +45,17 @@ export const disputeController = {
 
   getOne: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
-    const dispute = await DisputeService.getDisputeForUser(req.params.id, ctx.userId!);
+    const dispute = await DisputeService.getDisputeForUser(req.params.id, ctx.userId!, isAdminDisputeReader(res));
     appResponder(StatusCodes.OK, { dispute }, res);
   }),
 
   getForBooking: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
-    const dispute = await DisputeService.getDisputeForBooking(req.params.bookingId, ctx.userId!);
+    const dispute = await DisputeService.getDisputeForBooking(
+      req.params.bookingId,
+      ctx.userId!,
+      isAdminDisputeReader(res)
+    );
     appResponder(StatusCodes.OK, { dispute }, res);
   }),
 

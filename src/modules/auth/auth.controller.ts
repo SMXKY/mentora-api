@@ -122,6 +122,14 @@ export class AuthController {
     }
   );
 
+  stagingCreateUser = catchAsync(
+    async (req: Request, res: Response): Promise<void> => {
+      const ctx = buildContext(req, res);
+      const result = await AuthService.stagingCreateUser(req.body, ctx);
+      appResponder(StatusCodes.CREATED, result, res);
+    }
+  );
+
   me = catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
     const result = await AuthService.getSessionStatus(ctx);

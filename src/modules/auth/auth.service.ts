@@ -9,6 +9,7 @@ import {
   CreateAdminInput,
   DeactivateAccountInput,
   ReactivateAccountInput,
+  StagingCreateUserInput,
 } from "./auth.types";
 import { CompletionResult } from "../../services/accountCompletion/accountCompletion.service";
 import { OtpService } from "../../services/otp";
@@ -573,6 +574,106 @@ export class AuthService {
     ).catch(() => {});
 
     return { message: "auth/success:adminCreated" };
+  }
+
+  /**
+   * Staging-only account factory — see auth.route.ts for the STAGING_AUTH
+   * conditional registration (the route does not exist at all unless that
+   * env var is "true") and the single-super-admin-id gate applied there
+   * before this ever runs. Exists to provision test/seed accounts without
+   * burning real email/SMS provider quota: no OTP round trip, no welcome
+   * email, no notification of any kind — deliberately, this is the one
+   * thing that makes it different from createAdminUser above. Cannot
+   * create another Super Admin (StagingAssignableRole excludes it), so it
+   * can never mint an account with its own privilege level.
+   */
+  static async stagingCreateUser(
+    input: StagingCreateUserInput,
+    ctx: ServiceContext
+  ): Promise<{ token: string; userId: string }> {
+    const { email, firstName, lastName, role, password } = input;
+
+    validatePassword(password);
+
+    const existing = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new AppError(
+        "auth/errors:emailAlreadyRegistered",
+        StatusCodes.CONFLICT
+      );
+    }
+
+    const roleRow = await prisma.role.findUnique({
+      where: { name: role },
+      select: { id: true, name: true },
+    });
+    if (!roleRow) {
+      throw new AppError(
+        "auth/errors:roleNotFound",
+        StatusCodes.INTERNAL_SERVER_ERROR
+      );
+    }
+
+    const passwordHash = await argon2.hash(password);
+    const walletType =
+      ROLE_TO_WALLET_TYPE[role as SelfRegistrationRole] ?? undefined;
+
+    const user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          email,
+          firstName,
+          lastName,
+          password: passwordHash,
+          passwordChangedAt: new Date(),
+          isEmailVerified: true,
+          isStagingSeed: true,
+        },
+        select: { id: true },
+      });
+
+      await tx.userRole.create({
+        data: {
+          userId: newUser.id,
+          roleId: roleRow.id,
+          createdById: ctx.userId!,
+        },
+      });
+
+      if (walletType) {
+        await tx.wallet.create({
+          data: { userId: newUser.id, walletType, balanceXaf: 0 },
+        });
+      }
+
+      return newUser;
+    });
+
+    AuditService.record(ctx, "users", {
+      operation: LogOperation.CREATE,
+      category: LogCategory.WRITE,
+      recordId: user.id,
+      newState: { email, role, isStagingSeed: true },
+      changedFields: [],
+      eventType: "staging.account_created",
+      targetType: "users",
+    });
+
+    // Deliberately no NotificationService.send() / sendEmail() call here —
+    // that's the entire point of this endpoint versus createAdminUser.
+    const deviceId = await resolveOrCreateDevice(
+      user.id,
+      ctx.ipAddress,
+      ctx.userAgent
+    );
+
+    return {
+      token: await issueSessionToken(user.id, deviceId),
+      userId: user.id,
+    };
   }
 
   private static async authenticateCore(
