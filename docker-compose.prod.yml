@@ -5,18 +5,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: mentora-api:latest
+    # Either build on the VPS (needs ~4GB swap on a 2GB box, tsc is memory
+    # hungry: docker compose -f docker-compose.prod.yml build app) or build on
+    # a dev machine, push to GHCR and just `... pull app` here.
+    image: ghcr.io/smxky/mentora-api:latest
     container_name: mentora_api
     restart: unless-stopped
     env_file:
       - .env
-    environment:
-      # Points the app's ClamAV client (src/services/media/media.virusScan.ts)
-      # at the containerized clamd below instead of a local unix socket.
-      # Remove both this override and the clamav service if you'd rather set
-      # CLAMAV_ENABLED=false in .env and skip virus scanning entirely.
-      CLAMD_HOST: clamav
-      CLAMD_PORT: "3310"
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     # Lets the container resolve "host.docker.internal" to the VPS itself.
@@ -29,7 +25,6 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      - clamav
       - livekit
       - redis
       - meilisearch
@@ -44,25 +39,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-  # Virus scanning backend for uploaded media. First boot downloads the virus
-  # database (freshclam) and can take a couple of minutes; budget ~1-2GB RAM
-  # once the database is loaded — drop this service on a memory-constrained
-  # VPS and set CLAMAV_ENABLED=false in .env instead.
-  clamav:
-    image: clamav/clamav:stable
-    container_name: mentora_clamav
-    restart: unless-stopped
-    expose:
-      - "3310"
-    volumes:
-      - clamav_data:/var/lib/clamav
-    healthcheck:
-      test: ["CMD", "clamdcheck.sh"]
-      interval: 30s
-      timeout: 10s
-      start_period: 3m
-      retries: 5
 
   livekit:
     image: livekit/livekit-server:latest
@@ -118,6 +94,5 @@ services:
     # once that's verified against the real image rather than guessed.
 
 volumes:
-  clamav_data:
   redis_data:
   meili_data:

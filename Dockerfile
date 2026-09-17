@@ -17,6 +17,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db?schema=public"
+# tsc on this project needs more than Node's default ~1GB heap (it OOMs at
+# the build step on the VPS otherwise). Only applies to the build stage.
+ENV NODE_OPTIONS=--max-old-space-size=3072
 RUN npm run docs:build && npm run build
 RUN rm -rf ./dist/src/generated && cp -r ./src/generated ./dist/src/
 # ── runtime ──────────────────────────────────────────────────────────────────
