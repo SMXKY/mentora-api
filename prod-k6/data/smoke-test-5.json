@@ -1,0 +1,210 @@
+[
+  {
+    "index": 5,
+    "email": "zomo.ngono5@mentora-demo.cm",
+    "password": "Zomo9219!Mnt",
+    "firstName": "Zomo",
+    "middleName": "Nadine",
+    "lastName": "Ngono",
+    "fullLegalName": "Zomo Nadine Ngono",
+    "gender": "FEMALE",
+    "dob": "1991-01-13",
+    "photoFileName": "tutor-0005.jpg",
+    "cityId": "f582edc8-5493-40fb-806d-e3947ece3547",
+    "currentRegionId": "009a0c20-3444-42ea-b344-ad92ca78f4cc",
+    "cityOfOrigin": "Limbe",
+    "regionOfOrigin": "009a0c20-3444-42ea-b344-ad92ca78f4cc",
+    "placeOfBirth": "Limbe",
+    "currentStreet": "Rue 80",
+    "currentNeighbourhood": "Biyem-Assi",
+    "emergencyContactName": "Yenla Halle",
+    "emergencyContactPhone": "+237677201266",
+    "teachingMode": "BOTH",
+    "languages": [
+      "FR"
+    ],
+    "yearsOfExperience": 2,
+    "bio": "Patient and results-driven tutor with a track record of improving student outcomes in AMEB.",
+    "subjectIds": [
+      "3e69b852-f85c-4abf-9bfa-2adc895a4080"
+    ],
+    "levelIds": [
+      "c74f1bae-3679-4bc4-bc85-54f563068770"
+    ],
+    "ratePerOnlineHourXaf": 4000,
+    "ratePerHomeHourXaf": 10000,
+    "cniNumber": "4290319D",
+    "institutionName": "Advanced School of Translators and Interpreters Buea",
+    "qualificationType": "BSC",
+    "fieldOfStudy": "Biology",
+    "yearAwarded": 2001,
+    "trainWeight": null
+  },
+  {
+    "index": 6,
+    "email": "achiri.wandji6@mentora-demo.cm",
+    "password": "Achiri7142!Mnt",
+    "firstName": "Achiri",
+    "middleName": "Pierre",
+    "lastName": "Wandji",
+    "fullLegalName": "Achiri Pierre Wandji",
+    "gender": "MALE",
+    "dob": "1968-07-24",
+    "photoFileName": "tutor-0006.jpg",
+    "cityId": "fb367dea-794c-4d86-8803-0f4d56a56e1e",
+    "currentRegionId": "ee079c2f-19d2-4c28-bf4d-827667f64bd8",
+    "cityOfOrigin": "Bertoua",
+    "regionOfOrigin": "ee079c2f-19d2-4c28-bf4d-827667f64bd8",
+    "placeOfBirth": "Bertoua",
+    "currentStreet": "Rue 182",
+    "currentNeighbourhood": "Mendong",
+    "emergencyContactName": "Fatimatou Kenmogne",
+    "emergencyContactPhone": "+237666326663",
+    "teachingMode": "BOTH",
+    "languages": [
+      "EN"
+    ],
+    "yearsOfExperience": 3,
+    "bio": "Patient and results-driven tutor with a track record of improving student outcomes in Accounting.",
+    "subjectIds": [
+      "338f64be-f358-4654-a177-52559b0fe8d3"
+    ],
+    "levelIds": [
+      "0fcaa062-32c8-4c47-b9b1-1e632ab18656"
+    ],
+    "ratePerOnlineHourXaf": 2000,
+    "ratePerHomeHourXaf": 5000,
+    "cniNumber": "446299F",
+    "institutionName": "ENS Yaounde",
+    "qualificationType": "TEACHING_CERTIFICATE",
+    "fieldOfStudy": "Biology",
+    "yearAwarded": 2008,
+    "trainWeight": null
+  },
+  {
+    "index": 7,
+    "email": "kamdem.amougou7@mentora-demo.cm",
+    "password": "Kamdem4235!Mnt",
+    "firstName": "Kamdem",
+    "middleName": "Daniel",
+    "lastName": "Amougou",
+    "fullLegalName": "Kamdem Daniel Amougou",
+    "gender": "MALE",
+    "dob": "1972-05-07",
+    "photoFileName": "tutor-0007.jpg",
+    "cityId": "86f03775-f83c-4fad-8d95-0e451a800f32",
+    "currentRegionId": "ee079c2f-19d2-4c28-bf4d-827667f64bd8",
+    "cityOfOrigin": "Doum\u00e9",
+    "regionOfOrigin": "ee079c2f-19d2-4c28-bf4d-827667f64bd8",
+    "placeOfBirth": "Doum\u00e9",
+    "currentStreet": "Rue 65",
+    "currentNeighbourhood": "Bastos",
+    "emergencyContactName": "Nkwenti Baba",
+    "emergencyContactPhone": "+237692786639",
+    "teachingMode": "ONLINE_ONLY",
+    "languages": [
+      "EN",
+      "FR"
+    ],
+    "yearsOfExperience": 13,
+    "bio": "Dedicated tutor specializing in Accounting, focused on building strong fundamentals.",
+    "subjectIds": [
+      "cc788a63-f4d0-400c-b2e6-969fa330c092"
+    ],
+    "levelIds": [
+      "36e09745-896d-456a-82d5-e949f5feaf68"
+    ],
+    "ratePerOnlineHourXaf": 3500,
+    "ratePerHomeHourXaf": 4000,
+    "cniNumber": "51225779C",
+    "institutionName": "University of Bamenda",
+    "qualificationType": "BSC",
+    "fieldOfStudy": "French",
+    "yearAwarded": 2008,
+    "trainWeight": null
+  },
+  {
+    "index": 8,
+    "email": "ngouana.ngassa8@mentora-demo.cm",
+    "password": "Ngouana8822!Mnt",
+    "firstName": "Ngouana",
+    "middleName": "Elvis",
+    "lastName": "Ngassa",
+    "fullLegalName": "Ngouana Elvis Ngassa",
+    "gender": "MALE",
+    "dob": "1992-08-13",
+    "photoFileName": "tutor-0008.jpg",
+    "cityId": "cacbdb15-a321-4cfa-8265-2fabf228a1dd",
+    "currentRegionId": "8e8f70fe-9168-4702-982d-172042db772a",
+    "cityOfOrigin": "Yaound\u00e9",
+    "regionOfOrigin": "8e8f70fe-9168-4702-982d-172042db772a",
+    "placeOfBirth": "Yaound\u00e9",
+    "currentStreet": "Rue 54",
+    "currentNeighbourhood": "Mendong",
+    "emergencyContactName": "Fonyuy Mbua",
+    "emergencyContactPhone": "+237677497250",
+    "teachingMode": "ONLINE_ONLY",
+    "languages": [
+      "EN",
+      "FR"
+    ],
+    "yearsOfExperience": 8,
+    "bio": "Passionate educator with 8 years of experience helping students excel in Accounting (GCE A Level).",
+    "subjectIds": [
+      "85d606c4-a96c-4012-8951-6fd9c67557ad"
+    ],
+    "levelIds": [
+      "c74f1bae-3679-4bc4-bc85-54f563068770"
+    ],
+    "ratePerOnlineHourXaf": 2000,
+    "ratePerHomeHourXaf": 6000,
+    "cniNumber": "97760722",
+    "institutionName": "ENS Yaounde",
+    "qualificationType": "PHD",
+    "fieldOfStudy": "Chemistry",
+    "yearAwarded": 2004,
+    "trainWeight": null
+  },
+  {
+    "index": 9,
+    "email": "etoundi.wandji9@mentora-demo.cm",
+    "password": "Etoundi8237!Mnt",
+    "firstName": "Etoundi",
+    "middleName": "Renee",
+    "lastName": "Wandji",
+    "fullLegalName": "Etoundi Renee Wandji",
+    "gender": "FEMALE",
+    "dob": "1977-04-21",
+    "photoFileName": "tutor-0009.jpg",
+    "cityId": "1692717e-f26d-4f00-b5d9-d6e07804e71d",
+    "currentRegionId": "1c2698e4-f401-4297-85fa-b7ce057175b8",
+    "cityOfOrigin": "Batibo",
+    "regionOfOrigin": "1c2698e4-f401-4297-85fa-b7ce057175b8",
+    "placeOfBirth": "Batibo",
+    "currentStreet": "Rue 181",
+    "currentNeighbourhood": "Bonanjo",
+    "emergencyContactName": "Tangie Tebo",
+    "emergencyContactPhone": "+237698368720",
+    "teachingMode": "ONLINE_ONLY",
+    "languages": [
+      "EN",
+      "FR"
+    ],
+    "yearsOfExperience": 10,
+    "bio": "Patient and results-driven tutor with a track record of improving student outcomes in Accounting (GCE O Level).",
+    "subjectIds": [
+      "4852adce-18ed-460f-8f8a-8d0a733d634f"
+    ],
+    "levelIds": [
+      "c74f1bae-3679-4bc4-bc85-54f563068770"
+    ],
+    "ratePerOnlineHourXaf": 2000,
+    "ratePerHomeHourXaf": 6000,
+    "cniNumber": "14282796",
+    "institutionName": "Higher Teachers' Training College Bambili",
+    "qualificationType": "OTHER",
+    "fieldOfStudy": "History",
+    "yearAwarded": 2005,
+    "trainWeight": null
+  }
+]

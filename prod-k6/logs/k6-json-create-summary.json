@@ -1,0 +1,552 @@
+{
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [
+      {
+        "path": "::staging create",
+        "id": "191b4641873a8a674f893d208fefe1cf",
+        "groups": [],
+        "checks": [
+            {
+              "path": "::staging create::status is 201",
+              "id": "b4623a250e5f4695331bf053fe3aa9a7",
+              "passes": 2889,
+              "fails": 11,
+              "name": "status is 201"
+            },
+            {
+              "name": "token present",
+              "path": "::staging create::token present",
+              "id": "428fb11a8494037ee969389909fd3249",
+              "passes": 2889,
+              "fails": 11
+            }
+          ],
+        "name": "staging create"
+      },
+      {
+        "groups": [],
+        "checks": [
+            {
+              "id": "14d54373db7f210bb88e822e6f44d642",
+              "passes": 2800,
+              "fails": 89,
+              "name": "status is 200",
+              "path": "::profile::status is 200"
+            }
+          ],
+        "name": "profile",
+        "path": "::profile",
+        "id": "3910467d3a5a4c38ae1745ce5750ae19"
+      },
+      {
+        "name": "phone",
+        "path": "::phone",
+        "id": "714d46e52d4e4bdedcf1bf3316ed10c4",
+        "groups": [],
+        "checks": [
+            {
+              "name": "status is 200",
+              "path": "::phone::status is 200",
+              "id": "9d172878c25d611cb9e6e0da757a155a",
+              "passes": 2800,
+              "fails": 0
+            }
+          ]
+      },
+      {
+        "groups": [],
+        "checks": [
+            {
+              "name": "status is 200",
+              "path": "::profile picture::status is 200",
+              "id": "bc46e5e96d01c7bd9ecc4929c614cf95",
+              "passes": 2800,
+              "fails": 0
+            }
+          ],
+        "name": "profile picture",
+        "path": "::profile picture",
+        "id": "d5dc379894e56c531093e6512c467d56"
+      },
+      {
+        "checks": [
+          {
+            "name": "status is 200",
+            "path": "::intro video::status is 200",
+            "id": "e23b08b304d7db61423650f510dabd85",
+            "passes": 2800,
+            "fails": 0
+          }
+        ],
+        "name": "intro video",
+        "path": "::intro video",
+        "id": "b3a831b1da749867d6c676ec24ac20d8",
+        "groups": []
+      },
+      {
+        "name": "kyc step 1",
+        "path": "::kyc step 1",
+        "id": "218e81d77b8b332055d5000773873632",
+        "groups": [],
+        "checks": [
+            {
+              "path": "::kyc step 1::status is 200",
+              "id": "a58bfd0b5dc7a912c1a3f0d3cb45c158",
+              "passes": 2799,
+              "fails": 1,
+              "name": "status is 200"
+            },
+            {
+              "fails": 1,
+              "name": "application id present",
+              "path": "::kyc step 1::application id present",
+              "id": "f366404d0b3bab0bef2b779ecda95be9",
+              "passes": 2799
+            }
+          ]
+      },
+      {
+        "name": "kyc step 2",
+        "path": "::kyc step 2",
+        "id": "717109938606fbbe2d3cb2d7a8b5839a",
+        "groups": [],
+        "checks": [
+            {
+              "name": "status is 200",
+              "path": "::kyc step 2::status is 200",
+              "id": "8777dd09bded0ae64ce9d4422328631c",
+              "passes": 2799,
+              "fails": 0
+            }
+          ]
+      },
+      {
+        "name": "kyc credentials",
+        "path": "::kyc credentials",
+        "id": "3fe50cb51ae953aa26d45c3dac479f70",
+        "groups": [],
+        "checks": [
+            {
+              "fails": 0,
+              "name": "status is 201",
+              "path": "::kyc credentials::status is 201",
+              "id": "bed8bb12867ed530fe72cc4cdb2cb08a",
+              "passes": 2799
+            }
+          ]
+      },
+      {
+        "id": "2e50510f019bccb61120502b09aacf6e",
+        "groups": [],
+        "checks": [
+            {
+              "name": "status is 200",
+              "path": "::kyc submit::status is 200",
+              "id": "f4eee27bace89b8560cb9371b9b3530b",
+              "passes": 2799,
+              "fails": 0
+            }
+          ],
+        "name": "kyc submit",
+        "path": "::kyc submit"
+      },
+      {
+        "groups": [],
+        "checks": [
+            {
+              "name": "status is 200",
+              "path": "::fetch subjects::status is 200",
+              "id": "ca59234294f8653c589280c9d174dd60",
+              "passes": 2799,
+              "fails": 0
+            }
+          ],
+        "name": "fetch subjects",
+        "path": "::fetch subjects",
+        "id": "d977a4a25f32e7eb004516a72d51e435"
+      },
+      {
+        "groups": [],
+        "checks": [
+            {
+              "name": "status is 200",
+              "path": "::admin approve identity::status is 200",
+              "id": "2d2331a201c0943cdeb4635998b2b1b3",
+              "passes": 2799,
+              "fails": 0
+            }
+          ],
+        "name": "admin approve identity",
+        "path": "::admin approve identity",
+        "id": "2d69fdd30debd4899b42dbf26832633f"
+      }
+    ],
+    "checks": [
+      {
+        "passes": 6508,
+        "fails": 0,
+        "name": "status is 200",
+        "path": "::status is 200",
+        "id": "6210a8cd14cd70477eba5c5e4cb3fb5f"
+      }
+    ]
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "isStdOutTTY": true,
+    "isStdErrTTY": true,
+    "testRunDurationMs": 10495841.6777
+  },
+  "metrics": {
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0.0026937643356270335,
+        "passes": 101,
+        "fails": 37393
+      }
+    },
+    "http_req_sending": {
+      "contains": "time",
+      "values": {
+        "p(95)": 1.0009349999999997,
+        "avg": 0.259676916306609,
+        "min": 0,
+        "med": 0,
+        "max": 225.854,
+        "p(90)": 0.6172
+      },
+      "type": "trend"
+    },
+    "tutor_pipeline_failures": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 100,
+        "rate": 0.009527582739025599
+      },
+      "thresholds": {
+        "count<290": {
+          "ok": true
+        }
+      }
+    },
+    "route_pass__POST_kyc_me_step_1": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 2799,
+        "rate": 0.2666770408653265
+      }
+    },
+    "route_fail__POST_auth_staging_create": {
+      "contains": "default",
+      "values": {
+        "count": 11,
+        "rate": 0.001048034101292816
+      },
+      "type": "counter"
+    },
+    "http_req_waiting": {
+      "contains": "time",
+      "values": {
+        "p(90)": 3554.974320000001,
+        "p(95)": 4653.27878,
+        "avg": 1631.7913540406423,
+        "min": 207.618,
+        "med": 1125.5274,
+        "max": 30002.345
+      },
+      "type": "trend"
+    },
+    "route_pass__POST_kyc_me_credentials": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 2799,
+        "rate": 0.2666770408653265
+      }
+    },
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 6,
+        "min": 0,
+        "max": 6
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 203413197,
+        "rate": 19380.360646272136
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.36652564410305644,
+        "min": 0,
+        "med": 0,
+        "max": 2276.2976,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "route_pass__GET_kyc_me_subjects": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 2799,
+        "rate": 0.2666770408653265
+      }
+    },
+    "route_pass__POST_admin_kyc_applications_id_approve_identity": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 2799,
+        "rate": 0.2666770408653265
+      }
+    },
+    "route_pass__PATCH_tutors_me": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 2800,
+        "rate": 0.2667723166927168
+      }
+    },
+    "route_pass__POST_kyc_me_submit": {
+      "values": {
+        "count": 2799,
+        "rate": 0.2666770408653265
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "http_req_duration{expected_response:true}": {
+      "values": {
+        "p(95)": 4656.861740000001,
+        "avg": 1633.6672906907693,
+        "min": 207.618,
+        "med": 1127.8407,
+        "max": 21990.8993,
+        "p(90)": 3557.5207200000004
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "fails": 113,
+        "rate": 0.9973837747731061,
+        "passes": 43079
+      }
+    },
+    "tutor_pipeline_duration_ms": {
+      "type": "trend",
+      "contains": "default",
+      "values": {
+        "avg": 22076.369774919614,
+        "min": 10211,
+        "med": 21437,
+        "max": 57663,
+        "p(90)": 27260.2,
+        "p(95)": 29494.699999999997
+      }
+    },
+    "route_pass__PATCH_users_me": {
+      "contains": "default",
+      "values": {
+        "count": 2800,
+        "rate": 0.2667723166927168
+      },
+      "type": "counter"
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 1632.3910216567967,
+        "min": 207.618,
+        "med": 1126.0067,
+        "max": 30002.345,
+        "p(90)": 3555.914920000001,
+        "p(95)": 4654.10378
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.5061943964367632,
+        "min": 0,
+        "med": 0,
+        "max": 4815.7522,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 21325.9866,
+        "max": 57662.9467,
+        "p(90)": 27140.7753,
+        "p(95)": 29335.52695,
+        "avg": 21404.862285296174,
+        "min": 0
+      }
+    },
+    "vus": {
+      "values": {
+        "value": 1,
+        "min": 0,
+        "max": 6
+      },
+      "type": "gauge",
+      "contains": "default"
+    },
+    "iterations": {
+      "contains": "default",
+      "values": {
+        "count": 2904,
+        "rate": 0.27668100274130336
+      },
+      "type": "counter"
+    },
+    "route_fail__PATCH_tutors_me": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 89,
+        "rate": 0.008479548637732783
+      }
+    },
+    "route_pass__POST_kyc_me_step_2": {
+      "values": {
+        "count": 2799,
+        "rate": 0.2666770408653265
+      },
+      "type": "counter",
+      "contains": "default"
+    },
+    "group_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 4941.389489999999,
+        "avg": 1787.6827210366696,
+        "min": 209.8835,
+        "med": 1280.72595,
+        "max": 30012.0077,
+        "p(90)": 3855.09135
+      }
+    },
+    "route_pass__POST_tutors_me_intro_video": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 0.2667723166927168,
+        "count": 2800
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 63690822,
+        "rate": 6068.195763215518
+      }
+    },
+    "route_pass__POST_auth_staging_create": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 2889,
+        "rate": 0.27525186533044954
+      }
+    },
+    "route_pass__POST_admin_kyc_subjects_tutorSubjectId_approve": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 3254,
+        "rate": 0.310027542327893
+      }
+    },
+    "route_pass__PATCH_tutors_me_subjects_subjectId": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 3254,
+        "rate": 0.310027542327893
+      }
+    },
+    "route_pass__PATCH_users_me_profile_picture": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 2800,
+        "rate": 0.2667723166927168
+      }
+    },
+    "http_reqs": {
+      "contains": "default",
+      "values": {
+        "count": 37494,
+        "rate": 3.572271872170258
+      },
+      "type": "counter"
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.9601947378247184,
+        "min": 0,
+        "med": 0,
+        "max": 6330.4179,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "max": 1028.6986,
+        "p(90)": 0.6663,
+        "p(95)": 0.765,
+        "avg": 0.3399906998453089,
+        "min": 0,
+        "med": 0
+      }
+    }
+  },
+  "setup_data": {
+    "adminToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjllYzk4YzkwLTJhZjktNGU2OC04N2ZiLWJhZDc2MzBmMDdlYSIsImlhdCI6MTc4NjcwNDM4OCwiZXhwIjoxNzg3MzA5MTg4LCJqdGkiOiI2NTQ2ZGU1Yy05OWE1LTQyMzgtOWZjNC1iYWQwMTU2NzIyMGEifQ.efMYTrcuBli6BBnjxCPSK9ehUKYkGm1lNcvQH02rCiY"
+  }
+}

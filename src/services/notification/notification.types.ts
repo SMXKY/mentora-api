@@ -524,6 +524,45 @@ export const notificationRegistry: Record<
     isTransactional: false,
     defaultChannels: inAppPush,
   },
+
+  // ── Home-session safety layer ──────────────────────────────
+  SESSION_SOS_TRIGGERED: {
+    titleCode: "notifications/messages:session_sos_triggered.title",
+    bodyCode: "notifications/messages:session_sos_triggered.body",
+    isTransactional: true,
+    defaultChannels: inAppEmailPush,
+  },
+  SESSION_CHECKIN_SAFETY_FLAGGED: {
+    titleCode: "notifications/messages:session_checkin_safety_flagged.title",
+    bodyCode: "notifications/messages:session_checkin_safety_flagged.body",
+    isTransactional: true,
+    defaultChannels: inAppEmailPush,
+  },
+  SESSION_LOCATION_MISMATCH: {
+    titleCode: "notifications/messages:session_location_mismatch.title",
+    bodyCode: "notifications/messages:session_location_mismatch.body",
+    isTransactional: false,
+    defaultChannels: inAppPush,
+  },
+  SESSION_CHECKOUT_NUDGE: {
+    titleCode: "notifications/messages:session_checkout_nudge.title",
+    bodyCode: "notifications/messages:session_checkout_nudge.body",
+    isTransactional: true,
+    defaultChannels: inAppPushWhatsapp,
+  },
+  SESSION_CHECKOUT_ESCALATED: {
+    titleCode: "notifications/messages:session_checkout_escalated.title",
+    bodyCode: "notifications/messages:session_checkout_escalated.body",
+    isTransactional: true,
+    defaultChannels: inAppEmailPush,
+  },
+  SAFETY_ALERT_RESOLVED: {
+    titleCode: "notifications/messages:safety_alert_resolved.title",
+    bodyCode: "notifications/messages:safety_alert_resolved.body",
+    isTransactional: false,
+    defaultChannels: inAppPush,
+  },
+
   OTHER: {
     titleCode: "notifications/messages:other.title",
     bodyCode: "notifications/messages:other.body",

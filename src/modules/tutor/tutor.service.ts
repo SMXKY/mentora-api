@@ -261,8 +261,14 @@ export const TutorService = {
   async upsertMyProfile(userId: string, data: UpdateMyTutorProfileInput) {
     const existing = await prisma.tutorProfile.findFirst({
       where: { userId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, emergencyContactPhone: true },
     });
+
+    // Deliberately not blocked here on emergencyContactPhone even when
+    // teachingMode is HOME_ONLY/BOTH — a tutor can enable home teaching
+    // before adding a contact. The requirement bites at acceptBooking
+    // (booking.service.ts's assertTutorCanAcceptHomeSession) instead, since
+    // that's the point it's actually actionable and consequential.
 
     // Typing a rate here is a deliberate override — from this point on,
     // recomputeTutorRateRange leaves it alone even as subject pricing changes.

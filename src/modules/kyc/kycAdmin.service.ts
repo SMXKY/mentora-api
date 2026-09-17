@@ -928,6 +928,19 @@ export const KycAdminService = {
     if (tutorSubject.tutorProfile.kycStatus === KycStatus.IDENTITY_APPROVED) {
       assertValidTransition(KycStatus.IDENTITY_APPROVED, KycStatus.ACTIVE);
       const boostConfig = await getNewTutorBoostConfig();
+
+      // Carry the emergency contact already collected during KYC onto the
+      // live profile — home-session safety (checkin.service.ts) reads it
+      // from here, not from KycApplication, since a tutor should be able to
+      // update it later without going through reverification. Only copied
+      // once, at activation; never overwrites a value the tutor has since
+      // edited on their profile.
+      const kycApplication = await prisma.kycApplication.findFirst({
+        where: { tutorProfileId: tutorSubject.tutorProfileId },
+        orderBy: { version: "desc" },
+        select: { emergencyContactName: true, emergencyContactPhone: true },
+      });
+
       await prisma.tutorProfile.update({
         where: { id: tutorSubject.tutorProfileId },
         data: {
@@ -935,6 +948,10 @@ export const KycAdminService = {
           newTutorBoostExpiresAt: new Date(
             Date.now() + boostConfig.boostDurationDays * 24 * 60 * 60 * 1000
           ),
+          ...(kycApplication?.emergencyContactPhone && {
+            emergencyContactName: kycApplication.emergencyContactName,
+            emergencyContactPhone: kycApplication.emergencyContactPhone,
+          }),
         },
       });
 

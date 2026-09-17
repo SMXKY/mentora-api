@@ -27,5 +27,10 @@
   "rescheduleAlreadyResolved": "This reschedule request has already been responded to.",
   "notYourReschedule": "This reschedule request doesn't belong to you.",
   "noOccurrencesGenerated": "No session dates could be generated from these recurrence settings.",
-  "rescheduleTooCloseToSession": "This session starts too soon to reschedule freely — cancel it instead if you can't attend."
+  "rescheduleTooCloseToSession": "This session starts too soon to reschedule freely — cancel it instead if you can't attend.",
+  "acceptHomeRequiresEmergencyContact": "Add an emergency contact before accepting home sessions — this keeps someone reachable if a home session needs help.",
+  "firstSessionMustBeOnline": "Your first session with this tutor must be online — home sessions open up after that.",
+  "homeSessionRequiresLocation": "A session address is required for home sessions.",
+  "sosNotAvailable": "SOS is only available for an in-progress home session.",
+  "safetyAlertNotFound": "Safety alert not found."
 }

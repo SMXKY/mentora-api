@@ -22,6 +22,12 @@ export const UpdateMyTutorProfileSchema = z
     // client-supplied URL here would bypass that check entirely.
     minRateXaf: z.number().int().min(0).optional(),
     maxRateXaf: z.number().int().min(0).optional(),
+    // Required before teachingMode can be HOME_ONLY or BOTH — enforced in
+    // tutor.service.ts's upsertMyProfile, not here, since the requirement
+    // is conditional on another field in the same payload.
+    emergencyContactName: z.string().trim().min(1).max(255).optional(),
+    emergencyContactPhone: z.string().trim().min(1).max(20).optional(),
+    emergencyContactRelationship: z.string().trim().min(1).max(100).optional(),
   })
   .refine((d) => !d.minRateXaf || !d.maxRateXaf || d.minRateXaf <= d.maxRateXaf, {
     message: "tutor/errors:invalidRateRange",

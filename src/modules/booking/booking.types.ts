@@ -24,9 +24,44 @@ export const CreateBookingRequestSchema = z
     sessionStartTime: TimeStringSchema,
     durationMinutes: z.number().int().min(30).max(240),
     messageToTutor: z.string().trim().max(1000).optional(),
+    // Required when sessionType is HOME (checked in booking.service.ts, not
+    // here, since the requirement is conditional on another field). Captured
+    // from the booker's device and confirmed/edited before submit.
+    sessionAddress: z.string().trim().min(5).max(500).optional(),
+    sessionLatitude: z.number().min(-90).max(90).optional(),
+    sessionLongitude: z.number().min(-180).max(180).optional(),
   })
   .openapi("CreateBookingRequest");
 export type CreateBookingRequestInput = z.infer<typeof CreateBookingRequestSchema>;
+
+export const CheckInSchema = z
+  .object({
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    // "Anything to flag before you start?" — one signal among several, not
+    // a liability release. Logged for admin review when present, never
+    // required.
+    safetyNote: z.string().trim().max(500).optional(),
+  })
+  .openapi("CheckIn");
+export type CheckInInput = z.infer<typeof CheckInSchema>;
+
+export const CheckOutSchema = z
+  .object({
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+  })
+  .openapi("CheckOut");
+export type CheckOutInput = z.infer<typeof CheckOutSchema>;
+
+export const TriggerSosSchema = z
+  .object({
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    note: z.string().trim().max(1000).optional(),
+  })
+  .openapi("TriggerSos");
+export type TriggerSosInput = z.infer<typeof TriggerSosSchema>;
 
 export const RejectBookingSchema = z
   .object({
@@ -80,6 +115,24 @@ export const RespondToRescheduleSchema = z
   })
   .openapi("RespondToReschedule");
 export type RespondToRescheduleInput = z.infer<typeof RespondToRescheduleSchema>;
+
+export const SafetyAlertStatusEnum = z.enum(["OPEN", "ACKNOWLEDGED", "RESOLVED"]);
+
+export const ListSafetyAlertsQuerySchema = z
+  .object({
+    status: SafetyAlertStatusEnum.optional(),
+    cursor: z.string().uuid().optional(),
+    limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+  })
+  .openapi("ListSafetyAlertsQuery");
+export type ListSafetyAlertsQueryInput = z.infer<typeof ListSafetyAlertsQuerySchema>;
+
+export const ResolveSafetyAlertSchema = z
+  .object({
+    resolutionNote: z.string().trim().max(1000).optional(),
+  })
+  .openapi("ResolveSafetyAlert");
+export type ResolveSafetyAlertInput = z.infer<typeof ResolveSafetyAlertSchema>;
 
 export const ListBookingsQuerySchema = z
   .object({

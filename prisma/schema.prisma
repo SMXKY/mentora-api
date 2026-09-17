@@ -361,13 +361,13 @@ model User {
   password        String? @map("password") @db.VarChar(255)
   isEmailVerified Boolean @default(false) @map("is_email_verified")
 
-  phoneNumber String? @map("phone_number") @db.VarChar(20)
+  phoneNumber      String? @map("phone_number") @db.VarChar(20)
   // Stored separately so a bare local number ("677700900") typed at login
   // can be normalized to the full E.164 form before lookup without any
   // frontend change — see normalizePhone.util.ts. phoneNumber itself keeps
   // storing the full "+237..." form unchanged, this is additive metadata,
   // not a replacement for it.
-  phoneCountryCode String @default("+237") @map("phone_country_code") @db.VarChar(5)
+  phoneCountryCode String  @default("+237") @map("phone_country_code") @db.VarChar(5)
 
   whatsappNumber    String?   @map("whatsapp_number") @db.VarChar(20)
   whatsappOptIn     Boolean   @default(false) @map("whatsapp_opt_in")
@@ -379,7 +379,7 @@ model User {
   profilePictureUrl String?    @map("profile_picture_url") @db.VarChar(500)
   address           String?    @db.VarChar(500)
 
-  preferredLanguage Languages      @default(EN) @map("preferred_language")
+  preferredLanguage Languages       @default(EN) @map("preferred_language")
   themePreference   ThemePreference @default(SYSTEM) @map("theme_preference")
 
   notificationsMuted Boolean @default(false) @map("notifications_muted")
@@ -396,8 +396,8 @@ model User {
   // load-bearing meaning elsewhere (roles/permissions/audit) that this
   // deliberately doesn't touch.
   isStagingSeed     Boolean    @default(false) @map("is_staging_seed")
-  cityId String? @map("city_id") @db.Uuid
-  city   City?   @relation(fields: [cityId], references: [id])
+  cityId            String?    @map("city_id") @db.Uuid
+  city              City?      @relation(fields: [cityId], references: [id])
 
   // Self-deactivation: deletedAt doubles as the 30-day grace-period start.
   // anonymisedAt marks PII already scrubbed by the nightly job — once set,
@@ -420,7 +420,7 @@ model User {
   // presence, updated on connect/disconnect (see socket/index.ts). "Online"
   // in the UI is the live in-memory check (isUserOnline); this field is only
   // read once a user has disconnected, to show "last seen X ago".
-  lastActiveAt DateTime? @map("last_active_at")
+  lastActiveAt   DateTime? @map("last_active_at")
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -526,6 +526,8 @@ model User {
   incidentReportsFiled    IncidentReport[]      @relation("IncidentReportedBy")
   incidentReportsAgainst  IncidentReport[]      @relation("IncidentReportedAgainst")
   incidentReportsReviewed IncidentReport[]      @relation("IncidentReviewedBy")
+  safetyAlertsTriggered   SafetyAlert[]         @relation("SafetyAlertTriggeredBy")
+  safetyAlertsResolved    SafetyAlert[]         @relation("SafetyAlertResolvedBy")
 
   reviewWindowsReopened ReviewWindow[]
   reviewsAuthored       Review[]             @relation("ReviewAuthor")
@@ -564,7 +566,7 @@ model User {
   learningSnapshots       LearningAnalyticsSnapshot[]
   platformConfigsUpdated  PlatformConfig[]
   monthlyFeeCharges       MonthlyFeeCharge[]
-  savedCollections SavedCollection[]
+  savedCollections        SavedCollection[]
 
   @@index([status])
   @@index([isAccountComplete])
@@ -800,7 +802,7 @@ model City {
   tutorProfiles   TutorProfile[]
   kycApplications KycApplication[]
   demandSignals   DemandSignal[]
-  users User[]
+  users           User[]
 
   @@unique([name, regionId], map: "idx_city_name_region")
   @@index([regionId])
@@ -909,6 +911,14 @@ model TutorProfile {
   cityId             String       @map("city_id") @db.Uuid
   neighbourhood      String?      @db.VarChar(255)
   exactAddress       String?      @map("exact_address") @db.VarChar(500)
+
+  // Required before teachingMode can be set to HOME_ONLY or BOTH — enforced
+  // in tutor.service.ts, not at the DB level, since ONLINE_ONLY tutors never
+  // need it. Kept on the profile (not just KycApplication) so a tutor can
+  // update it any time without going through reverification.
+  emergencyContactName         String? @map("emergency_contact_name") @db.VarChar(255)
+  emergencyContactPhone        String? @map("emergency_contact_phone") @db.VarChar(20)
+  emergencyContactRelationship String? @map("emergency_contact_relationship") @db.VarChar(100)
 
   kycStatus          KycStatus @default(INCOMPLETE) @map("kyc_status")
   kycSubmittedAt     DateTime? @map("kyc_submitted_at")
@@ -1026,9 +1036,9 @@ model TutorSubject {
   // subject (tutor.service.ts, tutorSearch.service.ts) — independent of
   // `status`, so a tutor can pause a still-APPROVED subject without losing
   // the claim itself.
-  isOpenForBooking        Boolean  @default(false) @map("is_open_for_booking")
-  createdAt               DateTime @default(now()) @map("created_at")
-  updatedAt               DateTime @updatedAt @map("updated_at")
+  isOpenForBooking     Boolean  @default(false) @map("is_open_for_booking")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   tutorProfile TutorProfile        @relation(fields: [tutorProfileId], references: [id])
   subject      Subject             @relation(fields: [subjectId], references: [id])
@@ -1195,9 +1205,9 @@ model File {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  uploadedBy User          @relation(fields: [uploadedById], references: [id])
-  variants   FileVariant[]
-  materials  Material[]
+  uploadedBy         User          @relation(fields: [uploadedById], references: [id])
+  variants           FileVariant[]
+  materials          Material[]
   messageAttachments Message[]
 
   kycFrontPhotos               KycApplication[] @relation("KycCniFront")
@@ -1337,15 +1347,15 @@ model Collection {
   deletedAt      DateTime? @map("deleted_at")
   isFreePreview  Boolean   @default(false) @map("is_free_preview")
 
-  tutorProfile TutorProfile     @relation(fields: [tutorProfileId], references: [id])
-  subject      Subject          @relation(fields: [subjectId], references: [id])
-  level        Level            @relation(fields: [levelId], references: [id])
+  tutorProfile TutorProfile      @relation(fields: [tutorProfileId], references: [id])
+  subject      Subject           @relation(fields: [subjectId], references: [id])
+  level        Level             @relation(fields: [levelId], references: [id])
   sections     Section[]
   materials    Material[]
   lessonPlan   LessonPlan?
   accessGrants MaterialAccess[]
   reviews      MaterialReview[]
-  savedBy SavedCollection[]
+  savedBy      SavedCollection[]
 
   @@index([tutorProfileId])
   @@index([subjectId])
@@ -1354,8 +1364,8 @@ model Collection {
   @@index([tutorProfileId, subjectId], map: "idx_collection_tutor_subject")
   @@index([tutorProfileId, orderIndex], map: "idx_collection_tutor_order")
   @@index([deletedAt])
-  @@map("collections")
   @@index([isFreePreview])
+  @@map("collections")
 }
 
 model Section {
@@ -1860,6 +1870,35 @@ model Booking {
   tutorCheckedOutAt  DateTime? @map("tutor_checked_out_at")
   bookerCheckedOutAt DateTime? @map("booker_checked_out_at")
 
+  // Where a HOME session is supposed to happen — set at booking time from
+  // the booker's device location, confirmed/edited before submit. Never
+  // populated for ONLINE sessions.
+  sessionAddress   String?  @map("session_address") @db.VarChar(500)
+  sessionLatitude  Decimal? @map("session_latitude") @db.Decimal(9, 6)
+  sessionLongitude Decimal? @map("session_longitude") @db.Decimal(9, 6)
+
+  // Captured from the device at the moment of each check-in/check-out —
+  // lets checkin.service.ts flag a mismatch against sessionLatitude/
+  // sessionLongitude instead of trusting a bare timestamp tap.
+  tutorCheckedInLat   Decimal? @map("tutor_checked_in_lat") @db.Decimal(9, 6)
+  tutorCheckedInLng   Decimal? @map("tutor_checked_in_lng") @db.Decimal(9, 6)
+  bookerCheckedInLat  Decimal? @map("booker_checked_in_lat") @db.Decimal(9, 6)
+  bookerCheckedInLng  Decimal? @map("booker_checked_in_lng") @db.Decimal(9, 6)
+  tutorCheckedOutLat  Decimal? @map("tutor_checked_out_lat") @db.Decimal(9, 6)
+  tutorCheckedOutLng  Decimal? @map("tutor_checked_out_lng") @db.Decimal(9, 6)
+  bookerCheckedOutLat Decimal? @map("booker_checked_out_lat") @db.Decimal(9, 6)
+  bookerCheckedOutLng Decimal? @map("booker_checked_out_lng") @db.Decimal(9, 6)
+
+  // "Anything to flag before you start?" prompt shown at check-in — one
+  // signal among several, not a liability release. Null/empty is normal.
+  checkinSafetyNote String? @map("checkin_safety_note") @db.VarChar(500)
+
+  // Checkout-escalation timers (see checkin.service.ts sweepCheckoutNudge /
+  // sweepCheckoutEscalation) — set once each, never reset, so the sweep is
+  // idempotent without a separate Notification existence check.
+  checkoutNudgeSentAt DateTime? @map("checkout_nudge_sent_at")
+  checkoutEscalatedAt DateTime? @map("checkout_escalated_at")
+
   isGroupSession Boolean @default(false) @map("is_group_session")
   seriesId       String? @map("series_id") @db.Uuid
 
@@ -1890,6 +1929,7 @@ model Booking {
   autoRecommendation     AutoResolutionRecommendation?
   dispute                Dispute?
   incidentReports        IncidentReport[]
+  safetyAlerts           SafetyAlert[]
   reviewWindow           ReviewWindow?
   reviews                Review[]
   deadLetterJobs         DeadLetterJob[]
@@ -2085,6 +2125,13 @@ enum NotificationType {
 
   NEW_MESSAGE_RECEIVED
 
+  SESSION_SOS_TRIGGERED
+  SESSION_CHECKIN_SAFETY_FLAGGED
+  SESSION_LOCATION_MISMATCH
+  SESSION_CHECKOUT_NUDGE
+  SESSION_CHECKOUT_ESCALATED
+  SAFETY_ALERT_RESOLVED
+
   OTHER
 }
 
@@ -2099,6 +2146,7 @@ enum NotificationResourceType {
   ACCOUNT
   MESSAGE
   TUTOR_SUBJECT
+  SAFETY_ALERT
 }
 
 enum NotificationChannel {
@@ -2876,27 +2924,27 @@ model ConversationParticipant {
 }
 
 model Message {
-  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  conversationId    String        @map("conversation_id") @db.Uuid
-  senderId          String        @map("sender_id") @db.Uuid
-  content           String
-  contentDeleted    Boolean       @default(false) @map("content_deleted")
-  deletedContentKey String?       @map("deleted_content_key") @db.VarChar(255)
-  replyToId         String?       @map("reply_to_id") @db.Uuid
-  attachmentFileId  String?       @map("attachment_file_id") @db.Uuid
-  status            MessageStatus @default(SENT)
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId      String        @map("conversation_id") @db.Uuid
+  senderId            String        @map("sender_id") @db.Uuid
+  content             String
+  contentDeleted      Boolean       @default(false) @map("content_deleted")
+  deletedContentKey   String?       @map("deleted_content_key") @db.VarChar(255)
+  replyToId           String?       @map("reply_to_id") @db.Uuid
+  attachmentFileId    String?       @map("attachment_file_id") @db.Uuid
+  status              MessageStatus @default(SENT)
   // WhatsApp-style silent block: set true when the recipient had blocked
   // the sender at send time. The row is still persisted (so the sender's
   // own devices see it as sent, and it's recoverable for moderation), but
   // it must never be visible to the recipient — see MessagingService.
   // sendMessage/listMessages. A permanent snapshot of block state at send
   // time, not re-evaluated if the block is later lifted.
-  hiddenFromRecipient Boolean     @default(false) @map("hidden_from_recipient")
-  deliveredAt       DateTime?     @map("delivered_at")
-  deletedById       String?       @map("deleted_by") @db.Uuid
-  deletedAt         DateTime?     @map("deleted_at")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
+  hiddenFromRecipient Boolean       @default(false) @map("hidden_from_recipient")
+  deliveredAt         DateTime?     @map("delivered_at")
+  deletedById         String?       @map("deleted_by") @db.Uuid
+  deletedAt           DateTime?     @map("deleted_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
 
   conversation      Conversation         @relation(fields: [conversationId], references: [id])
   sender            User                 @relation("MessageSender", fields: [senderId], references: [id])
@@ -3233,10 +3281,10 @@ model IncidentReport {
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
-  booking         Booking @relation(fields: [bookingId], references: [id])
-  reportedBy      User    @relation("IncidentReportedBy", fields: [reportedById], references: [id])
-  reportedAgainst User    @relation("IncidentReportedAgainst", fields: [reportedAgainstId], references: [id])
-  reviewedBy      User?   @relation("IncidentReviewedBy", fields: [reviewedById], references: [id])
+  booking          Booking                         @relation(fields: [bookingId], references: [id])
+  reportedBy       User                            @relation("IncidentReportedBy", fields: [reportedById], references: [id])
+  reportedAgainst  User                            @relation("IncidentReportedAgainst", fields: [reportedAgainstId], references: [id])
+  reviewedBy       User?                           @relation("IncidentReviewedBy", fields: [reviewedById], references: [id])
   evidenceSnapshot IncidentReportEvidenceSnapshot?
 
   @@index([bookingId])
@@ -3263,6 +3311,57 @@ model IncidentReportEvidenceSnapshot {
 
   @@index([assembledAt])
   @@map("incident_report_evidence_snapshots")
+}
+
+enum SafetyAlertType {
+  SOS
+  CHECKIN_FLAGGED
+  LOCATION_MISMATCH
+  CHECKOUT_ESCALATION
+}
+
+enum SafetyAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+/**
+ * Home-session safety layer (live bookings). One row per notable safety
+ * event on a HOME booking — a self-triggered SOS, a flagged check-in note,
+ * a check-in location that doesn't match sessionLatitude/sessionLongitude,
+ * or a checkout that never happened. Always resolved by a human admin;
+ * nothing here auto-closes.
+ */
+model SafetyAlert {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId     String            @map("booking_id") @db.Uuid
+  alertType     SafetyAlertType   @map("alert_type")
+  status        SafetyAlertStatus @default(OPEN)
+  triggeredById String?           @map("triggered_by") @db.Uuid
+  latitude      Decimal?          @db.Decimal(9, 6)
+  longitude     Decimal?          @db.Decimal(9, 6)
+  note          String?           @db.VarChar(1000)
+
+  emergencyContactNotifiedAt      DateTime? @map("emergency_contact_notified_at")
+  emergencyContactNotifiedChannel String?   @map("emergency_contact_notified_channel") @db.VarChar(20)
+
+  resolvedById   String?   @map("resolved_by") @db.Uuid
+  resolvedAt     DateTime? @map("resolved_at")
+  resolutionNote String?   @map("resolution_note") @db.VarChar(1000)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  booking     Booking @relation(fields: [bookingId], references: [id])
+  triggeredBy User?   @relation("SafetyAlertTriggeredBy", fields: [triggeredById], references: [id])
+  resolvedBy  User?   @relation("SafetyAlertResolvedBy", fields: [resolvedById], references: [id])
+
+  @@index([bookingId])
+  @@index([status])
+  @@index([alertType])
+  @@index([status, createdAt], map: "idx_safety_alert_status_time")
+  @@map("safety_alerts")
 }
 
 enum ReviewAuthorRole {

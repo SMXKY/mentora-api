@@ -13,6 +13,11 @@ import {
   RequestRescheduleSchema,
   RespondToRescheduleSchema,
   ListBookingsQuerySchema,
+  CheckInSchema,
+  CheckOutSchema,
+  TriggerSosSchema,
+  ListSafetyAlertsQuerySchema,
+  ResolveSafetyAlertSchema,
 } from "./booking.types";
 import checkAccountCompletion from "../../middlewares/checkAccountCompletion.middleware";
 import checkKyc from "../../middlewares/checkKyc.middleware";
@@ -88,12 +93,20 @@ router.get(
 router.post(
   "/:id/check-in",
   validate(ParamsBookingId, "params"),
+  validate(CheckInSchema),
   bookingController.checkIn
 );
 router.post(
   "/:id/check-out",
   validate(ParamsBookingId, "params"),
+  validate(CheckOutSchema),
   bookingController.checkOut
+);
+router.post(
+  "/:id/sos",
+  validate(ParamsBookingId, "params"),
+  validate(TriggerSosSchema),
+  bookingController.triggerSos
 );
 router.post(
   "/:id/confirm",
@@ -128,6 +141,21 @@ adminRouter.get(
   validate(ListBookingsQuerySchema, "query"),
   bookingController.listAdmin
 );
+// ── Home-session safety layer (admin) ───────────────────────────
+// Registered ahead of "/:id" — "live-home-sessions" would otherwise be
+// swallowed by the "/:id" wildcard since both are single path segments.
+adminRouter.get(
+  "/live-home-sessions",
+  restrictTo(permissions.bookings.flaggedRead),
+  bookingController.listLiveHomeSessions
+);
+adminRouter.get(
+  "/:id/dossier",
+  restrictTo(permissions.bookings.flaggedRead),
+  validate(ParamsBookingId, "params"),
+  bookingController.getDossier
+);
+
 adminRouter.get(
   "/:id",
   restrictTo(permissions.bookings.readAll),
@@ -135,5 +163,21 @@ adminRouter.get(
   bookingController.getAdminOne
 );
 
-export { adminRouter as bookingAdminRouter };
+const safetyAlertAdminRouter = Router();
+safetyAlertAdminRouter.use(protect);
+safetyAlertAdminRouter.get(
+  "/",
+  restrictTo(permissions.bookings.flaggedRead),
+  validate(ListSafetyAlertsQuerySchema, "query"),
+  bookingController.listSafetyAlerts
+);
+safetyAlertAdminRouter.post(
+  "/:alertId/resolve",
+  restrictTo(permissions.bookings.manage),
+  validate(z.object({ alertId: z.string().uuid() }), "params"),
+  validate(ResolveSafetyAlertSchema),
+  bookingController.resolveSafetyAlert
+);
+
+export { adminRouter as bookingAdminRouter, safetyAlertAdminRouter };
 export default router;

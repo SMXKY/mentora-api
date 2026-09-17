@@ -242,6 +242,58 @@ function assertSessionTypeAllowed(
   }
 }
 
+/** Statuses that mean a booking actually happened (or is happening) rather
+ * than just being requested/rejected/abandoned before payment — used to
+ * decide whether a tutor/student pair has an established session history. */
+const REALIZED_BOOKING_STATUSES: BookingStatus[] = [
+  BookingStatus.PAID,
+  BookingStatus.IN_PROGRESS,
+  BookingStatus.AWAITING_CONFIRMATION,
+  BookingStatus.CONFIRMED,
+  BookingStatus.AUTO_CONFIRMED,
+  BookingStatus.DISPUTED,
+  BookingStatus.RESOLVED_TUTOR_FAVOR,
+  BookingStatus.RESOLVED_PARENT_FAVOR,
+];
+
+/** Home-session safety gating for the BOOKER's request — deliberately
+ * excludes the tutor's emergency-contact requirement, which isn't
+ * something the booker can act on. That's enforced separately, on the
+ * tutor, at acceptBooking (see assertTutorCanAcceptHomeSession below).
+ * - a tutor/student pair's first realized session must be ONLINE — a home
+ *   visit is never a stranger's first contact with a family.
+ * - a session address is required so the platform knows where the tutor is
+ *   going, which every other safety mechanism (check-in verification, live
+ *   admin visibility, escalation) depends on. */
+async function assertHomeSessionEligible(
+  tutor: { id: string },
+  studentProfileId: string,
+  input: Pick<CreateBookingRequestInput, "sessionAddress" | "sessionLatitude" | "sessionLongitude">
+) {
+  if (!input.sessionAddress || input.sessionLatitude == null || input.sessionLongitude == null) {
+    throw new AppError(
+      "booking/errors:homeSessionRequiresLocation",
+      StatusCodes.BAD_REQUEST
+    );
+  }
+
+  const priorRealizedSession = await prisma.booking.findFirst({
+    where: {
+      tutorProfileId: tutor.id,
+      studentProfileId,
+      deletedAt: null,
+      status: { in: REALIZED_BOOKING_STATUSES },
+    },
+    select: { id: true },
+  });
+  if (!priorRealizedSession) {
+    throw new AppError(
+      "booking/errors:firstSessionMustBeOnline",
+      StatusCodes.BAD_REQUEST
+    );
+  }
+}
+
 function serializeBooking(booking: any) {
   return {
     id: booking.id,
@@ -275,6 +327,9 @@ function serializeBooking(booking: any) {
     bookerCheckedInAt: booking.bookerCheckedInAt,
     tutorCheckedOutAt: booking.tutorCheckedOutAt,
     bookerCheckedOutAt: booking.bookerCheckedOutAt,
+    sessionAddress: booking.sessionAddress,
+    sessionLatitude: booking.sessionLatitude,
+    sessionLongitude: booking.sessionLongitude,
     isGroupSession: booking.isGroupSession,
     seriesId: booking.seriesId,
     createdAt: booking.createdAt,
@@ -322,6 +377,9 @@ async function createBookingRequest(
   ]);
 
   assertSessionTypeAllowed(tutor.teachingMode, input.sessionType);
+  if (input.sessionType === "HOME") {
+    await assertHomeSessionEligible(tutor, studentProfile.id, input);
+  }
 
   const tutorSubject = await assertApprovedSubjectLevel(
     input.tutorProfileId,
@@ -386,6 +444,11 @@ async function createBookingRequest(
       sessionEndTime: minutesToDbTime(endMinutes),
       agreedRateXaf,
       status: BookingStatus.REQUESTED,
+      ...(input.sessionType === "HOME" && {
+        sessionAddress: input.sessionAddress,
+        sessionLatitude: input.sessionLatitude,
+        sessionLongitude: input.sessionLongitude,
+      }),
     },
   });
 
@@ -430,6 +493,25 @@ async function getBookingForUser(bookingId: string, userId: string) {
   return { booking, isBooker, isTutor };
 }
 
+/** The tutor-facing half of home-session safety gating — the booker's
+ * request can go in without a tutor emergency contact on file (see
+ * assertHomeSessionEligible above), but the tutor can't accept it without
+ * one. This is the point enforcement actually bites, since it's the
+ * tutor's own missing data and the tutor is the one who can fix it. */
+async function assertTutorCanAcceptHomeSession(booking: { sessionType: string; tutorProfileId: string }) {
+  if (booking.sessionType !== "HOME") return;
+  const tutorProfile = await prisma.tutorProfile.findUnique({
+    where: { id: booking.tutorProfileId },
+    select: { emergencyContactPhone: true },
+  });
+  if (!tutorProfile?.emergencyContactPhone) {
+    throw new AppError(
+      "booking/errors:acceptHomeRequiresEmergencyContact",
+      StatusCodes.BAD_REQUEST
+    );
+  }
+}
+
 async function acceptBooking(
   tutorUserId: string,
   bookingId: string,
@@ -439,6 +521,7 @@ async function acceptBooking(
   if (!isTutor)
     throw new AppError("booking/errors:notYourBooking", StatusCodes.FORBIDDEN);
   assertValidTransition(booking.status, BookingStatus.ACCEPTED);
+  await assertTutorCanAcceptHomeSession(booking);
 
   const { paymentWindowHours } = await bookingConfig.getAll();
   const paymentWindowExpiresAt = new Date(
@@ -778,6 +861,108 @@ async function getAdminBooking(bookingId: string) {
   return serializeBooking(booking);
 }
 
+/** Ops visibility into every HOME session currently underway — the gap the
+ * safety layer was built to close, since before this admins had no way to
+ * see where an active home session was happening at all. */
+async function listLiveHomeSessions() {
+  const rows = await prisma.booking.findMany({
+    where: { sessionType: "HOME", status: BookingStatus.IN_PROGRESS, deletedAt: null },
+    include: {
+      ...DISPLAY_INCLUDE,
+      safetyAlerts: { where: { status: { not: "RESOLVED" } } },
+    },
+    orderBy: { tutorCheckedInAt: "asc" },
+  });
+
+  return rows.map((booking) => ({
+    ...serializeBooking(booking),
+    tutorCheckedInLat: booking.tutorCheckedInLat,
+    tutorCheckedInLng: booking.tutorCheckedInLng,
+    bookerCheckedInLat: booking.bookerCheckedInLat,
+    bookerCheckedInLng: booking.bookerCheckedInLng,
+    checkinSafetyNote: booking.checkinSafetyNote,
+    openAlertsCount: booking.safetyAlerts.length,
+  }));
+}
+
+/** Everything an admin needs in one place to act fast on a HOME-session
+ * safety event — identities, the booked address, the check-in/out trail,
+ * and the emergency contact, ready to hand to that contact or to police
+ * without having to piece it together across screens under time pressure. */
+async function getBookingDossier(bookingId: string) {
+  const booking = await prisma.booking.findFirst({
+    where: { id: bookingId, deletedAt: null },
+    include: {
+      subject: { select: { id: true, name: true } },
+      tutorProfile: {
+        select: {
+          id: true,
+          exactAddress: true,
+          neighbourhood: true,
+          emergencyContactName: true,
+          emergencyContactPhone: true,
+          emergencyContactRelationship: true,
+          user: {
+            select: { id: true, firstName: true, lastName: true, phoneNumber: true, email: true },
+          },
+        },
+      },
+      booker: { select: { id: true, firstName: true, lastName: true, phoneNumber: true, email: true } },
+      studentProfile: { select: { id: true, firstName: true } },
+      safetyAlerts: { orderBy: { createdAt: "desc" } },
+    },
+  });
+  if (!booking)
+    throw new AppError("booking/errors:bookingNotFound", StatusCodes.NOT_FOUND);
+
+  return {
+    bookingId: booking.id,
+    status: booking.status,
+    sessionDate: booking.sessionDate.toISOString().slice(0, 10),
+    sessionAddress: booking.sessionAddress,
+    sessionLatitude: booking.sessionLatitude,
+    sessionLongitude: booking.sessionLongitude,
+    tutor: {
+      userId: booking.tutorProfile.user.id,
+      name: `${booking.tutorProfile.user.firstName} ${booking.tutorProfile.user.lastName}`.trim(),
+      phone: booking.tutorProfile.user.phoneNumber,
+      email: booking.tutorProfile.user.email,
+      registeredAddress: booking.tutorProfile.exactAddress,
+      neighbourhood: booking.tutorProfile.neighbourhood,
+    },
+    emergencyContact: {
+      name: booking.tutorProfile.emergencyContactName,
+      phone: booking.tutorProfile.emergencyContactPhone,
+      relationship: booking.tutorProfile.emergencyContactRelationship,
+    },
+    booker: booking.booker
+      ? {
+          userId: booking.booker.id,
+          name: `${booking.booker.firstName} ${booking.booker.lastName}`.trim(),
+          phone: booking.booker.phoneNumber,
+          email: booking.booker.email,
+        }
+      : null,
+    student: booking.studentProfile
+      ? { id: booking.studentProfile.id, name: booking.studentProfile.firstName }
+      : null,
+    timeline: {
+      tutorCheckedInAt: booking.tutorCheckedInAt,
+      tutorCheckedInLat: booking.tutorCheckedInLat,
+      tutorCheckedInLng: booking.tutorCheckedInLng,
+      bookerCheckedInAt: booking.bookerCheckedInAt,
+      bookerCheckedInLat: booking.bookerCheckedInLat,
+      bookerCheckedInLng: booking.bookerCheckedInLng,
+      tutorCheckedOutAt: booking.tutorCheckedOutAt,
+      bookerCheckedOutAt: booking.bookerCheckedOutAt,
+      checkoutNudgeSentAt: booking.checkoutNudgeSentAt,
+      checkoutEscalatedAt: booking.checkoutEscalatedAt,
+    },
+    checkinSafetyNote: booking.checkinSafetyNote,
+    safetyAlerts: booking.safetyAlerts,
+  };
+}
+
 export const BookingService = {
   createBookingRequest,
   acceptBooking,
@@ -796,6 +981,8 @@ export const BookingService = {
   OCCUPYING_STATUSES,
   listAdminBookings,
   getAdminBooking,
+  listLiveHomeSessions,
+  getBookingDossier,
 };
 
 export default BookingService;

@@ -148,6 +148,7 @@ const ROUTE_NAMES = [
   "POST /auth/register/email/verify-otp",
   "POST /auth/register/complete",
   "PATCH /tutors/me",
+  "PATCH /users/me",
   "POST /tutors/me/intro-video",
   "POST /kyc/me/step-1",
   "POST /kyc/me/step-2",
@@ -230,7 +231,7 @@ export function setup() {
   console.log(`[setup] plan: ${TOTAL_TUTORS} tutors, ${VUS} VUs, starting from index ${START_INDEX}`);
 
   const loginRes = http.post(
-    `${API}/auth/login`,
+    `${API}/auth/admin/login`,
     JSON.stringify({ identifier: SUPER_ADMIN_EMAIL, password: SUPER_ADMIN_PASSWORD }),
     jsonHeaders()
   );
@@ -377,6 +378,9 @@ export function createAndActivateTutor(data) {
   if (!ok) return finishFailed(globalIndex, name, startedAt);
 
   const tutorToken = data._tutorToken;
+  // Picked once, reused for both the profile-level range (required for
+  // completion, see below) and the per-subject rates set later after approval.
+  const [minPrice, maxPrice] = pick(PRICE_BANDS);
 
   // ---- 2. Profile completion ----
   group("profile", () => {
@@ -389,10 +393,24 @@ export function createAndActivateTutor(data) {
         cityId: city.id,
         languages: pick(LANGUAGES_POOL),
         yearsOfExperience: 1 + Math.floor(Math.random() * 12),
+        // Required by evaluateCompletion's "pricing" item — reads
+        // TutorProfile.minRateXaf/maxRateXaf directly, not the per-subject
+        // rates set later after approval.
+        minRateXaf: minPrice,
+        maxRateXaf: maxPrice,
       }),
       jsonHeaders(tutorToken)
     );
     ok = verify("PATCH /tutors/me", res, { "status is 200": (r) => r.status === 200 }) && ok;
+  });
+  if (!ok) return finishFailed(globalIndex, name, startedAt);
+
+  // Required by evaluateCompletion's "phone_number" item — a User-level
+  // field, not settable via PATCH /tutors/me.
+  group("phone", () => {
+    const phone = `+237${6 + (globalIndex % 4)}${String(10000000 + (globalIndex % 89999999)).padStart(8, "0")}`;
+    const res = http.patch(`${API}/users/me`, JSON.stringify({ phoneNumber: phone }), jsonHeaders(tutorToken));
+    ok = verify("PATCH /users/me", res, { "status is 200": (r) => r.status === 200 }) && ok;
   });
   if (!ok) return finishFailed(globalIndex, name, startedAt);
 
@@ -523,7 +541,7 @@ export function createAndActivateTutor(data) {
   if (!allSubjectsApproved) return finishFailed(globalIndex, name, startedAt);
 
   // ---- 11. Open each subject for booking with realistic pricing (search's hardVisibilityFilter requires isOpenForBooking: true) ----
-  const [minPrice, maxPrice] = pick(PRICE_BANDS);
+  // Reuses the same minPrice/maxPrice picked earlier for the profile-level range.
   let allPricingSet = true;
   for (let i = 0; i < assignment.subjectIds.length; i++) {
     const res = http.patch(

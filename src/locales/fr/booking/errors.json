@@ -27,5 +27,10 @@
   "rescheduleAlreadyResolved": "Cette demande de report a déjà reçu une réponse.",
   "notYourReschedule": "Cette demande de report ne vous appartient pas.",
   "noOccurrencesGenerated": "Aucune date de session n'a pu être générée avec ces paramètres de récurrence.",
-  "rescheduleTooCloseToSession": "Cette session commence trop bientôt pour être reportée librement — annulez-la si vous ne pouvez pas y assister."
+  "rescheduleTooCloseToSession": "Cette session commence trop bientôt pour être reportée librement — annulez-la si vous ne pouvez pas y assister.",
+  "acceptHomeRequiresEmergencyContact": "Ajoutez un contact d'urgence avant d'accepter des séances à domicile — cela garantit qu'une personne est joignable si une séance à domicile nécessite de l'aide.",
+  "firstSessionMustBeOnline": "Votre première session avec ce tuteur doit être en ligne — les séances à domicile s'ouvrent ensuite.",
+  "homeSessionRequiresLocation": "Une adresse de session est requise pour les séances à domicile.",
+  "sosNotAvailable": "Le SOS n'est disponible que pour une séance à domicile en cours.",
+  "safetyAlertNotFound": "Alerte de sécurité introuvable."
 }

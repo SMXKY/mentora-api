@@ -33,6 +33,18 @@ export const bookingConfig = createConfigGroup({
     description: "Default minimum student count suggested when a tutor creates a group session",
     default: 2,
   },
+  checkoutEscalationGraceMinutes: {
+    key: "booking.checkout_escalation_grace_minutes",
+    category: ConfigCategory.BOOKING,
+    description: "Minutes after the checkout nudge before an unresolved home session escalates to admin as a safety alert",
+    default: 30,
+  },
+  locationMismatchThresholdMeters: {
+    key: "booking.location_mismatch_threshold_meters",
+    category: ConfigCategory.BOOKING,
+    description: "Distance between a HOME session's booked address and a check-in/out location before it's flagged as a mismatch",
+    default: 500,
+  },
 });
 
 export type BookingConfig = Awaited<ReturnType<typeof bookingConfig.getAll>>;

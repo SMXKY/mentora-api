@@ -78,14 +78,20 @@ export const bookingController = {
 
   checkIn: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
-    const booking = await CheckinService.checkIn(ctx.userId!, req.params.id);
+    const booking = await CheckinService.checkIn(ctx.userId!, req.params.id, req.body);
     appResponder(StatusCodes.OK, { booking }, res);
   }),
 
   checkOut: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const ctx = buildContext(req, res);
-    const booking = await CheckinService.checkOut(ctx.userId!, req.params.id);
+    const booking = await CheckinService.checkOut(ctx.userId!, req.params.id, req.body);
     appResponder(StatusCodes.OK, { booking }, res);
+  }),
+
+  triggerSos: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    const alert = await CheckinService.triggerSos(ctx.userId!, req.params.id, req.body);
+    appResponder(StatusCodes.CREATED, { alert }, res);
   }),
 
   requestReschedule: catchAsync(async (req: Request, res: Response): Promise<void> => {
@@ -114,6 +120,27 @@ export const bookingController = {
   getAdminOne: catchAsync(async (req: Request, res: Response): Promise<void> => {
     const booking = await BookingService.getAdminBooking(req.params.id);
     appResponder(StatusCodes.OK, { booking }, res);
+  }),
+
+  listLiveHomeSessions: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const sessions = await BookingService.listLiveHomeSessions();
+    appResponder(StatusCodes.OK, { sessions }, res);
+  }),
+
+  getDossier: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const dossier = await BookingService.getBookingDossier(req.params.id);
+    appResponder(StatusCodes.OK, { dossier }, res);
+  }),
+
+  listSafetyAlerts: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const result = await CheckinService.listSafetyAlerts(req.query as any);
+    appResponder(StatusCodes.OK, result.data, res, result.meta);
+  }),
+
+  resolveSafetyAlert: catchAsync(async (req: Request, res: Response): Promise<void> => {
+    const ctx = buildContext(req, res);
+    const alert = await CheckinService.resolveSafetyAlert(ctx.userId!, req.params.alertId, req.body.resolutionNote);
+    appResponder(StatusCodes.OK, { alert }, res);
   }),
 
   respondToReschedule: catchAsync(async (req: Request, res: Response): Promise<void> => {

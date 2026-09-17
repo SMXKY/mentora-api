@@ -117,6 +117,7 @@ for (const t of tutors) {
 const ROUTE_NAMES = [
   "POST /auth/staging/create",
   "PATCH /tutors/me",
+  "PATCH /users/me",
   "PATCH /users/me/profile-picture",
   "POST /tutors/me/intro-video",
   "POST /kyc/me/step-1",
@@ -187,7 +188,7 @@ export function setup() {
   console.log(`[setup] ${Object.keys(photoBinByFileName).length} unique photos preloaded from ${PHOTOS_DIR}`);
 
   const loginRes = http.post(
-    `${API}/auth/login`,
+    `${API}/auth/admin/login`,
     JSON.stringify({ identifier: STAGING_ADMIN_EMAIL, password: STAGING_ADMIN_PASSWORD }),
     jsonHeaders()
   );
@@ -267,10 +268,25 @@ export function createTutorFromRecord(data) {
         cityId: t.cityId,
         languages: t.languages,
         yearsOfExperience: t.yearsOfExperience,
+        // Required by evaluateCompletion's "pricing" item (accountCompletion.service.ts)
+        // — reads TutorProfile.minRateXaf/maxRateXaf directly, not the per-subject
+        // rates set later via PATCH /tutors/me/subjects/:subjectId after approval.
+        minRateXaf: t.ratePerOnlineHourXaf,
+        maxRateXaf: t.ratePerHomeHourXaf,
       }),
       jsonHeaders(tutorToken)
     );
     ok = verify("PATCH /tutors/me", res, { "status is 200": (r) => r.status === 200 });
+  });
+  if (!ok) return finishFailed(globalIndex, t, startedAt);
+
+  // Required by evaluateCompletion's "phone_number" item — a User-level
+  // field, not settable via PATCH /tutors/me. Synthesized here since the
+  // JSON only carries emergencyContactPhone (a different person).
+  group("phone", () => {
+    const phone = `+237${6 + (globalIndex % 4)}${String(10000000 + (globalIndex % 89999999)).padStart(8, "0")}`;
+    const res = http.patch(`${API}/users/me`, JSON.stringify({ phoneNumber: phone }), jsonHeaders(tutorToken));
+    ok = verify("PATCH /users/me", res, { "status is 200": (r) => r.status === 200 });
   });
   if (!ok) return finishFailed(globalIndex, t, startedAt);
 

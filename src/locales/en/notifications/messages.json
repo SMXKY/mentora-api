@@ -279,6 +279,30 @@
     "title": "New message from {{senderName}}",
     "body": "You have a new message from {{senderName}}."
   },
+  "session_sos_triggered": {
+    "title": "SOS triggered on a home session",
+    "body": "{{triggeredByName}} triggered SOS during a home session. Open the safety alert now."
+  },
+  "session_checkin_safety_flagged": {
+    "title": "Safety note flagged at check-in",
+    "body": "{{triggeredByName}} flagged a concern at check-in for a home session."
+  },
+  "session_location_mismatch": {
+    "title": "Check-in location doesn't match booking",
+    "body": "{{triggeredByName}} checked in away from the booked session address."
+  },
+  "session_checkout_nudge": {
+    "title": "Are you clear?",
+    "body": "Your home session ended a moment ago — tap to confirm you've checked out safely."
+  },
+  "session_checkout_escalated": {
+    "title": "Home session checkout overdue — no response",
+    "body": "No checkout and no response to the safety nudge. Review the session dossier now."
+  },
+  "safety_alert_resolved": {
+    "title": "Safety alert resolved",
+    "body": "An admin has resolved the safety alert on your recent home session."
+  },
   "other": {
     "title": "Notification",
     "body": "You have a new notification."

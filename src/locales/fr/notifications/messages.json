@@ -279,6 +279,30 @@
     "title": "Nouveau message de {{senderName}}",
     "body": "Vous avez un nouveau message de {{senderName}}."
   },
+  "session_sos_triggered": {
+    "title": "SOS déclenché lors d'une séance à domicile",
+    "body": "{{triggeredByName}} a déclenché le SOS pendant une séance à domicile. Ouvrez l'alerte de sécurité maintenant."
+  },
+  "session_checkin_safety_flagged": {
+    "title": "Signalement de sécurité à l'arrivée",
+    "body": "{{triggeredByName}} a signalé une préoccupation à l'arrivée pour une séance à domicile."
+  },
+  "session_location_mismatch": {
+    "title": "L'emplacement d'arrivée ne correspond pas à la réservation",
+    "body": "{{triggeredByName}} s'est enregistré loin de l'adresse de séance prévue."
+  },
+  "session_checkout_nudge": {
+    "title": "Tout va bien ?",
+    "body": "Votre séance à domicile s'est terminée il y a un instant — confirmez que vous êtes parti(e) en sécurité."
+  },
+  "session_checkout_escalated": {
+    "title": "Départ en retard — aucune réponse",
+    "body": "Aucun départ enregistré et aucune réponse à l'alerte de sécurité. Consultez le dossier de la séance maintenant."
+  },
+  "safety_alert_resolved": {
+    "title": "Alerte de sécurité résolue",
+    "body": "Un administrateur a résolu l'alerte de sécurité de votre récente séance à domicile."
+  },
   "other": {
     "title": "Notification",
     "body": "Vous avez une nouvelle notification."

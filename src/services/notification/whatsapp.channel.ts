@@ -87,6 +87,46 @@ export async function sendWhatsappChannel(
   }
 }
 
+/**
+ * Sends a WhatsApp template message straight to a phone number that isn't
+ * a platform User — used for a tutor's emergency contact during a home-
+ * session safety event, who has no account, no opt-in flag, and no
+ * Notification row to key off. Same Graph API path as sendWhatsappChannel,
+ * deliberately bypassing the User/Notification machinery.
+ *
+ * Requires `templateName` to already be an approved template in WhatsApp
+ * Business Manager, same as every other template send in this file — this
+ * does not exist yet for safety alerts and must be created there first.
+ */
+export async function sendWhatsappToPhoneNumber(
+  phone: string,
+  templateName: string,
+  bodyText: string,
+  locale: "en" | "fr" = "en"
+): Promise<boolean> {
+  try {
+    return await callGraphApi({
+      messaging_product: "whatsapp",
+      to: phone,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: locale === "fr" ? "fr" : "en_US" },
+        components: [
+          { type: "body", parameters: [{ type: "text", text: bodyText }] },
+        ],
+      },
+    });
+  } catch (err) {
+    console.error({
+      event: "whatsapp_phone_send_failed",
+      templateName,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return false;
+  }
+}
+
 /** Sent immediately once a user completes the opt-in flow. */
 export async function sendOptInConfirmation(userId: string): Promise<void> {
   const user = await prisma.user.findUnique({
